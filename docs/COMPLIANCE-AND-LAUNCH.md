@@ -376,3 +376,16 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   was already off. Verified with `next build` (clean, whole app compiles) then `next start` + `curl -D-`:
   `/` and `/login` carry all five headers and no `X-Powered-By`/`Server`. CSP still deferred (the one
   remaining browser-header item) — it needs a nonce/hash strategy for Next's chunks.
+
+**2026-06-01 — Production hardening #4: fail-fast on a missing/weak JWT signing key (no insecure boot):**
+- `Program.cs` previously did `signingKey = jwt["SigningKey"] ?? "<baked-in dev key>"` — so a Production
+  deploy that forgot to set `Auth__Jwt__SigningKey` would have **silently booted on a publicly known
+  key**, letting anyone forge a JWT (incl. an Admin token) and fully bypass auth. This is the single
+  highest-severity misconfiguration a token-auth service can ship.
+- Now: in **Development** the dev key fallback is kept (zero-config local run). Outside Development the
+  app **throws at startup** if the key is missing/blank, still equals the dev key, or is shorter than
+  32 bytes (HMAC-SHA256 needs ≥256 bits) — it refuses to start rather than run insecure.
+- Live-verified (ASPNETCORE_ENVIRONMENT=Production): no key → `InvalidOperationException "…not configured"`
+  + **no "Now listening"**; key `"abc"` → `"…too short for HMAC-SHA256"`; Development → boots, `/health` 200.
+  `render.yaml` already sets a real `Auth__Jwt__SigningKey`, so this is a guardrail against future
+  misconfig, not a change to the current deploy. Build clean; engine tests unaffected (51/51).

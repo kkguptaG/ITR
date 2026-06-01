@@ -106,7 +106,30 @@ builder.Services.Scan(scan => scan
 
 // --- JWT Bearer auth ---
 var jwt = builder.Configuration.GetSection("Auth:Jwt");
-var signingKey = jwt["SigningKey"] ?? "tallyg-dev-signing-key-please-override-in-config-0123456789";
+const string DevSigningKey = "tallyg-dev-signing-key-please-override-in-config-0123456789";
+var signingKey = jwt["SigningKey"];
+if (builder.Environment.IsDevelopment())
+{
+    // Dev convenience: fall back to a well-known key so the app runs with zero config.
+    signingKey ??= DevSigningKey;
+}
+else
+{
+    // Production/Staging MUST supply a strong, secret key. Falling back to the baked-in dev
+    // key here would let anyone forge JWTs and impersonate any user/admin — so fail fast and
+    // loud at startup rather than boot an insecure service on a publicly known key.
+    if (string.IsNullOrWhiteSpace(signingKey) || signingKey == DevSigningKey)
+    {
+        throw new InvalidOperationException(
+            "Auth:Jwt:SigningKey is not configured. Set a strong secret via the Auth__Jwt__SigningKey " +
+            "environment variable / secret store before running outside Development.");
+    }
+    if (Encoding.UTF8.GetByteCount(signingKey) < 32)
+    {
+        throw new InvalidOperationException(
+            "Auth:Jwt:SigningKey is too short for HMAC-SHA256 — provide at least 32 bytes (256 bits) of entropy.");
+    }
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
