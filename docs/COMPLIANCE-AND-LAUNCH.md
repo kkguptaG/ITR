@@ -368,3 +368,11 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   **Next.js frontend** (`next.config` `headers()`), where clickjacking/MIME/referrer protections matter
   most for the actual HTML document. CSP needs per-app tuning (Next inline/runtime chunks) so it is
   deliberately deferred rather than shipped loose.
+- **DONE (same day):** frontend `next.config.mjs` now sets `headers()` for `/:path*` →
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`,
+  `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`, plus
+  `Strict-Transport-Security` (2y, incl. subdomains) **only in a production build**. `poweredByHeader`
+  was already off. Verified with `next build` (clean, whole app compiles) then `next start` + `curl -D-`:
+  `/` and `/login` carry all five headers and no `X-Powered-By`/`Server`. CSP still deferred (the one
+  remaining browser-header item) — it needs a nonce/hash strategy for Next's chunks.
