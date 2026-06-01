@@ -1138,6 +1138,12 @@ public sealed class ReturnService : IReturnService
             AdvanceTax = result.AdvanceTax,
             InterestPenalty = result.InterestPenalty,
             RefundOrPayable = result.RefundOrPayable,
+            AdjustedTotalIncome = result.AdjustedTotalIncome,
+            AlternativeMinimumTax = result.AlternativeMinimumTax,
+            AmtCreditGenerated = result.AmtCreditGenerated,
+            AmtCreditSetOff = result.AmtCreditSetOff,
+            Relief89 = result.Relief89,
+            Relief90And91 = result.Relief90And91,
             IsRecommended = true,
             TraceJson = JsonSerializer.Serialize(result.Trace, SnapshotJsonOptions),
             ComputedAt = _clock.UtcNow
@@ -1271,7 +1277,8 @@ public sealed class ReturnService : IReturnService
     private static TaxComputationDto ToComputationDto(TaxComputation c) => new(
         c.Id, c.Regime, c.GrossTotalIncome, c.TotalDeductions, c.TaxableIncome, c.TaxBeforeCess,
         c.Cess, c.Rebate87A, c.Surcharge, c.TotalTax, c.TdsPaid, c.AdvanceTax, c.InterestPenalty,
-        c.RefundOrPayable, c.IsRecommended, c.ComputedAt);
+        c.RefundOrPayable, c.AdjustedTotalIncome, c.AlternativeMinimumTax, c.AmtCreditGenerated,
+        c.AmtCreditSetOff, c.Relief89, c.Relief90And91, c.IsRecommended, c.ComputedAt);
 
     // --- misc helpers ---
 

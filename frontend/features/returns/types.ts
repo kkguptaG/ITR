@@ -49,6 +49,13 @@ export interface TaxComputationDto {
   interestPenalty: DecimalString;
   /** Positive = refund due, negative = payable. */
   refundOrPayable: DecimalString;
+  // AMT (s.115JC/JD) + reliefs (s.89/90/91); "0" when not applicable.
+  adjustedTotalIncome: DecimalString;
+  alternativeMinimumTax: DecimalString;
+  amtCreditGenerated: DecimalString;
+  amtCreditSetOff: DecimalString;
+  relief89: DecimalString;
+  relief90And91: DecimalString;
   isRecommended: boolean;
   computedAt: IsoDateTime;
 }

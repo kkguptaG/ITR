@@ -151,14 +151,13 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     advanceTax: num(c.advanceTax),
     interestPenalty: num(c.interestPenalty),
     refundOrPayable: num(c.refundOrPayable),
-    // The persisted snapshot DTO doesn't carry the AMT/relief breakdown (only the live /tax/compute
-    // response does); default to 0 so they're simply hidden when rendering a saved snapshot.
-    adjustedTotalIncome: 0,
-    alternativeMinimumTax: 0,
-    amtCreditGenerated: 0,
-    amtCreditSetOff: 0,
-    relief89: 0,
-    relief90And91: 0,
+    // AMT/relief breakdown now persisted on the snapshot too.
+    adjustedTotalIncome: num(c.adjustedTotalIncome),
+    alternativeMinimumTax: num(c.alternativeMinimumTax),
+    amtCreditGenerated: num(c.amtCreditGenerated),
+    amtCreditSetOff: num(c.amtCreditSetOff),
+    relief89: num(c.relief89),
+    relief90And91: num(c.relief90And91),
     trace: [],
   };
 }

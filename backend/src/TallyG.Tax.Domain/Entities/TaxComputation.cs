@@ -34,6 +34,14 @@ public class TaxComputation : BaseEntity, ITenantScoped
     /// <summary>Positive ⇒ refund, negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; set; }
 
+    // AMT (s.115JC/JD) + reliefs (s.89/90/91); 0 when not applicable.
+    public decimal AdjustedTotalIncome { get; set; }
+    public decimal AlternativeMinimumTax { get; set; }
+    public decimal AmtCreditGenerated { get; set; }
+    public decimal AmtCreditSetOff { get; set; }
+    public decimal Relief89 { get; set; }
+    public decimal Relief90And91 { get; set; }
+
     public bool IsRecommended { get; set; }
 
     /// <summary>Line-by-line computation trace (jsonb on Postgres, text on Sqlite).</summary>

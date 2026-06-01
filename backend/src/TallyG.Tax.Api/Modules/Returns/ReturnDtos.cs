@@ -291,5 +291,11 @@ public sealed record TaxComputationDto(
     decimal AdvanceTax,
     decimal InterestPenalty,
     decimal RefundOrPayable,
+    decimal AdjustedTotalIncome,
+    decimal AlternativeMinimumTax,
+    decimal AmtCreditGenerated,
+    decimal AmtCreditSetOff,
+    decimal Relief89,
+    decimal Relief90And91,
     bool IsRecommended,
     DateTimeOffset ComputedAt);
