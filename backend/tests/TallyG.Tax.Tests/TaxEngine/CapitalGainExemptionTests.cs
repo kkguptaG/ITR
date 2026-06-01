@@ -65,6 +65,21 @@ public class CapitalGainExemptionTests
     }
 
     [Fact]
+    public void Section54EC_does_not_apply_to_equity_ltcg()
+    {
+        // 54EC is for land/building only; tagging it on equity LTCG must have no effect.
+        var g = new CapitalGainInput(CapitalGainAssetType.ListedEquity, CapitalGainTerm.Long, null,
+            SaleConsideration: 10_000_000m, CostOfAcquisition: 0m, CostOfImprovement: 0m, ExpensesOnTransfer: 0m,
+            ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            FairMarketValueOnGrandfatherDate: null, IndexedCost: null,
+            ExemptionSection: "54EC", ReinvestmentAmount: 6_000_000m);
+
+        var r = CapitalGainsCalculator.Compute(new[] { g }, Rules);
+
+        r.Buckets.Ltcg112AGross.Should().Be(10_000_000m); // exemption ignored
+    }
+
+    [Fact]
     public void Reinvestment_exemption_does_not_apply_to_short_term_gains()
     {
         // Listed-equity STCG (s.111A) ₹2L; a "54" tag must have no effect (54 is LTCG-only).

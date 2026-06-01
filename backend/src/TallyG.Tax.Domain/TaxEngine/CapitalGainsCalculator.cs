@@ -201,6 +201,12 @@ public static class CapitalGainsCalculator
             case "54":
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
             case "54EC":
+                // s.54EC applies only to LTCG on land or building — ignore it for any other asset.
+                if (g.AssetType != CapitalGainAssetType.ImmovableProperty)
+                {
+                    return 0m;
+                }
+
                 return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
             case "54F":
             {
