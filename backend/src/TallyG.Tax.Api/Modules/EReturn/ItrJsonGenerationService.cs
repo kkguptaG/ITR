@@ -301,7 +301,13 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             ["Surcharge"] = R(surcharge),
             ["EducationCess"] = R(c?.Cess ?? 0m),
             ["GrossTaxLiability"] = R(c?.TotalTax ?? 0m),
-            ["NetTaxLiability"] = R(c?.TotalTax ?? 0m),
+            ["ReliefUs89"] = R(c?.Relief89 ?? 0m),               // arrears (Form 10E)
+            ["ReliefUs90_91"] = R(c?.Relief90And91 ?? 0m),       // foreign tax credit
+            ["NetTaxLiability"] = R(c?.TotalTax ?? 0m),          // already net of reliefs + AMT determination
+            ["AlternateMinimumTax"] = R(c?.AlternativeMinimumTax ?? 0m),   // Schedule AMT (s.115JC); 0 when N/A
+            ["AdjustedTotalIncomeForAMT"] = R(c?.AdjustedTotalIncome ?? 0m),
+            ["AmtCreditGeneratedUs115JD"] = R(c?.AmtCreditGenerated ?? 0m),
+            ["AmtCreditSetOffUs115JD"] = R(c?.AmtCreditSetOff ?? 0m),
             ["IntrstPay"] = R(c?.InterestPenalty ?? 0m),       // total interest u/s 234A/B/C (per-section split lives in the trace)
             ["AggregateLiability"] = R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m)),
             ["TotalTaxPayable"] = R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m))  // tax + 234 interest
