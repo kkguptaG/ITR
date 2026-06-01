@@ -309,6 +309,7 @@ public sealed class RuleSet
             Ltcg112RateWithIndexation = GetDecimal(c, "ltcg_112_rate_with_indexation") ?? 0.20m,
             Ltcg112RateWithoutIndexation = GetDecimal(c, "ltcg_112_rate_without_indexation") ?? 0.125m,
             Crypto115BbhRate = GetDecimal(c, "crypto_115bbh_rate") ?? 0.30m,
+            Section54EcCap = GetDecimal(c, "section_54ec_cap") ?? 5000000m,
             GrandfatherDate112A = GetDateOnly(c, "grandfather_date_112a"),
             PropertyIndexationCutoff = GetDateOnly(c, "property_indexation_cutoff"),
             HoldingMonths = holding,
@@ -539,6 +540,10 @@ public sealed class CapitalGainRules
     public decimal Ltcg112RateWithIndexation { get; init; } = 0.20m;
     public decimal Ltcg112RateWithoutIndexation { get; init; } = 0.125m;
     public decimal Crypto115BbhRate { get; init; } = 0.30m;
+
+    /// <summary>s.54EC investment cap (NHAI/REC bonds): ₹50,00,000.</summary>
+    public decimal Section54EcCap { get; init; } = 5000000m;
+
     public DateOnly? GrandfatherDate112A { get; init; }
     public DateOnly? PropertyIndexationCutoff { get; init; }
     public IReadOnlyDictionary<string, int> HoldingMonths { get; init; } = new Dictionary<string, int>();

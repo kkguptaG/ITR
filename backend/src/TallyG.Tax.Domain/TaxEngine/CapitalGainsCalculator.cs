@@ -19,7 +19,7 @@ public static class CapitalGainsCalculator
         var lines = new List<CapitalGainLine>(gains.Count);
         foreach (var g in gains)
         {
-            lines.Add(ComputeLine(g, rules));
+            lines.Add(ApplyReinvestmentExemption(ComputeLine(g, rules), g, rules));
         }
 
         // --- Intra-head set-off (Ch.3 §3.6.4), applied on the special-rate buckets ---
@@ -162,6 +162,61 @@ public static class CapitalGainsCalculator
         return new CapitalGainLine(g.AssetType, g.Term, "slab",
             Cost: g.CostOfAcquisition, GrandfatheredCost: null, Gain: gain, Rate: 0m,
             Note: "Capital gain taxed at slab rate");
+    }
+
+    /// <summary>
+    /// Apply a reinvestment exemption (s.54 / 54F / 54EC) — or the manually-entered exemption amount —
+    /// to a LONG-term gain line, reducing its taxable gain. These exemptions apply only to LTCG (s.112 /
+    /// s.112A), never to STCG, slab-rate gains or VDA. The s.112A ₹1.25L exemption is separate and is
+    /// applied later on the aggregated bucket.
+    /// </summary>
+    private static CapitalGainLine ApplyReinvestmentExemption(CapitalGainLine line, CapitalGainInput g, CapitalGainRules rules)
+    {
+        if (line.Term != CapitalGainTerm.Long || (line.Section != "112" && line.Section != "112A_gross") || line.Gain <= 0m)
+        {
+            return line;
+        }
+
+        var exemption = ComputeExemption(g, line.Gain, rules);
+        if (exemption <= 0m)
+        {
+            return line;
+        }
+
+        var label = string.IsNullOrWhiteSpace(g.ExemptionSection) ? "exemption" : $"s.{g.ExemptionSection.Trim()} exemption";
+        return line with
+        {
+            Gain = TaxMath.NonNegative(line.Gain - exemption),
+            Note = $"{line.Note}; less {label} ₹{exemption:N0}",
+        };
+    }
+
+    /// <summary>Compute the LTCG exemption: 54/54EC cap the reinvested amount (54EC also at ₹50L); 54F is
+    /// proportionate to net consideration reinvested; no section ⇒ the manual <c>ExemptionAmount</c>.</summary>
+    private static decimal ComputeExemption(CapitalGainInput g, decimal gain, CapitalGainRules rules)
+    {
+        var sec = (g.ExemptionSection ?? string.Empty).Trim().ToUpperInvariant().Replace("U/S", string.Empty).Replace("S.", string.Empty).Trim();
+        switch (sec)
+        {
+            case "54":
+                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+            case "54EC":
+                return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
+            case "54F":
+            {
+                var netConsideration = TaxMath.NonNegative(g.SaleConsideration - g.ExpensesOnTransfer);
+                if (netConsideration <= 0m || g.ReinvestmentAmount <= 0m)
+                {
+                    return 0m;
+                }
+
+                var proportion = Math.Min(1m, g.ReinvestmentAmount / netConsideration);
+                return TaxMath.NonNegative(gain * proportion);
+            }
+            default:
+                // No section supplied: honour the manually-entered exemption amount (previously ignored).
+                return Math.Min(gain, TaxMath.NonNegative(g.ExemptionAmount));
+        }
     }
 
     private static decimal SumSection(IReadOnlyList<CapitalGainLine> lines, string section)

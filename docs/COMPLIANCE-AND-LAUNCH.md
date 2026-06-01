@@ -459,3 +459,19 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
 - **Chapter VI-A depth is now complete** for the common sections: 80C/80CCD(1B)/80CCD(2)/80D/80TTA/80TTB
   (caps), 80U/80DD (fixed), 80DDB (capped), 80EEA/80EEB (1.5L), 80GG (least-of), 80G (qualifying limit),
   80E + profit-linked (full). Rarer sections (80GGA/80GGC/80RRB/…) still flow through the uncapped bucket.
+
+**2026-06-01 — Capital-gains reinvestment exemptions (s.54 / 54F / 54EC) + a latent-bug fix:**
+- **Bug fixed:** the capital-gains sub-engine previously *ignored* every `ExemptionAmount` — the field was
+  captured but never reduced the gain. It is now applied to long-term gains (s.112 / s.112A lines).
+- **New computation** on `CapitalGainInput` (`ExemptionSection` + `ReinvestmentAmount`): **s.54** (residential
+  house) and **s.54EC** (land/building → NHAI/REC bonds) exempt the reinvested amount up to the gain — 54EC
+  additionally capped at **₹50L** (rule-set `capital_gains.section_54ec_cap`); **s.54F** (any asset) is
+  *proportionate* — gain × (amount reinvested ÷ net consideration). Exemptions apply to LTCG only (never
+  STCG/slab/VDA); the s.112A ₹1.25L exemption stays separate, applied on the aggregated bucket afterward.
+- Exposed on the ad-hoc `/tax/compute` DTO (`CapitalGainInputDto`); the persisted return path already feeds
+  the now-honoured manual `ExemptionAmount`. Persisting `ExemptionSection`/`ReinvestmentAmount` on the
+  capital-gain entity + capture UI is the follow-up.
+- Verified: **5 new tests** (engine **79 → 84**, all green) — 54EC ₹50L cap, 54 full exemption, 54F 50%
+  proportion, manual exemption now applied, and STCG unaffected.
+- PENDING CA REVIEW: the engine does not yet hard-gate each section to its eligible asset class (e.g. 54EC
+  to land/building only) — it trusts the section the filer selects. Documented simplification.

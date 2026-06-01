@@ -226,7 +226,7 @@ public sealed class TaxService : ITaxService
             CapitalGains = (r.CapitalGains ?? Array.Empty<CapitalGainInputDto>()).Select(c => new CapitalGainInput(
                 c.AssetType, c.Term, c.TaxSection, c.SaleConsideration, c.CostOfAcquisition, c.CostOfImprovement,
                 c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate,
-                c.FairMarketValueOnGrandfatherDate, c.IndexedCost)).ToList(),
+                c.FairMarketValueOnGrandfatherDate, c.IndexedCost, c.ExemptionSection, c.ReinvestmentAmount)).ToList(),
             BusinessIncomes = (r.BusinessIncomes ?? Array.Empty<BusinessIncomeInputDto>()).Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.DigitalReceipts, b.CashReceipts, b.NetProfit, b.Speculative)).ToList(),
             OtherIncomes = (r.OtherIncomes ?? Array.Empty<OtherIncomeInputDto>()).Select(o => new OtherIncomeInput(o.Label, o.Amount, o.Nature)).ToList(),

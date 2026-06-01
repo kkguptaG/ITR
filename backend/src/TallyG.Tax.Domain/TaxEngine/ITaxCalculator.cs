@@ -141,7 +141,11 @@ public sealed record CapitalGainInput(
     /// <summary>FMV on the 112A grandfathering date (31-Jan-2018) for pre-2018 listed equity.</summary>
     decimal? FairMarketValueOnGrandfatherDate = null,
     /// <summary>Indexed cost of acquisition for property eligible for the 20%-with-indexation option.</summary>
-    decimal? IndexedCost = null);
+    decimal? IndexedCost = null,
+    /// <summary>Reinvestment-exemption section for a LONG-term gain: "54" / "54F" / "54EC" (null ⇒ use the manual <see cref="ExemptionAmount"/>).</summary>
+    string? ExemptionSection = null,
+    /// <summary>Amount reinvested (new house u/s 54/54F, or specified bonds u/s 54EC) driving the computed exemption.</summary>
+    decimal ReinvestmentAmount = 0m);
 
 public sealed record BusinessIncomeInput(
     bool IsPresumptive,

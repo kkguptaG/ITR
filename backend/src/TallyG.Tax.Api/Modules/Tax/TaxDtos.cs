@@ -84,7 +84,9 @@ public sealed record CapitalGainInputDto(
     DateOnly? AcquisitionDate,
     DateOnly? TransferDate,
     decimal? FairMarketValueOnGrandfatherDate,
-    decimal? IndexedCost);
+    decimal? IndexedCost,
+    string? ExemptionSection = null,
+    decimal ReinvestmentAmount = 0m);
 
 public sealed record BusinessIncomeInputDto(
     bool IsPresumptive,
