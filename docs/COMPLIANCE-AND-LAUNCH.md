@@ -179,3 +179,148 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   business/profession incl. F&O). Verified live: both produce the correct form envelope + schedules.
   Schedules remain provisional / reconcile-with-official, same as ITR-1/4.
 - Backend build 0/0; frontend `next build` clean (`/filings` route bundled).
+
+**2026-06-01 — Deploy prep + private-preview lock-down:**
+- **Hosting decision:** Hostinger shared hosting (hPanel) cannot run ASP.NET Core 9 + Next.js SSR +
+  PostgreSQL, so the app deploys to **Render** (managed: Postgres + two Docker web services) while
+  Hostinger keeps the **domain + DNS** for `itrhelp.com`. Runbook: `infra/DEPLOY-RENDER.md`;
+  blueprint: `render.yaml`. (Production DPDP residency → move to an India region later.)
+- **Managed-Postgres fix:** `NormalizePostgresConnectionString` converts Render's
+  `postgresql://user:pass@host/db` URI to Npgsql keyword format (SslMode.Prefer + TrustServerCertificate),
+  since Npgsql doesn't parse the URI form natively.
+- **Lock-down (so a public staging URL is not freely self-registerable), verified live in Production mode:**
+  - `Auth__AllowSelfRegistration=false` → `RegisterAsync`, the signup-OTP path, and the
+    create-on-verify path all refuse with **403 `AUTH.REGISTRATION_CLOSED`**. Only the seeded
+    `admin@itrhelp.com` / `demo@itrhelp.com` exist.
+  - `ASPNETCORE_ENVIRONMENT=Production` → `devOtp` is **null** in API responses; the login OTP is
+    only written to the server log (`[OTP STUB] ... code=######`), which the operator reads from
+    Render's **Logs** tab.
+  - Smoke (Production + SQLite, the flag set): register → 403, signup-OTP → 403, login-OTP for the
+    seeded demo → 200 with `devOtp:null` and the code present in the log. Backend build 0/0.
+  - `render.yaml` corrected to the keys the code actually reads: `Auth__Jwt__SigningKey`
+    (Render `generateValue`), `Auth__Jwt__Issuer`, `Auth__Jwt__Audience` (the earlier `Jwt__Secret`
+    keys were dead config).
+- **Source control:** the project was pushed to GitHub `kkguptaG/ITR` (main). NOTE: the assistant's
+  own `git push` / `remote set-url` were blocked by the safety classifier (unverified external
+  target); the user runs all pushes themselves. **Keep the repo Private** until the compliance gates
+  are done. Re-enabling sign-up (`Auth__AllowSelfRegistration=true`) and wiring a real SMS/email OTP
+  provider are launch-gated, not preview tasks.
+
+**2026-06-01 — Depth build-out #1: Schedule S salary breakup + s.234A/B/C interest (vs a mature CA suite):**
+- Context: benchmarked our computation/capture depth against a mature CA desktop product (CompuTax).
+  Honest gap audit recorded; prioritised the two highest-frequency gaps first.
+- **Salary breakup (Schedule S):** new `SalaryComponent` child of `SalaryDetail` + pure `SalaryRollup`
+  (components → flat Gross/Perquisites/HRA-exempt/ExemptAllowances the engine already consumes, so the
+  computation + ITR-JSON are unchanged). Frontend salary form gained a CompuTax-style grid
+  (Particular · Type 17(1)/17(2)/17(3)/s.10 · Total · Exempt) with a live rollup summary. **Fixed a
+  real bug:** profits-in-lieu (17(3)) was dropped before tax — now folded into the taxable base in
+  both engine-input mappers + Schedule S. Live-verified: 4-component breakup → Gross ₹8.4L / Perq
+  ₹1.2L / PIL ₹1L / HRA-exempt ₹1.44L; old-regime tax ₹89,128, new ₹0.
+- **Interest u/s 234A/B/C:** pure `InterestCalculator` (rate + s.208 threshold data-driven from the
+  rule-set, defaulted 1% / ₹10,000). 234A late-filing, 234B advance-tax default (≥90% test), 234C
+  deferment (installment-wise, with safe-harbour; exact when payment dates are supplied, else the
+  honest "no advance tax paid on time" assumption with a trace note). Wired into the engine
+  (InterestPenalty + refund/payable now reflect it) with dates threaded from the AY via TaxService.
+  Live-verified (as-of today): old regime ₹12L → 234B ₹3,276 + 234C ₹8,272; new regime ₹0 → no interest.
+- Tests 39/39 green (added rollup + 234A/B/C). Still provisional / pending-CA. **Known next gaps**
+  (from the audit): AMT 115JC/AMTC, relief 89/90/91, loss carry-forward, agri-income head, lottery
+  115BB, full salary-component regime gating, and quarterly advance-tax capture for exact 234C.
+- Build note: lingering `dotnet run` hosts held `Domain.dll` and caused a stale incremental build
+  (engine ran old code) — kill stray `dotnet` + `dotnet build -t:Rebuild` before verifying.
+
+**2026-06-01 — Depth build-out #2: Income-from-Other-Sources segregation (115BB + agri):**
+- The audit flagged Other Sources as a "black box". Added a `nature` tag (normal / interest / dividend /
+  lottery_115bb / agricultural) carried in `IncomeSource.SourceMetaJson` + the ad-hoc calculator DTO,
+  threaded to the engine in both TaxService and ReturnService (via `ExtractNature`).
+- **Winnings / casual income (s.115BB):** flat 30% (rule-set `casual_income_115bb_rate`), no deductions,
+  no s.87A against it; counted in GTI + total income for surcharge/87A gating but taxed separately.
+- **Agricultural income:** exempt (not in GTI) but partial-integration aggregated for rate —
+  slabTax(normal+agri) − slabTax(agri+basic-exemption); the offset surfaces as the
+  "Rebate on agricultural income" trace line (matches the CompuTax computation sheet). Threshold ₹5,000;
+  basic-exemption derived from the regime's first 0% slab. Applies in both regimes.
+- Frontend: Other-income form gained a **Nature** dropdown (stores `{"nature":…}` in SourceMetaJson).
+- Tests 44/44. Live-verified end-to-end: salary 10L + lottery 2L + agri 5L → Casual115BB tax ₹60,000,
+  agri rebate ₹62,500, totalTax ₹2,54,800, composing correctly with 234B/234C interest. Provisional / pending-CA.
+
+**2026-06-01 — Depth build-out #3: brought-forward loss set-off (HP + business):**
+- Engine sets off brought-forward (earlier-year) **house-property** and **non-speculative business**
+  losses against the SAME head's current-year income only; the unutilised part is reported as still
+  carried forward (trace: `*.BfLossSetOff` / `*.BfLossCarryForward`). Losses never cross heads.
+- Inputs on `TaxComputationInput` + the ad-hoc `TaxCalculatorRequest`. Tests 47/47 (HP set-off,
+  business set-off + carry-forward remainder, cross-head isolation). Live-verified via /tax/calculator:
+  ₹3L business profit + ₹5L b/f loss → GTI ₹0, ₹2L carried forward.
+- **Follow-ups (noted):** returns-level capture + UI for b/f losses; capital-loss set-off (STCL/LTCL vs
+  the special-rate buckets); speculative-loss separation. Still provisional / pending-CA.
+
+**2026-06-01 — Depth build-out #4: return-level prepaid-tax + b/f-loss capture (correctness fix):**
+- **Bug fixed:** `BuildInputFromReturnAsync` hard-coded TDS/TCS/advance/SA tax to **₹0**, so every saved
+  return overstated tax payable AND 234 interest (computed on the full tax, ignoring TDS already deducted).
+- Added `TdsPaid / TcsPaid / AdvanceTaxPaid / SelfAssessmentTaxPaid` + `BroughtForwardHousePropertyLoss /
+  BusinessLoss` to `TaxReturn` + `UpdateReturnRequest` (PATCH) + `ReturnDetailDto`; both engine-input
+  builders (TaxService + ReturnService) now read them. (New columns → dev Sqlite recreated; Postgres prod
+  needs EF migrations — next.)
+- Live-verified: 12L salary + ₹1.5L TDS → tax ₹1,63,800, TDS credited, 234 interest ₹973 (was ~₹11.5k),
+  net payable −₹14,773 (was −₹1,63,800+). b/f business loss stored + carries forward when no business income.
+- **Follow-up:** frontend "Taxes paid & brought-forward losses" capture card (API-complete; UI next).
+- Infra note: a stale **`TallyG.Tax.Api.exe`** (not `dotnet.exe`) held port 5080 + `Domain.dll` — kill
+  that process name too, not just `dotnet`, before rebuild/restart.
+
+**2026-06-01 — Depth build-out #5: capital-loss set-off + Summary capture card:**
+- **Capture card:** the Summary step now has a "Taxes already paid & brought-forward losses" card
+  (TDS/TCS/advance/SA + b/f HP/business loss) that PATCHes the return and recomputes — making the #4
+  capture usable in the UI, not just the API.
+- **Capital-loss set-off:** brought-forward STCL (vs slab-STCG → 111A → 112 → 112A) and LTCL (vs 112 →
+  112A only) set off against the rate-specific CG buckets in a documented tax-minimising order; VDA
+  (115BBH) never reduced; unused carries forward (trace `CG.Bf{Stcl,Ltcl}{SetOff,CarryForward}`).
+  Inputs on `TaxComputationInput` + ad-hoc `TaxCalculatorRequest`. Tests 50/50 (STCL→111A ₹23,400,
+  LTCL→112 ₹39,000, LTCL-can't-touch-STCG ₹31,200 + c/f). Set-off order pending CA validation.
+- **Follow-ups:** returns-level capture + card fields for the two CG losses (mechanical); EF Core
+  migrations for Postgres schema evolution (next). Still provisional / pending-CA.
+
+**2026-06-01 — Production hardening #1: EF Core migrations (Postgres schema evolution):**
+- **Why:** the Postgres prod path relied on `EnsureCreated`, which never ALTERs an existing DB — so any
+  new table/column (salary_components, the tax_returns capture columns) would silently fail to deploy
+  (the exact bug hit twice locally). Migrations fix this; Program.cs already prefers `Migrate()` when
+  migrations exist.
+- Added `dotnet-ef` as a **local tool** (`.config/dotnet-tools.json`, v9.0.6); referenced
+  `Microsoft.EntityFrameworkCore.Design` in the Api (startup) project + added `compile` asset in
+  Infrastructure; new `AppDbContextDesignTimeFactory` pins **Npgsql + snake_case** so migrations target
+  the production schema (dev Sqlite is untouched, still `EnsureCreated`).
+- Generated `Persistence/Migrations/InitialCreate` — full current model, Postgres `jsonb` + snake_case,
+  incl. `salary_components` + `tax_returns.{tds_paid,advance_tax_paid,self_assessment_tax_paid,
+  brought_forward_house_property_loss,brought_forward_business_loss}`. `dotnet ef migrations list` shows it;
+  solution builds 0/0; 50/50 tests green.
+- **Deploy caveat:** on Render Postgres, `Migrate()` applies it to a FRESH DB cleanly. If a Postgres DB
+  was already created earlier via `EnsureCreated` (untracked by `__EFMigrationsHistory`), drop it (or
+  baseline) before the first migrated deploy. New schema changes from now on = `dotnet ef migrations add`.
+- Not applied to a live Postgres here (no local Postgres) — generation + compile + model-snapshot verified;
+  apply happens on deploy.
+
+**2026-06-01 — Code review of the session's changes (7 finder angles, high effort) + fixes:**
+- **CRITICAL regression fixed:** the flat-salary entry path always sends `components: []`, and
+  `ApplySalaryBreakup` treated a non-null (even empty) list as "rebuild from breakup" → rolled up an
+  empty set → zeroed Gross/HRA/perquisites. Every plain-entry salary return would have been zeroed.
+  Fix: treat null OR empty components as "keep the flat fields". Live-verified (gross ₹12L preserved).
+- **Correctness fixed:** s.234A base wrongly subtracted self-assessment tax (which is paid at/after the
+  due date — exactly what 234A penalises). Now base = tax − TDS/TCS − advance only. Regression test added.
+- **Cleanup:** removed a duplicate unused `UpdateReturnBody` type (frontend returns/types.ts). Build/typecheck confirm it was unused.
+- Tests 51/51; backend + frontend build clean.
+- **Review findings queued (next):** (1) b/f CAPITAL losses (STCL/LTCL) are reachable only via the ad-hoc
+  calculator — add them to TaxReturn + the capture card; (2) `ReturnService.BuildComputationInput`
+  (filing-snapshot path) doesn't thread the 234 interest dates / CG losses, so the snapshot can disagree
+  with `/tax/compute` — centralise the TaxReturn→input mapping; (3) dedupe `ExtractNature` (copied in two
+  services). **Documented limitations (need more capture / CA sign-off):** 234B should stop interest at the
+  self-assessment payment date (we capture amount, not date); 234C proviso excluding late-year CG/115BB
+  income; 87A interaction with agri partial-integration; salary-component row ordering (CreatedAt ties).
+
+**2026-06-01 — Review follow-ups closed (capital-loss capture + path consistency + dedup):**
+- **Capital losses on real returns:** added `BroughtForwardShortTermCapitalLoss` /
+  `BroughtForwardLongTermCapitalLoss` to `TaxReturn` + `UpdateReturnRequest` + `ReturnDetailDto` + the
+  Summary capture card. New EF migration `AddCapitalLossCarryForward` (Npgsql). Live-verified on a return:
+  LTCG-112 ₹4L + b/f LTCL ₹1L → taxed on ₹3L, GTI ₹3L, tax ₹39,000.
+- **Path consistency:** extracted `TaxComputationInputFactory.FromReturn(...)` as the SINGLE
+  `TaxReturn → TaxComputationInput` mapper, used by BOTH TaxService (/tax/compute) and ReturnService
+  (filing snapshot) — they no longer diverge on prepaid taxes, b/f losses, 234 dates or Other-Sources
+  nature; a new input field is edited in one place. (Snapshot age still defaults to an adult slab — documented.)
+- **Dedup:** `ExtractNature` now lives once in the factory (was copied in two services).
+- Tests 51/51; backend + frontend build clean; live compute on a real return reflects all of the above.

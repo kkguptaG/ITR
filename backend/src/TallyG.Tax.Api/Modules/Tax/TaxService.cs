@@ -6,6 +6,7 @@ using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
 using TallyG.Tax.Domain.TaxEngine;
 using TallyG.Tax.Infrastructure.Persistence;
+using TallyG.Tax.Api.Common;
 
 namespace TallyG.Tax.Api.Modules.Tax;
 
@@ -204,34 +205,9 @@ public sealed class TaxService : ITaxService
 
         var age = await ResolveAgeAsync(ret, ct);
 
-        return new TaxComputationInput
-        {
-            AssessmentYearCode = ayCode,
-            RuleSetVersion = ret.RuleSetVersion,
-            RulesJson = rulesJson,
-            Age = age,
-            Salaries = salaries.Select(s => new SalaryInput(
-                s.Employer, s.Gross, s.Perquisites, s.ExemptAllowances, s.HraExemption, s.ProfessionalTax)).ToList(),
-            HouseProperties = houses.Select(h => new HousePropertyInput(
-                h.Type, h.AnnualValue, h.MunicipalTaxPaid, h.InterestOnLoan)).ToList(),
-            CapitalGains = gains.Select(c => new CapitalGainInput(
-                c.AssetType, c.Term, c.TaxSection, c.SalePrice, c.CostOfAcquisition, c.CostOfImprovement,
-                c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate,
-                FairMarketValueOnGrandfatherDate: null,
-                IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null)).ToList(),
-            BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
-                b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
-                b.NetProfit, b.SpeculativeFlag)).ToList(),
-            OtherIncomes = incomeSources
-                .Where(s => s.Type == IncomeType.OtherSources)
-                .Select(s => new OtherIncomeInput(s.Label ?? "Other", s.Amount)).ToList(),
-            Deductions = deductions.Select(d => new DeductionInput(d.Section, d.Amount, d.SubType)).ToList(),
-            // TDS/advance come from the documents/AIS pass; ad-hoc callers can pass them directly.
-            TdsPaid = 0m,
-            TcsPaid = 0m,
-            AdvanceTaxPaid = 0m,
-            SelfAssessmentTaxPaid = 0m,
-        };
+        return TaxComputationInputFactory.FromReturn(
+            ret, ayCode, rulesJson, age, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
+            salaries, houses, gains, businesses, incomeSources, deductions);
     }
 
     private static TaxComputationInput BuildInputFromAdHoc(
@@ -253,12 +229,16 @@ public sealed class TaxService : ITaxService
                 c.FairMarketValueOnGrandfatherDate, c.IndexedCost)).ToList(),
             BusinessIncomes = (r.BusinessIncomes ?? Array.Empty<BusinessIncomeInputDto>()).Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.DigitalReceipts, b.CashReceipts, b.NetProfit, b.Speculative)).ToList(),
-            OtherIncomes = (r.OtherIncomes ?? Array.Empty<OtherIncomeInputDto>()).Select(o => new OtherIncomeInput(o.Label, o.Amount)).ToList(),
+            OtherIncomes = (r.OtherIncomes ?? Array.Empty<OtherIncomeInputDto>()).Select(o => new OtherIncomeInput(o.Label, o.Amount, o.Nature)).ToList(),
             Deductions = (r.Deductions ?? Array.Empty<DeductionInputDto>()).Select(d => new DeductionInput(d.Section, d.ClaimedAmount, d.SubType)).ToList(),
             TdsPaid = r.TdsPaid,
             TcsPaid = r.TcsPaid,
             AdvanceTaxPaid = r.AdvanceTaxPaid,
             SelfAssessmentTaxPaid = r.SelfAssessmentTaxPaid,
+            BroughtForwardHousePropertyLoss = r.BroughtForwardHousePropertyLoss,
+            BroughtForwardBusinessLoss = r.BroughtForwardBusinessLoss,
+            BroughtForwardShortTermCapitalLoss = r.BroughtForwardShortTermCapitalLoss,
+            BroughtForwardLongTermCapitalLoss = r.BroughtForwardLongTermCapitalLoss,
         };
     }
 

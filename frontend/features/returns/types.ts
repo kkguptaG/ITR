@@ -76,7 +76,17 @@ export interface ReturnDetailDto {
   businessIncomes: unknown[];
   deductions: unknown[];
   latestComputation: TaxComputationDto | null;
+  // Prepaid taxes (credits) + brought-forward losses captured on the return.
+  tdsPaid: number;
+  tcsPaid: number;
+  advanceTaxPaid: number;
+  selfAssessmentTaxPaid: number;
+  broughtForwardHousePropertyLoss: number;
+  broughtForwardBusinessLoss: number;
+  broughtForwardShortTermCapitalLoss: number;
+  broughtForwardLongTermCapitalLoss: number;
 }
+
 
 /** POST /returns body. itrType/regime optional — auto-selector classifies later. */
 export interface CreateReturnBody {

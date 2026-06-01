@@ -32,7 +32,9 @@ git push -u origin main
 2. **New + → Blueprint** → pick the `tallyg-tax` repo → Render reads **`render.yaml`** and shows:
    a Postgres `tallyg-db`, a web service `tallyg-api`, a web service `tallyg-web`.
 3. **Apply** → Render builds both Docker images and provisions Postgres. First build ≈ 5–10 min.
-   - The API auto-seeds on boot (admin@tallyg.test / demo@tallyg.test; OTP returned as `devOtp`).
+   - The API auto-seeds on boot (admin@itrhelp.com / demo@itrhelp.com). Self-registration is **off**
+     and `devOtp` is **hidden** (Production), so you log in by reading the one-time OTP from the API
+     service's **Logs** tab — see Step 5.
 4. When live, each service has a `*.onrender.com` URL — open the API one + `/health` to confirm,
    then the web one to confirm the UI loads.
 
@@ -58,14 +60,22 @@ hPanel → **Domains → itrhelp.com → DNS / Nameservers → DNS Zone**. Add t
 - DNS propagates in minutes–hours. Render auto-issues **Let's Encrypt TLS** once it resolves; the
   domains flip to "Verified / Certificate issued".
 
-## Step 5 — Lock the preview down (important)
-Right now anyone who finds the URL can self-register (and `devOtp` is returned in Development). For a
-truly private preview, do **one** of:
-- **Recommended:** set `ASPNETCORE_ENVIRONMENT=Production` on `tallyg-api` (stops `devOtp`), seed/use
-  one known account, and add a real SMS/email OTP provider; **or**
-- Keep it open but unlisted, and add a holding/`noindex` page; **or**
-- Put Cloudflare Access / an IP allowlist in front.
-Don't index it (no public marketing) until the compliance gates are done.
+## Step 5 — Logging in (the preview is already locked down)
+`render.yaml` ships the lock-down, so you do **not** need to change anything to keep it private:
+- `ASPNETCORE_ENVIRONMENT=Production` → `devOtp` is **not** returned in any API response.
+- `Auth__AllowSelfRegistration=false` → `POST /auth/register` and signup-OTP both return **403**;
+  only the seeded accounts exist.
+
+**To sign in** (as `admin@itrhelp.com` or `demo@itrhelp.com`):
+1. On the web app's login screen, enter the seeded email and request an OTP.
+2. Open `tallyg-api` in Render → **Logs**, find the line
+   `[OTP STUB] channel=Email purpose=Login to=admin@itrhelp.com code=######`.
+3. Type that 6-digit code into the verify screen. (The code also expires; just request a new one.)
+
+**Before any public launch** (in addition to the ERI / CA / DPDP gates):
+- Wire a real **SMS/email OTP provider** (replace the `ConsoleOtpSender` stub) so users get their own code.
+- Only then consider re-enabling sign-up (`Auth__AllowSelfRegistration=true`) — and not before.
+- Keep it `noindex` / no public marketing until all gates are done.
 
 ## Cost
 Free tier works for staging (web services sleep when idle; free Postgres is time-limited). For an

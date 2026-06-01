@@ -5,9 +5,15 @@
 #   • the Next.js 14 web app   (Docker, frontend/Dockerfile)
 # Connect this repo in Render → New + → Blueprint. See infra/DEPLOY-RENDER.md.
 #
-# NOT for public production: this runs in Development mode (devOtp login, no SMS)
-# and the tax figures are provisional / pending-CA. Lock it down + add the
-# compliance gates (ERI, CA sign-off, audit) before any public launch.
+# LOCKED-DOWN PRIVATE PREVIEW (not a public launch):
+#   • ASPNETCORE_ENVIRONMENT=Production         → devOtp is NOT returned in API responses
+#   • Auth__AllowSelfRegistration=false         → public sign-up is closed; only seeded
+#                                                  accounts (admin@/demo@itrhelp.com) can log in
+#   • the operator reads the login OTP from this service's Render "Logs" tab
+#     (look for: [OTP STUB] ... to=admin@itrhelp.com code=######)
+# Still pre-ERI and the tax figures are provisional / pending-CA — complete the compliance
+# gates (ERI registration, CA sign-off, security/DPDP audit) + wire a real SMS/email OTP
+# provider before any public launch.
 # ---------------------------------------------------------------------------
 
 databases:
@@ -29,7 +35,7 @@ services:
     autoDeploy: true
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
-        value: Development       # STAGING ONLY: returns devOtp so you can log in without an SMS provider
+        value: Production        # LOCKED DOWN: devOtp is NOT returned in API responses
       - key: ASPNETCORE_URLS
         value: http://+:10000    # Render routes to port 10000 by default
       - key: Database__Provider
@@ -38,11 +44,13 @@ services:
         fromDatabase:
           name: tallyg-db
           property: connectionString   # postgresql:// URI — normalized to Npgsql format in code
-      - key: Jwt__Secret
-        generateValue: true            # Render generates + stores a strong secret
-      - key: Jwt__Issuer
+      - key: Auth__AllowSelfRegistration
+        value: "false"           # no public self-registration; only the seeded accounts can sign in
+      - key: Auth__Jwt__SigningKey
+        generateValue: true            # Render generates + stores a strong key (signs AND validates JWTs)
+      - key: Auth__Jwt__Issuer
         value: https://api.itrhelp.com
-      - key: Jwt__Audience
+      - key: Auth__Jwt__Audience
         value: https://itrhelp.com
       - key: Cors__Origins__0
         value: https://itrhelp.com

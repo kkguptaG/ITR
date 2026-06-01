@@ -18,11 +18,10 @@ public sealed class LocalDiskStorage : IFileStorage
     {
         _root = configuration["Storage:LocalRoot"]
                 ?? Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".localstore");
-        // Normalize; if the relative dance above is brittle, prefer the explicit demo path.
-        if (!Path.IsPathRooted(_root))
-        {
-            _root = Path.GetFullPath(_root);
-        }
+        // Always normalize to a rooted path with the platform separator. A configured root like
+        // "D:/TallyGTax/backend/.localstore" (forward slashes) would otherwise never match the
+        // back-slashed Path.GetFullPath result in ResolvePath's traversal guard, failing every save.
+        _root = Path.GetFullPath(_root);
 
         // Loopback URL the SPA/client PUTs bytes to (the Documents controller handles it).
         _publicBaseUrl = (configuration["Storage:PublicBaseUrl"] ?? "http://localhost:5080/api/v1")

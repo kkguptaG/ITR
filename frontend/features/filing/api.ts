@@ -83,6 +83,14 @@ export interface UpdateReturnBody {
   itrType?: string;
   regime?: string;
   answersJson?: string;
+  tdsPaid?: number;
+  tcsPaid?: number;
+  advanceTaxPaid?: number;
+  selfAssessmentTaxPaid?: number;
+  broughtForwardHousePropertyLoss?: number;
+  broughtForwardBusinessLoss?: number;
+  broughtForwardShortTermCapitalLoss?: number;
+  broughtForwardLongTermCapitalLoss?: number;
 }
 export const updateReturn = (id: string, body: UpdateReturnBody) =>
   apiPatch<ReturnDetailDto>(`/returns/${id}`, body);

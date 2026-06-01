@@ -8,6 +8,7 @@ using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
 using TallyG.Tax.Domain.TaxEngine;
 using TallyG.Tax.Infrastructure.Persistence;
+using TallyG.Tax.Api.Common;
 
 namespace TallyG.Tax.Api.Modules.Returns;
 
@@ -187,6 +188,16 @@ public sealed class ReturnService : IReturnService
             ret.AnswersJson = NormalizeJson(request.AnswersJson, "RETURN.ANSWERS_INVALID");
         }
 
+        // Prepaid taxes + brought-forward losses (only the supplied fields; clamped non-negative).
+        if (request.TdsPaid is { } tds) ret.TdsPaid = Math.Max(0m, tds);
+        if (request.TcsPaid is { } tcs) ret.TcsPaid = Math.Max(0m, tcs);
+        if (request.AdvanceTaxPaid is { } adv) ret.AdvanceTaxPaid = Math.Max(0m, adv);
+        if (request.SelfAssessmentTaxPaid is { } sa) ret.SelfAssessmentTaxPaid = Math.Max(0m, sa);
+        if (request.BroughtForwardHousePropertyLoss is { } hpl) ret.BroughtForwardHousePropertyLoss = Math.Max(0m, hpl);
+        if (request.BroughtForwardBusinessLoss is { } bl) ret.BroughtForwardBusinessLoss = Math.Max(0m, bl);
+        if (request.BroughtForwardShortTermCapitalLoss is { } stcl) ret.BroughtForwardShortTermCapitalLoss = Math.Max(0m, stcl);
+        if (request.BroughtForwardLongTermCapitalLoss is { } ltcl) ret.BroughtForwardLongTermCapitalLoss = Math.Max(0m, ltcl);
+
         // Touching the working draft moves it out of the pristine Draft state.
         if (ret.Status == ReturnStatus.Draft)
         {
@@ -277,11 +288,12 @@ public sealed class ReturnService : IReturnService
     public async Task<IReadOnlyList<SalaryDetailDto>> ListSalariesAsync(Guid id, CancellationToken ct = default)
     {
         await LoadOwnedReturnAsync(id, ct);
-        return await _db.SalaryDetails
+        var entities = await _db.SalaryDetails
             .Where(s => s.TaxReturnId == id)
+            .Include(s => s.Components)
             .OrderBy(s => s.Employer)
-            .Select(s => ToSalaryDto(s))
             .ToListAsync(ct);
+        return entities.Select(ToSalaryDto).ToList();
     }
 
     public async Task<SalaryDetailDto> AddSalaryAsync(Guid id, UpsertSalaryRequest request, CancellationToken ct = default)
@@ -310,6 +322,7 @@ public sealed class ReturnService : IReturnService
             ProfessionalTax = request.ProfessionalTax
         };
 
+        ApplySalaryBreakup(entity, request);
         _db.SalaryDetails.Add(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
         return ToSalaryDto(entity);
@@ -320,7 +333,9 @@ public sealed class ReturnService : IReturnService
         var ret = await LoadOwnedReturnAsync(id, ct);
         EnsureMutable(ret);
 
-        var entity = await _db.SalaryDetails.FirstOrDefaultAsync(s => s.Id == salaryId && s.TaxReturnId == id, ct)
+        var entity = await _db.SalaryDetails
+                         .Include(s => s.Components)
+                         .FirstOrDefaultAsync(s => s.Id == salaryId && s.TaxReturnId == id, ct)
                      ?? throw AppException.NotFound("Salary detail not found.", "RETURN.SALARY_NOT_FOUND");
 
         if (string.IsNullOrWhiteSpace(request.Employer))
@@ -339,6 +354,7 @@ public sealed class ReturnService : IReturnService
         entity.StdDeduction = request.StdDeduction;
         entity.ProfessionalTax = request.ProfessionalTax;
 
+        ApplySalaryBreakup(entity, request);
         await MarkInProgressAndSaveAsync(ret, ct);
         return ToSalaryDto(entity);
     }
@@ -353,6 +369,37 @@ public sealed class ReturnService : IReturnService
 
         _db.SalaryDetails.Remove(entity); // SalaryDetail is not soft-deletable.
         await MarkInProgressAndSaveAsync(ret, ct);
+    }
+
+    /// <summary>
+    /// When an itemised Schedule S breakup is supplied, (re)build the salary's component rows and
+    /// roll them up into the flat SalaryDetail fields the engine consumes. No breakup ⇒ the flat
+    /// fields already set from the request are used as-is (backward compatible).
+    /// </summary>
+    private static void ApplySalaryBreakup(SalaryDetail entity, UpsertSalaryRequest request)
+    {
+        // Null OR empty breakup ⇒ keep the flat fields from the request as-is. The flat-entry UI path
+        // always serialises components as [], which must NOT roll up to zero and wipe the salary.
+        if (request.Components is null || request.Components.Count == 0)
+        {
+            return;
+        }
+
+        entity.Components.Clear();
+        foreach (var c in request.Components)
+        {
+            entity.Components.Add(new SalaryComponent
+            {
+                TenantId = entity.TenantId,
+                Label = (c.Label ?? string.Empty).Trim(),
+                Category = c.Category,
+                Total = c.Total < 0m ? 0m : c.Total,
+                Exempt = c.Exempt < 0m ? 0m : c.Exempt,
+                IsHra = c.IsHra,
+            });
+        }
+
+        SalaryRollup.Apply(entity, entity.Components);
     }
 
     // =========================================================== house property
@@ -911,7 +958,8 @@ public sealed class ReturnService : IReturnService
 
         var incomeSources = await _db.IncomeSources.Where(s => s.TaxReturnId == id)
             .Select(s => new IncomeSourceDto(s.Id, s.Type, s.Label, s.Amount, s.SourceMetaJson)).ToListAsync(ct);
-        var salaries = await _db.SalaryDetails.Where(s => s.TaxReturnId == id).Select(s => ToSalaryDto(s)).ToListAsync(ct);
+        var salaryEntities = await _db.SalaryDetails.Where(s => s.TaxReturnId == id).Include(s => s.Components).ToListAsync(ct);
+        var salaries = salaryEntities.Select(ToSalaryDto).ToList();
         var houses = await _db.HouseProperties.Where(h => h.TaxReturnId == id).Select(h => ToHouseDto(h)).ToListAsync(ct);
         var gains = await _db.CapitalGains.Where(c => c.TaxReturnId == id).Select(c => ToCapitalGainDto(c)).ToListAsync(ct);
         var businesses = await _db.BusinessIncomes.Where(b => b.TaxReturnId == id).Select(b => ToBusinessDto(b)).ToListAsync(ct);
@@ -948,7 +996,15 @@ public sealed class ReturnService : IReturnService
             gains,
             businesses,
             deductions,
-            computation);
+            computation,
+            ret.TdsPaid,
+            ret.TcsPaid,
+            ret.AdvanceTaxPaid,
+            ret.SelfAssessmentTaxPaid,
+            ret.BroughtForwardHousePropertyLoss,
+            ret.BroughtForwardBusinessLoss,
+            ret.BroughtForwardShortTermCapitalLoss,
+            ret.BroughtForwardLongTermCapitalLoss);
     }
 
     /// <summary>
@@ -1079,7 +1135,7 @@ public sealed class ReturnService : IReturnService
         return computation;
     }
 
-    private static TaxComputationInput BuildComputationInput(
+    private TaxComputationInput BuildComputationInput(
         TaxReturn ret,
         string ayCode,
         string rulesJson,
@@ -1089,29 +1145,10 @@ public sealed class ReturnService : IReturnService
         IReadOnlyList<BusinessIncome> businesses,
         IReadOnlyList<IncomeSource> incomeSources,
         IReadOnlyList<Deduction> deductions)
-    {
-        return new TaxComputationInput
-        {
-            AssessmentYearCode = ayCode,
-            RuleSetVersion = ret.RuleSetVersion,
-            RulesJson = rulesJson,
-            Age = 30, // Age comes from UserProfile in a later pass; default adult slab for now.
-            Salaries = salaries.Select(s => new SalaryInput(
-                s.Employer, s.Gross, s.Perquisites, s.ExemptAllowances, s.HraExemption, s.ProfessionalTax)).ToList(),
-            HouseProperties = houses.Select(h => new HousePropertyInput(
-                h.Type, h.AnnualValue, h.MunicipalTaxPaid, h.InterestOnLoan)).ToList(),
-            CapitalGains = gains.Select(c => new CapitalGainInput(
-                c.AssetType, c.Term, c.TaxSection, c.SalePrice, c.CostOfAcquisition, c.CostOfImprovement,
-                c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate)).ToList(),
-            BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
-                b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
-                b.NetProfit, b.SpeculativeFlag)).ToList(),
-            OtherIncomes = incomeSources
-                .Where(s => s.Type == IncomeType.OtherSources)
-                .Select(s => new OtherIncomeInput(s.Label ?? "Other", s.Amount)).ToList(),
-            Deductions = deductions.Select(d => new DeductionInput(d.Section, d.Amount, d.SubType)).ToList()
-        };
-    }
+        => TaxComputationInputFactory.FromReturn(
+            // Age defaults to an adult slab on this snapshot path (resolved from UserProfile on /tax/compute).
+            ret, ayCode, rulesJson, 30, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
+            salaries, houses, gains, businesses, incomeSources, deductions);
 
     private async Task<int> NextVersionNoAsync(Guid taxReturnId, CancellationToken ct)
     {
@@ -1198,7 +1235,11 @@ public sealed class ReturnService : IReturnService
 
     private static SalaryDetailDto ToSalaryDto(SalaryDetail s) => new(
         s.Id, s.Employer, s.Tan, s.Gross, s.Hra, s.Perquisites, s.ProfitsInLieu,
-        s.ExemptAllowances, s.HraExemption, s.StdDeduction, s.ProfessionalTax);
+        s.ExemptAllowances, s.HraExemption, s.StdDeduction, s.ProfessionalTax,
+        s.Components
+            .OrderBy(c => c.CreatedAt)
+            .Select(c => new SalaryComponentDto(c.Id, c.Label, c.Category, c.Total, c.Exempt, c.Total - c.Exempt, c.IsHra))
+            .ToList());
 
     private static HousePropertyDto ToHouseDto(HouseProperty h) => new(
         h.Id, h.Type, h.Address, h.AnnualValue, h.AnnualRent, h.MunicipalTaxPaid,

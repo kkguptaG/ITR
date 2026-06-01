@@ -180,8 +180,8 @@ Passwordless OTP. Two seeded accounts in the default **retail** tenant (idempote
 
 | Login (email **or** mobile) | Role | Use for |
 |---|---|---|
-| `admin@tallyg.test` / `+919000000001` | Admin | Admin / back-office screens |
-| `demo@tallyg.test` / `+919000000002` | User | The taxpayer filing journey |
+| `admin@itrhelp.com` / `+919000000001` | Admin | Admin / back-office screens |
+| `demo@itrhelp.com` / `+919000000002` | User | The taxpayer filing journey |
 
 - **In `Development`** (both the Docker stack and the no-Docker path run as Development), the OTP code
   is returned in the `POST /api/v1/auth/otp/request` response as **`devOtp`** — log in with no SMS/email

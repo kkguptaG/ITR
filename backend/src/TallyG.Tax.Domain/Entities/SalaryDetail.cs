@@ -22,5 +22,9 @@ public class SalaryDetail : BaseEntity, ITenantScoped
 
     public Guid? Form16DocumentId { get; set; }
 
+    /// <summary>Optional itemised Schedule S breakup. When present it is rolled up into the
+    /// flat fields above via SalaryRollup, so the engine + ITR-JSON stay unchanged.</summary>
+    public List<SalaryComponent> Components { get; set; } = new();
+
     public TaxReturn? TaxReturn { get; set; }
 }

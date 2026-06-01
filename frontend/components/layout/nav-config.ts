@@ -18,6 +18,8 @@ import {
   TrendingUp,
   Building2,
   FileDown,
+  Landmark,
+  BookOpenCheck,
 } from 'lucide-react';
 import type { Role } from '@/lib/api-types';
 
@@ -52,6 +54,13 @@ export const navSections: NavSection[] = [
       { href: '/filings', messageKey: 'filings', icon: FileDown },
       { href: '/support', messageKey: 'support', icon: LifeBuoy },
       { href: '/settings', messageKey: 'settings', icon: Settings },
+    ],
+  },
+  {
+    titleKey: 'accountingSection',
+    items: [
+      { href: '/accounting/vouchers', messageKey: 'vouchers', icon: Landmark },
+      { href: '/accounting/ledgers', messageKey: 'chartOfAccounts', icon: BookOpenCheck },
     ],
   },
   {

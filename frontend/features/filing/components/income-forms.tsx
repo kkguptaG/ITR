@@ -7,7 +7,7 @@
 // step composes them with <EditableList/>.
 // ---------------------------------------------------------------------------
 
-import { Controller, useForm, type Control, type DefaultValues, type Path } from 'react-hook-form';
+import { Controller, useFieldArray, useForm, type Control, type DefaultValues, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Button, CurrencyInput, Field, Input, Select } from '@/components/ui';
@@ -21,6 +21,7 @@ import {
   type CapitalGainFormValues,
   type HousePropertyFormValues,
   type OtherIncomeFormValues,
+  type SalaryComponentFormValues,
   type SalaryFormValues,
 } from '../schemas';
 
@@ -70,6 +71,44 @@ function FormActions({ onCancel, loading, submitLabel }: { onCancel: () => void;
 }
 
 // ----------------------------------------------------------------- Salary
+const SALARY_COMPONENT_TYPES = [
+  { value: 'Salary', label: 'Salary — 17(1)' },
+  { value: 'Allowance', label: 'Allowance — s.10' },
+  { value: 'Perquisite', label: 'Perquisite — 17(2)' },
+  { value: 'ProfitInLieu', label: 'Profit in lieu — 17(3)' },
+] as const;
+
+const COMMON_PARTICULARS = [
+  'Basic Salary', 'Dearness Allowance', 'Bonus', 'Grade Pay', 'Leave Encashment',
+  'House Rent Allowance', 'Conveyance Allowance', 'LTA / LTC', 'Children Education Allowance',
+  'Perquisite - Motor Car', 'Rent Free Accommodation', 'Gratuity', 'Severance',
+];
+
+function isHraLabel(label: string): boolean {
+  return /h\.?\s*r\.?\s*a\b|house\s*rent/i.test(label ?? '');
+}
+
+/** Mirrors the backend SalaryRollup so the form previews the rolled-up totals live. */
+function rollupSalaryComponents(components: SalaryComponentFormValues[]) {
+  let gross = 0, perquisites = 0, profitsInLieu = 0, hra = 0, hraExemption = 0, exemptAllowances = 0;
+  for (const c of components) {
+    const total = Math.max(0, Number(c.total) || 0);
+    const exempt = Math.min(Math.max(0, Number(c.exempt) || 0), total);
+    if (c.category === 'Perquisite') perquisites += total;
+    else if (c.category === 'ProfitInLieu') profitsInLieu += total;
+    else if (c.category === 'Allowance') {
+      gross += total;
+      if (isHraLabel(c.label)) { hra += total; hraExemption += exempt; }
+      else exemptAllowances += exempt;
+    } else gross += total; // Salary 17(1)
+  }
+  return { gross, perquisites, profitsInLieu, hra, hraExemption, exemptAllowances };
+}
+
+function inr(n: number): string {
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+}
+
 export function SalaryForm({
   defaultValues,
   onSubmit,
@@ -83,34 +122,167 @@ export function SalaryForm({
 }) {
   const t = useTranslations('income');
   const tc = useTranslations('common');
-  const { control, register, handleSubmit, formState: { errors } } = useForm<SalaryFormValues>({
+  const { control, register, handleSubmit, watch, formState: { errors } } = useForm<SalaryFormValues>({
     resolver: zodResolver(salarySchema),
     defaultValues: {
       employer: '', tan: '', gross: 0, hra: 0, perquisites: 0, profitsInLieu: 0,
-      exemptAllowances: 0, hraExemption: 0, stdDeduction: 50000, professionalTax: 0,
+      exemptAllowances: 0, hraExemption: 0, stdDeduction: 50000, professionalTax: 0, components: [],
       ...defaultValues,
     } as DefaultValues<SalaryFormValues>,
   });
+  const { fields, append, remove } = useFieldArray({ control, name: 'components' });
+  const components = (watch('components') ?? []) as SalaryComponentFormValues[];
+  const useBreakup = fields.length > 0;
+  const rolled = rollupSalaryComponents(components);
+
+  // On submit: if a breakup exists, roll it up into the flat fields + derive each row's HRA flag.
+  const submit = (v: SalaryFormValues) => {
+    if (v.components && v.components.length > 0) {
+      const r = rollupSalaryComponents(v.components);
+      onSubmit({
+        ...v,
+        gross: r.gross,
+        hra: r.hra,
+        perquisites: r.perquisites,
+        profitsInLieu: r.profitsInLieu,
+        exemptAllowances: r.exemptAllowances,
+        hraExemption: r.hraExemption,
+        components: v.components.map((c) => ({
+          ...c,
+          isHra: c.category === 'Allowance' && isHraLabel(c.label),
+        })),
+      });
+    } else {
+      onSubmit({ ...v, components: [] });
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
+    <form onSubmit={handleSubmit(submit)} noValidate className="space-y-3">
       <Field label={t('employer')} error={errors.employer?.message} required>
         <Input {...register('employer')} placeholder="Acme Pvt Ltd" />
       </Field>
       <Field label={t('tan')} hint={t('tanHint')}>
         <Input {...register('tan')} placeholder="DELA12345B" />
       </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <MoneyField control={control} name="gross" label={t('grossSalary')} error={errors.gross?.message} />
-        <MoneyField control={control} name="hra" label={t('hra')} />
-        <MoneyField control={control} name="hraExemption" label={t('hraExemption')} hint={t('hraExemptionHint')} />
-        <MoneyField control={control} name="exemptAllowances" label={t('exemptAllowances')} />
-        <MoneyField control={control} name="perquisites" label={t('perquisites')} />
-        <MoneyField control={control} name="stdDeduction" label={t('stdDeduction')} />
-        <MoneyField control={control} name="professionalTax" label={t('professionalTax')} />
+
+      {/* Schedule S salary breakup (CompuTax-style component grid) */}
+      <div className="space-y-2 rounded-lg border border-ink-100 bg-ink-50/40 p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-ink-700">Salary breakup — Schedule S</div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => append({ label: '', category: 'Salary', total: 0, exempt: 0, isHra: false })}
+          >
+            + Add component
+          </Button>
+        </div>
+
+        {fields.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            Itemise your Form-16 components (Basic, DA, HRA, perquisites…), or just enter the totals below.
+          </p>
+        ) : (
+          <>
+            <datalist id="salary-particulars">
+              {COMMON_PARTICULARS.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
+            <div className="hidden grid-cols-12 gap-2 text-[11px] uppercase tracking-wide text-ink-400 sm:grid">
+              <div className="col-span-4">Particular</div>
+              <div className="col-span-3">Type</div>
+              <div className="col-span-2 text-right">Total</div>
+              <div className="col-span-2 text-right">Exempt</div>
+              <div className="col-span-1" />
+            </div>
+            {fields.map((f, i) => (
+              <div key={f.id} className="grid grid-cols-12 items-center gap-2">
+                <div className="col-span-12 sm:col-span-4">
+                  <Input list="salary-particulars" placeholder="Particular" {...register(`components.${i}.label` as const)} />
+                </div>
+                <div className="col-span-6 sm:col-span-3">
+                  <Select {...register(`components.${i}.category` as const)}>
+                    {SALARY_COMPONENT_TYPES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="col-span-3 sm:col-span-2">
+                  <Controller
+                    control={control}
+                    name={`components.${i}.total` as const}
+                    render={({ field }) => (
+                      <CurrencyInput value={(field.value as number) ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />
+                    )}
+                  />
+                </div>
+                <div className="col-span-3 sm:col-span-2">
+                  <Controller
+                    control={control}
+                    name={`components.${i}.exempt` as const}
+                    render={({ field }) => (
+                      <CurrencyInput value={(field.value as number) ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />
+                    )}
+                  />
+                </div>
+                <div className="col-span-12 flex justify-end sm:col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => remove(i)}
+                    className="px-2 text-sm text-ink-400 hover:text-red-600"
+                    aria-label="Remove component"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Live rolled-up summary (mirrors the engine) */}
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Gross 17(1)+allow." value={rolled.gross} />
+              <Stat label="Perquisites 17(2)" value={rolled.perquisites} />
+              <Stat label="HRA exempt" value={rolled.hraExemption} />
+              <Stat label="Other exempt s.10" value={rolled.exemptAllowances} />
+            </div>
+            <p className="text-[11px] text-ink-400">
+              Standard deduction is applied automatically by the engine per regime.
+              {rolled.profitsInLieu > 0 ? ` Profits in lieu 17(3): ${inr(rolled.profitsInLieu)}.` : ''}
+            </p>
+          </>
+        )}
       </div>
+
+      {/* Flat totals — shown only when NOT using the itemised breakup */}
+      {useBreakup ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MoneyField control={control} name="professionalTax" label={t('professionalTax')} />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MoneyField control={control} name="gross" label={t('grossSalary')} error={errors.gross?.message} />
+          <MoneyField control={control} name="hra" label={t('hra')} />
+          <MoneyField control={control} name="hraExemption" label={t('hraExemption')} hint={t('hraExemptionHint')} />
+          <MoneyField control={control} name="exemptAllowances" label={t('exemptAllowances')} />
+          <MoneyField control={control} name="perquisites" label={t('perquisites')} />
+          <MoneyField control={control} name="professionalTax" label={t('professionalTax')} />
+        </div>
+      )}
       <FormActions onCancel={onCancel} loading={loading} submitLabel={tc('save')} />
     </form>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-ink-100 bg-white px-2 py-1">
+      <div className="text-[10px] uppercase tracking-wide text-ink-400">{label}</div>
+      <div className="font-semibold text-ink-800">{inr(value)}</div>
+    </div>
   );
 }
 
@@ -329,13 +501,25 @@ export function OtherIncomeForm({
   const tc = useTranslations('common');
   const { control, register, handleSubmit, formState: { errors } } = useForm<OtherIncomeFormValues>({
     resolver: zodResolver(otherIncomeSchema),
-    defaultValues: { label: '', amount: 0, ...defaultValues } as DefaultValues<OtherIncomeFormValues>,
+    defaultValues: { label: '', amount: 0, nature: 'normal', ...defaultValues } as DefaultValues<OtherIncomeFormValues>,
   });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
       <Field label={t('otherLabel')} error={errors.label?.message} required>
         <Input {...register('label')} placeholder={t('otherPlaceholder')} />
+      </Field>
+      <Field
+        label="Nature of income"
+        hint="Winnings/lottery are taxed at a flat 30% (s.115BB); agricultural income is exempt but raises your slab rate."
+      >
+        <Select {...register('nature')}>
+          <option value="normal">Other / general</option>
+          <option value="interest">Interest (savings / FD)</option>
+          <option value="dividend">Dividend</option>
+          <option value="lottery_115bb">Winnings / lottery (s.115BB)</option>
+          <option value="agricultural">Agricultural income</option>
+        </Select>
       </Field>
       <MoneyField control={control} name="amount" label={t('amount')} error={errors.amount?.message} />
       <FormActions onCancel={onCancel} loading={loading} submitLabel={tc('save')} />

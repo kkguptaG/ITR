@@ -57,7 +57,44 @@ public sealed record TaxComputationInput
     public decimal TcsPaid { get; init; }
     public decimal AdvanceTaxPaid { get; init; }
     public decimal SelfAssessmentTaxPaid { get; init; }
+
+    // --- s.234A/B/C interest context (optional; interest is 0 when the dates are absent) ---
+
+    /// <summary>s.139(1) due date for furnishing the return (drives 234A late-filing interest).</summary>
+    public DateOnly? FilingDueDate { get; init; }
+
+    /// <summary>Date the return is/will be furnished (the "as of" date for a draft). Ends the 234A/234B periods.</summary>
+    public DateOnly? ActualFilingDate { get; init; }
+
+    /// <summary>Previous-year (FY) start, 1 Apr — places the four advance-tax installment due dates (234C).</summary>
+    public DateOnly? PreviousYearStart { get; init; }
+
+    /// <summary>Previous-year (FY) end, 31 Mar — the AY begins the next day, when 234B interest starts.</summary>
+    public DateOnly? PreviousYearEnd { get; init; }
+
+    /// <summary>True for 44AD/44ADA presumptive: a single 15-Mar advance-tax installment (234C).</summary>
+    public bool PresumptiveAdvanceTax { get; init; }
+
+    /// <summary>Quarterly advance-tax payments with dates, for exact s.234C. Empty ⇒ none assumed paid on time.</summary>
+    public IReadOnlyList<AdvanceTaxInstallmentInput> AdvanceTaxInstallments { get; init; } = Array.Empty<AdvanceTaxInstallmentInput>();
+
+    // --- Brought-forward (earlier-year) losses; each sets off ONLY against the same head's current income ---
+
+    /// <summary>Brought-forward house-property loss (sets off only against current-year HP income; 8-year c/f).</summary>
+    public decimal BroughtForwardHousePropertyLoss { get; init; }
+
+    /// <summary>Brought-forward non-speculative business loss (sets off only against current-year business income; 8-year c/f).</summary>
+    public decimal BroughtForwardBusinessLoss { get; init; }
+
+    /// <summary>Brought-forward short-term capital loss (sets off vs current STCG and LTCG; 8-year c/f).</summary>
+    public decimal BroughtForwardShortTermCapitalLoss { get; init; }
+
+    /// <summary>Brought-forward long-term capital loss (sets off ONLY vs current LTCG; 8-year c/f).</summary>
+    public decimal BroughtForwardLongTermCapitalLoss { get; init; }
 }
+
+/// <summary>One advance-tax payment (amount + date paid) used for exact s.234C deferment interest.</summary>
+public sealed record AdvanceTaxInstallmentInput(DateOnly PaidOn, decimal Amount);
 
 public sealed record SalaryInput(
     string Employer,
@@ -98,7 +135,12 @@ public sealed record BusinessIncomeInput(
     decimal NetProfit,
     bool Speculative);
 
-public sealed record OtherIncomeInput(string Label, decimal Amount);
+/// <summary>
+/// Income from other sources. <paramref name="Nature"/> routes the tax treatment:
+/// "lottery_115bb" → flat s.115BB rate; "agricultural" → exempt but aggregated for rate
+/// (partial integration); anything else (null/"normal"/"interest"/"dividend") → slab rate.
+/// </summary>
+public sealed record OtherIncomeInput(string Label, decimal Amount, string? Nature = null);
 
 public sealed record DeductionInput(string Section, decimal ClaimedAmount, string? SubType = null);
 

@@ -34,6 +34,17 @@ export const personalSchema = z.object({
 export type PersonalFormValues = z.infer<typeof personalSchema>;
 
 // ----------------------------------------------------------------- salary
+// One row of the Schedule S breakup grid. `isHra` is derived from the label at
+// submit time (see the salary form) so the HRA exempt part routes to s.10(13A).
+export const salaryComponentSchema = z.object({
+  label: z.string().trim().max(120).default(''),
+  category: z.enum(['Salary', 'Allowance', 'Perquisite', 'ProfitInLieu']).default('Salary'),
+  total: optionalMoney,
+  exempt: optionalMoney,
+  isHra: z.boolean().optional().default(false),
+});
+export type SalaryComponentFormValues = z.infer<typeof salaryComponentSchema>;
+
 export const salarySchema = z.object({
   employer: z.string().trim().min(1, 'Employer name is required.').max(200),
   tan: z.string().trim().max(20).optional().or(z.literal('')),
@@ -45,6 +56,8 @@ export const salarySchema = z.object({
   hraExemption: optionalMoney,
   stdDeduction: optionalMoney,
   professionalTax: optionalMoney,
+  // Optional itemised breakup; when present the backend rolls it up into the fields above.
+  components: z.array(salaryComponentSchema).optional().default([]),
 });
 export type SalaryFormValues = z.infer<typeof salarySchema>;
 
@@ -101,9 +114,13 @@ export const businessIncomeSchema = z
 export type BusinessIncomeFormValues = z.infer<typeof businessIncomeSchema>;
 
 // ----------------------------------------------------------------- other source
+export const OTHER_INCOME_NATURES = ['normal', 'interest', 'dividend', 'lottery_115bb', 'agricultural'] as const;
+
 export const otherIncomeSchema = z.object({
   label: z.string().trim().min(1, 'Describe the income.').max(120),
   amount: money,
+  // Drives the tax treatment: lottery → flat 30% (s.115BB); agricultural → exempt but rate-aggregated.
+  nature: z.enum(OTHER_INCOME_NATURES).default('normal'),
 });
 export type OtherIncomeFormValues = z.infer<typeof otherIncomeSchema>;
 

@@ -58,10 +58,17 @@ public sealed class TaxCalculator : ITaxCalculator
         var housePropertyIncome = ComputeHousePropertyHead(input, regime, regimeRules, rs, trace);
         var (capitalGains, slabRateCgIncome) = ComputeCapitalGainsHead(input, rs, trace);
         var businessIncome = ComputeBusinessHead(input, trace);
-        var otherIncome = ComputeOtherSourcesHead(input, trace);
+        var (otherIncome, casual115BB, agriculturalIncome) = ComputeOtherSourcesHead(input, trace);
+
+        // Brought-forward (earlier-year) losses set off against the SAME head's current income.
+        housePropertyIncome = SetOffBroughtForwardLoss(housePropertyIncome, input.BroughtForwardHousePropertyLoss, "HouseProperty", trace);
+        businessIncome = SetOffBroughtForwardLoss(businessIncome, input.BroughtForwardBusinessLoss, "Business", trace);
 
         // Special-rate (flat) income is taxed OUTSIDE the slab; slab-rate CG folds into normal income.
-        var specialBuckets = capitalGains.Buckets;
+        // Brought-forward capital losses (STCL/LTCL) set off against this year's capital-gain buckets.
+        var specialBuckets = ApplyBroughtForwardCapitalLosses(
+            capitalGains.Buckets, input.BroughtForwardShortTermCapitalLoss, input.BroughtForwardLongTermCapitalLoss, trace);
+        slabRateCgIncome = TaxMath.NonNegative(specialBuckets.SlabRateGains);
         var specialRateIncome = specialBuckets.TotalSpecialRateIncome;
 
         // --- Stage 4: Gross Total Income (normal, slab-taxed portion) ---
@@ -72,9 +79,9 @@ public sealed class TaxCalculator : ITaxCalculator
             businessIncome +
             otherIncome;
 
-        var grossTotalIncome = normalGti + specialRateIncome;
+        var grossTotalIncome = normalGti + specialRateIncome + casual115BB;
         trace.Add(new TraceLine("GrossTotalIncome",
-            "Gross Total Income (all heads, incl. special-rate income)", grossTotalIncome, "Ch.3 §3.4.2.4"));
+            "Gross Total Income (all heads, incl. special-rate + casual income)", grossTotalIncome, "Ch.3 §3.4.2.4"));
 
         // --- Stage 5: Chapter VI-A deductions (regime-gated, capped) ---
         var (chapterViaTotal, deductionTrace) = ComputeChapterViaDeductions(input, regime, regimeRules, rs, salaryIncome);
@@ -85,19 +92,20 @@ public sealed class TaxCalculator : ITaxCalculator
 
         // --- Stage 6: total/taxable income, rounded to nearest ₹10 (s.288A) ---
         var normalTaxable = TaxMath.RoundIncome(normalTaxableBeforeRounding, rs.Rounding);
-        var totalTaxableIncome = normalTaxable + specialRateIncome;
+        var totalTaxableIncome = normalTaxable + specialRateIncome + casual115BB;
         trace.Add(new TraceLine("TaxableIncome",
             "Total taxable income (rounded to nearest ₹10, s.288A)", totalTaxableIncome, "s.288A"));
 
         // --- Stage 7/8: slab tax on normal income + flat tax on special-rate income ---
         var slabs = regimeRules.ResolveSlabs(input.Age);
-        var slabTax = ComputeSlabTax(normalTaxable, slabs, trace);
+        var slabTax = ComputeSlabTaxWithAgri(normalTaxable, agriculturalIncome, slabs, rs, trace);
         var (specialTax, specialTaxTrace) = ComputeSpecialRateTax(specialBuckets, rs, trace);
+        var casualTax = ComputeCasual115BBTax(casual115BB, rs, trace);
 
         var taxOnNormal = slabTax;
-        var taxBeforeRebate = slabTax + specialTax;
+        var taxBeforeRebate = slabTax + specialTax + casualTax;
         trace.Add(new TraceLine("TaxBeforeRebate",
-            "Tax before rebate (slab tax + special-rate tax)", taxBeforeRebate, "Ch.3 §3.4.2.8"));
+            "Tax before rebate (slab + special-rate + casual 115BB)", taxBeforeRebate, "Ch.3 §3.4.2.8"));
 
         // --- Stage 11 (computed pre-surcharge so order matches): 87A rebate ---
         // Rebate applies against slab tax on NORMAL income only (not 112A/111A special income),
@@ -126,8 +134,11 @@ public sealed class TaxCalculator : ITaxCalculator
                 "Less: TDS + TCS + advance + self-assessment tax", prepaid, "Ch.3 §3.4.2.12"));
         }
 
+        // --- Stage 13: interest u/s 234A/B/C (0 unless the filing/PY dates are supplied) ---
+        var interest = InterestCalculator.Compute(input, totalTax, rs, trace);
+
         // --- Stage 14: net refund (positive) or payable (negative) ---
-        var refundOrPayable = TaxMath.RoundTax(prepaid - totalTax, rs.Rounding);
+        var refundOrPayable = TaxMath.RoundTax(prepaid - totalTax - interest, rs.Rounding);
         trace.Add(new TraceLine("RefundOrPayable",
             refundOrPayable >= 0m ? "Refund due" : "Balance tax payable", refundOrPayable, null));
 
@@ -147,7 +158,7 @@ public sealed class TaxCalculator : ITaxCalculator
             TotalTax = totalTax,
             TdsPaid = input.TdsPaid + input.TcsPaid,
             AdvanceTax = input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid,
-            InterestPenalty = 0m,
+            InterestPenalty = interest,
             RefundOrPayable = refundOrPayable,
             Trace = trace,
         };
@@ -320,16 +331,140 @@ public sealed class TaxCalculator : ITaxCalculator
         return TaxMath.NonNegative(total);
     }
 
-    private static decimal ComputeOtherSourcesHead(TaxComputationInput input, List<TraceLine> trace)
+    /// <summary>
+    /// Set off a brought-forward (earlier-year) loss against the same head's current-year income.
+    /// A b/f loss can only absorb POSITIVE income of its own head; the unutilised part keeps carrying
+    /// forward (reported in the trace). No income this year ⇒ the whole b/f loss carries forward.
+    /// </summary>
+    private static decimal SetOffBroughtForwardLoss(decimal currentIncome, decimal bfLoss, string head, List<TraceLine> trace)
     {
-        if (input.OtherIncomes.Count == 0)
+        if (bfLoss <= 0m)
         {
-            return 0m;
+            return currentIncome;
         }
 
-        var total = input.OtherIncomes.Sum(o => o.Amount);
-        trace.Add(new TraceLine("OtherSources.Net", "Income from other sources", total, "Schedule OS"));
-        return TaxMath.NonNegative(total);
+        if (currentIncome <= 0m)
+        {
+            trace.Add(new TraceLine($"{head}.BfLossCarryForward",
+                $"{head}: brought-forward loss carried forward (no current income to absorb it)", bfLoss, "set-off"));
+            return currentIncome;
+        }
+
+        var setOff = Math.Min(currentIncome, bfLoss);
+        trace.Add(new TraceLine($"{head}.BfLossSetOff",
+            $"Less: brought-forward {head} loss set off against current income", setOff, "set-off"));
+
+        var carryForward = bfLoss - setOff;
+        if (carryForward > 0m)
+        {
+            trace.Add(new TraceLine($"{head}.BfLossCarryForward",
+                $"{head}: brought-forward loss still carried forward", carryForward, "set-off"));
+        }
+
+        return currentIncome - setOff;
+    }
+
+    /// <summary>
+    /// Set off brought-forward capital losses against this year's capital-gain buckets, in a
+    /// tax-minimising order (STCL: slab-rate STCG → 111A → 112 → 112A ; LTCL: 112 → 112A — LTCG only).
+    /// VDA (s.115BBH) gains are never reduced (no loss set-off is allowed against them). Unused loss
+    /// keeps carrying forward (trace). The ordering is a documented default, pending CA validation.
+    /// </summary>
+    private static SpecialRateBuckets ApplyBroughtForwardCapitalLosses(
+        SpecialRateBuckets b, decimal bfStcl, decimal bfLtcl, List<TraceLine> trace)
+    {
+        if (bfStcl <= 0m && bfLtcl <= 0m)
+        {
+            return b;
+        }
+
+        decimal stcg111A = b.Stcg111A, ltcg112ATaxable = b.Ltcg112ATaxable, ltcg112 = b.Ltcg112, slab = b.SlabRateGains;
+
+        // Long-term loss: ONLY against LTCG (s.112 then s.112A taxable).
+        var ltcl = bfLtcl;
+        Absorb(ref ltcl, ref ltcg112);
+        Absorb(ref ltcl, ref ltcg112ATaxable);
+
+        // Short-term loss: against STCG (slab-rate then 111A), then LTCG (112 then 112A taxable).
+        var stcl = bfStcl;
+        Absorb(ref stcl, ref slab);
+        Absorb(ref stcl, ref stcg111A);
+        Absorb(ref stcl, ref ltcg112);
+        Absorb(ref stcl, ref ltcg112ATaxable);
+
+        var usedStcl = bfStcl - stcl;
+        if (usedStcl > 0m)
+        {
+            trace.Add(new TraceLine("CG.BfStclSetOff",
+                "Less: brought-forward short-term capital loss set off against capital gains", usedStcl, "set-off"));
+        }
+        if (stcl > 0m)
+        {
+            trace.Add(new TraceLine("CG.BfStclCarryForward", "Short-term capital loss still carried forward", stcl, "set-off"));
+        }
+
+        var usedLtcl = bfLtcl - ltcl;
+        if (usedLtcl > 0m)
+        {
+            trace.Add(new TraceLine("CG.BfLtclSetOff",
+                "Less: brought-forward long-term capital loss set off against LTCG", usedLtcl, "set-off"));
+        }
+        if (ltcl > 0m)
+        {
+            trace.Add(new TraceLine("CG.BfLtclCarryForward", "Long-term capital loss still carried forward", ltcl, "set-off"));
+        }
+
+        return b with { Stcg111A = stcg111A, Ltcg112ATaxable = ltcg112ATaxable, Ltcg112 = ltcg112, SlabRateGains = slab };
+    }
+
+    private static void Absorb(ref decimal loss, ref decimal gain)
+    {
+        if (loss <= 0m || gain <= 0m)
+        {
+            return;
+        }
+
+        var used = Math.Min(loss, gain);
+        gain -= used;
+        loss -= used;
+    }
+
+    private static (decimal Normal, decimal Casual115BB, decimal Agricultural) ComputeOtherSourcesHead(
+        TaxComputationInput input, List<TraceLine> trace)
+    {
+        decimal normal = 0m, casual = 0m, agri = 0m;
+        foreach (var o in input.OtherIncomes)
+        {
+            switch ((o.Nature ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "lottery_115bb" or "lottery" or "115bb" or "casual" or "winnings":
+                    casual += o.Amount;
+                    break;
+                case "agricultural" or "agriculture" or "agri":
+                    agri += o.Amount;
+                    break;
+                default:
+                    normal += o.Amount;
+                    break;
+            }
+        }
+
+        if (normal != 0m)
+        {
+            trace.Add(new TraceLine("OtherSources.Net", "Income from other sources", TaxMath.NonNegative(normal), "Schedule OS"));
+        }
+
+        if (casual > 0m)
+        {
+            trace.Add(new TraceLine("OtherSources.Casual115BB", "Winnings / casual income (s.115BB, flat-rate)", casual, "s.115BB"));
+        }
+
+        if (agri > 0m)
+        {
+            trace.Add(new TraceLine("OtherSources.Agricultural", "Agricultural income (exempt; aggregated for rate)", agri, "s.10(1)"));
+        }
+
+        return (TaxMath.NonNegative(normal), TaxMath.NonNegative(casual), TaxMath.NonNegative(agri));
     }
 
     // ------------------------------------------------------- Chapter VI-A
@@ -497,6 +632,64 @@ public sealed class TaxCalculator : ITaxCalculator
         }
 
         trace.Add(new TraceLine("SlabTax", "Tax on normal income at slab rates", tax, "Ch.3 §3.4.2.8"));
+        return tax;
+    }
+
+    /// <summary>
+    /// Slab tax with agricultural-income partial integration (s.2(2)/Finance Act scheme): when agri
+    /// income exceeds the threshold and normal income exceeds the basic exemption, tax =
+    /// slabTax(normal + agri) − slabTax(agri + basic exemption). The subtracted amount is the
+    /// "rebate on agricultural income". Otherwise ordinary slab tax.
+    /// </summary>
+    private static decimal ComputeSlabTaxWithAgri(
+        decimal normalTaxable, decimal agri, IReadOnlyList<SlabBand> slabs, RuleSet rs, List<TraceLine> trace)
+    {
+        var basicExemption = BasicExemptionLimit(slabs);
+        if (agri <= rs.AgriIntegrationThreshold || normalTaxable <= basicExemption)
+        {
+            return ComputeSlabTax(normalTaxable, slabs, trace); // agri does not affect the rate
+        }
+
+        var taxOnAggregate = ComputeSlabTaxNoTrace(normalTaxable + agri, slabs);
+        var agriOffset = ComputeSlabTaxNoTrace(agri + basicExemption, slabs);
+        var slabTax = TaxMath.NonNegative(taxOnAggregate - agriOffset);
+
+        trace.Add(new TraceLine("SlabTax", "Tax on normal income at slab rates (agri partial integration)", slabTax, "Ch.3 §3.4.2.8"));
+        trace.Add(new TraceLine("RebateOnAgriculturalIncome",
+            "Rebate on agricultural income (partial-integration offset)", agriOffset, "Partial integration"));
+        return slabTax;
+    }
+
+    /// <summary>The basic exemption limit = upper bound of the first 0%-rate slab band.</summary>
+    private static decimal BasicExemptionLimit(IReadOnlyList<SlabBand> slabs)
+    {
+        foreach (var band in slabs)
+        {
+            if (band.Rate == 0m && band.Upto is { } upto)
+            {
+                return upto;
+            }
+
+            if (band.Rate > 0m)
+            {
+                break;
+            }
+        }
+
+        return 0m;
+    }
+
+    /// <summary>Flat tax on winnings / casual income u/s 115BB (no deductions, no 87A against it).</summary>
+    private static decimal ComputeCasual115BBTax(decimal casual, RuleSet rs, List<TraceLine> trace)
+    {
+        if (casual <= 0m)
+        {
+            return 0m;
+        }
+
+        var rate = rs.CasualIncome115BBRate <= 0m ? 0.30m : rs.CasualIncome115BBRate;
+        var tax = casual * rate;
+        trace.Add(new TraceLine("Tax.Casual115BB", $"Tax on winnings / casual income @ {rate:P0} (s.115BB)", tax, "s.115BB"));
         return tax;
     }
 

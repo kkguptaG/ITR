@@ -33,6 +33,7 @@ public sealed class AuthService : IAuthService
     private readonly int _accessTokenMinutes;
     private readonly int _refreshTokenDays;
     private readonly int _otpTtlSeconds;
+    private readonly bool _allowSelfRegistration;
 
     public AuthService(
         AppDbContext db,
@@ -61,12 +62,22 @@ public sealed class AuthService : IAuthService
         _accessTokenMinutes = ParseInt(jwt["AccessTokenMinutes"], 15);
         _refreshTokenDays = ParseInt(jwt["RefreshTokenDays"], 30);
         _otpTtlSeconds = ParseInt(config["Auth:OtpTtlSeconds"], 300);
+        // Lock-down switch: when "false", no new accounts can be created (neither the register
+        // endpoint nor the signup-OTP path). Existing/seeded accounts can still sign in.
+        _allowSelfRegistration = !string.Equals(
+            config["Auth:AllowSelfRegistration"], "false", StringComparison.OrdinalIgnoreCase);
     }
 
     // ----------------------------------------------------------------- register
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
+        if (!_allowSelfRegistration)
+        {
+            throw new AppException("AUTH.REGISTRATION_CLOSED",
+                "Self-registration is disabled on this environment. Contact the administrator for access.", 403);
+        }
+
         var email = Normalize(request.Email);
         var mobile = NormalizeMobile(request.Mobile);
         var fullName = request.FullName.Trim();
@@ -132,6 +143,12 @@ public sealed class AuthService : IAuthService
     public async Task<OtpRequestResponse> RequestOtpAsync(OtpRequestRequest request, CancellationToken ct = default)
     {
         var purpose = ParsePurpose(request.Purpose);
+        if (purpose == OtpPurpose.Signup && !_allowSelfRegistration)
+        {
+            throw new AppException("AUTH.REGISTRATION_CLOSED",
+                "Self-registration is disabled on this environment.", 403);
+        }
+
         var (identifier, channel) = ResolveIdentifier(request.Identifier);
 
         // Resolve a user if one exists (null for first-time signup OTPs).
@@ -347,7 +364,7 @@ public sealed class AuthService : IAuthService
             ? await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Email == otp.Identifier, ct)
             : await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.MobileE164 == otp.Identifier, ct);
 
-        if (user is not null || otp.Purpose != OtpPurpose.Signup)
+        if (user is not null || otp.Purpose != OtpPurpose.Signup || !_allowSelfRegistration)
         {
             return user;
         }

@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TallyG.Tax.Domain\TallyG.Tax.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TallyG.Tax.Infrastructure\TallyG.Tax.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TallyG.Tax.Api\TallyG.Tax.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -43,6 +43,19 @@ public sealed class RuleSet
     /// <summary>Health &amp; Education cess rate, e.g. 0.04.</summary>
     public decimal Cess { get; init; }
 
+    /// <summary>Monthly interest rate for s.234A/B/C (e.g. 0.01 = 1% per month or part). Default 1%.</summary>
+    public decimal InterestMonthlyRate { get; init; } = 0.01m;
+
+    /// <summary>Advance-tax liability threshold (s.208): at/above this, advance tax is due and
+    /// s.234B/234C can apply. Default ₹10,000.</summary>
+    public decimal AdvanceTaxThreshold { get; init; } = 10000m;
+
+    /// <summary>Flat tax rate on casual income u/s 115BB (lottery, betting, game shows). Default 30%.</summary>
+    public decimal CasualIncome115BBRate { get; init; } = 0.30m;
+
+    /// <summary>Agricultural income above this is aggregated for rate (partial integration). Default ₹5,000.</summary>
+    public decimal AgriIntegrationThreshold { get; init; } = 5000m;
+
     public required RegimeRules Old { get; init; }
     public required RegimeRules New { get; init; }
 
@@ -96,6 +109,10 @@ public sealed class RuleSet
                 Disclaimer = GetString(root, "disclaimer"),
                 Rounding = ParseRounding(root),
                 Cess = GetDecimal(root, "cess") ?? 0.04m,
+                InterestMonthlyRate = GetDecimal(root, "interest_monthly_rate") ?? 0.01m,
+                AdvanceTaxThreshold = GetDecimal(root, "advance_tax_threshold") ?? 10000m,
+                CasualIncome115BBRate = GetDecimal(root, "casual_income_115bb_rate") ?? 0.30m,
+                AgriIntegrationThreshold = GetDecimal(root, "agri_integration_threshold") ?? 5000m,
                 New = ParseRegime(newEl),
                 Old = ParseRegime(oldEl),
                 DeductionCaps = ParseDeductionCaps(root),

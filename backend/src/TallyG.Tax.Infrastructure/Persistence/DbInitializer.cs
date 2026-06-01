@@ -122,8 +122,8 @@ public static class DbInitializer
 
     private static async Task SeedUsersAsync(AppDbContext db, CancellationToken ct)
     {
-        await UpsertUserAsync(db, AdminUserId, "Platform Admin", "admin@tallyg.test", "+919000000001", "Admin", ct);
-        await UpsertUserAsync(db, DemoUserId, "Demo Taxpayer", "demo@tallyg.test", "+919000000002", "User", ct);
+        await UpsertUserAsync(db, AdminUserId, "Platform Admin", "admin@itrhelp.com", "+919000000001", "Admin", ct);
+        await UpsertUserAsync(db, DemoUserId, "Demo Taxpayer", "demo@itrhelp.com", "+919000000002", "User", ct);
     }
 
     private static async Task UpsertUserAsync(

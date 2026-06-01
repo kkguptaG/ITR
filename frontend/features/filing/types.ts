@@ -53,6 +53,7 @@ export type IncomeType =
   | 'CapitalGains'
   | 'Business'
   | 'OtherSources';
+export type SalaryComponentCategory = 'Salary' | 'Perquisite' | 'ProfitInLieu' | 'Allowance';
 
 // ------------------------------------------------------------ income heads (Returns module)
 
@@ -70,6 +71,22 @@ export interface UpsertIncomeSourceRequest {
   sourceMetaJson?: string | null;
 }
 
+export interface SalaryComponentDto {
+  id: Guid;
+  label: string;
+  category: SalaryComponentCategory;
+  total: number;
+  exempt: number;
+  taxable: number;
+  isHra: boolean;
+}
+export interface UpsertSalaryComponentRequest {
+  label: string;
+  category: SalaryComponentCategory;
+  total: number;
+  exempt: number;
+  isHra?: boolean;
+}
 export interface SalaryDetailDto {
   id: Guid;
   employer: string;
@@ -82,6 +99,7 @@ export interface SalaryDetailDto {
   hraExemption: number;
   stdDeduction: number;
   professionalTax: number;
+  components: SalaryComponentDto[];
 }
 export interface UpsertSalaryRequest {
   employer: string;
@@ -94,6 +112,7 @@ export interface UpsertSalaryRequest {
   hraExemption: number;
   stdDeduction: number;
   professionalTax: number;
+  components?: UpsertSalaryComponentRequest[];
 }
 
 export interface HousePropertyDto {

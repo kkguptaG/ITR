@@ -38,6 +38,7 @@ public class AppDbContext : DbContext
     public DbSet<ReturnVersion> ReturnVersions => Set<ReturnVersion>();
     public DbSet<IncomeSource> IncomeSources => Set<IncomeSource>();
     public DbSet<SalaryDetail> SalaryDetails => Set<SalaryDetail>();
+    public DbSet<SalaryComponent> SalaryComponents => Set<SalaryComponent>();
     public DbSet<HouseProperty> HouseProperties => Set<HouseProperty>();
     public DbSet<CapitalGain> CapitalGains => Set<CapitalGain>();
     public DbSet<BusinessIncome> BusinessIncomes => Set<BusinessIncome>();
@@ -48,6 +49,13 @@ public class AppDbContext : DbContext
     // --- Documents ---
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentExtraction> DocumentExtractions => Set<DocumentExtraction>();
+
+    // --- Accounting (chart of accounts + bank-statement import → double-entry vouchers) ---
+    public DbSet<Ledger> Ledgers => Set<Ledger>();
+    public DbSet<BankStatementImport> BankStatementImports => Set<BankStatementImport>();
+    public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
+    public DbSet<Voucher> Vouchers => Set<Voucher>();
+    public DbSet<VoucherEntry> VoucherEntries => Set<VoucherEntry>();
 
     // --- Payments / Growth ---
     public DbSet<Plan> Plans => Set<Plan>();
@@ -83,6 +91,7 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
         ConfigureCompositeKeys(modelBuilder);
+        ConfigureRelationships(modelBuilder);
         ConfigureMoney(modelBuilder);
         ConfigureJsonColumns(modelBuilder);
         ConfigureSqliteValueConversions(modelBuilder);
@@ -94,6 +103,38 @@ public class AppDbContext : DbContext
     {
         b.Entity<UserRole>().HasKey(x => new { x.UserId, x.RoleId, x.ScopeTenantId });
         b.Entity<RolePermission>().HasKey(x => new { x.RoleId, x.PermissionId });
+    }
+
+    /// <summary>Explicit parent/child relationships (those not obvious to convention).</summary>
+    private static void ConfigureRelationships(ModelBuilder b)
+    {
+        // A salary's itemised breakup cascades with the parent SalaryDetail (which is hard-deleted).
+        b.Entity<SalaryDetail>()
+            .HasMany(s => s.Components)
+            .WithOne(c => c.SalaryDetail!)
+            .HasForeignKey(c => c.SalaryDetailId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Accounting: the FK property names (ImportId) do not follow EF's principal-type convention
+        // (BankStatementImportId), so the parent→child links are wired explicitly to avoid shadow
+        // FK columns. Indexes back the import-list and ledger-balance queries.
+        b.Entity<BankStatementImport>()
+            .HasMany(i => i.Lines)
+            .WithOne()
+            .HasForeignKey(l => l.ImportId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<Voucher>()
+            .HasMany(v => v.Entries)
+            .WithOne(e => e.Voucher!)
+            .HasForeignKey(e => e.VoucherId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<Ledger>().HasIndex(l => new { l.TenantId, l.UserId });
+        b.Entity<BankStatementImport>().HasIndex(i => new { i.TenantId, i.UserId });
+        b.Entity<BankStatementLine>().HasIndex(l => l.ImportId);
+        b.Entity<Voucher>().HasIndex(v => new { v.TenantId, v.UserId });
+        b.Entity<VoucherEntry>().HasIndex(e => e.LedgerId);
     }
 
     /// <summary>All decimal money columns are NUMERIC(14,2) — exact to the paisa (Ch.2).</summary>

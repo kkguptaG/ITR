@@ -15,7 +15,18 @@ namespace TallyG.Tax.Api.Modules.Returns;
 public sealed record CreateReturnRequest(string AssessmentYear, ItrType? ItrType, Regime? Regime);
 
 /// <summary>PATCH /returns/{id} body. Only the supplied (non-null) fields are applied.</summary>
-public sealed record UpdateReturnRequest(ItrType? ItrType, Regime? Regime, string? AnswersJson);
+public sealed record UpdateReturnRequest(
+    ItrType? ItrType,
+    Regime? Regime,
+    string? AnswersJson,
+    decimal? TdsPaid = null,
+    decimal? TcsPaid = null,
+    decimal? AdvanceTaxPaid = null,
+    decimal? SelfAssessmentTaxPaid = null,
+    decimal? BroughtForwardHousePropertyLoss = null,
+    decimal? BroughtForwardBusinessLoss = null,
+    decimal? BroughtForwardShortTermCapitalLoss = null,
+    decimal? BroughtForwardLongTermCapitalLoss = null);
 
 /// <summary>List-row projection for GET /returns.</summary>
 public sealed record ReturnSummaryDto(
@@ -53,7 +64,15 @@ public sealed record ReturnDetailDto(
     IReadOnlyList<CapitalGainDto> CapitalGains,
     IReadOnlyList<BusinessIncomeDto> BusinessIncomes,
     IReadOnlyList<DeductionDto> Deductions,
-    TaxComputationDto? LatestComputation);
+    TaxComputationDto? LatestComputation,
+    decimal TdsPaid,
+    decimal TcsPaid,
+    decimal AdvanceTaxPaid,
+    decimal SelfAssessmentTaxPaid,
+    decimal BroughtForwardHousePropertyLoss,
+    decimal BroughtForwardBusinessLoss,
+    decimal BroughtForwardShortTermCapitalLoss,
+    decimal BroughtForwardLongTermCapitalLoss);
 
 // ----------------------------------------------------------------- income sources
 
@@ -74,7 +93,20 @@ public sealed record UpsertSalaryRequest(
     decimal ExemptAllowances,
     decimal HraExemption,
     decimal StdDeduction,
-    decimal ProfessionalTax);
+    decimal ProfessionalTax)
+{
+    /// <summary>Optional Schedule S breakup; when present it rolls up into the fields above.
+    /// A settable init property (not a positional param) so System.Text.Json binds the JSON array.</summary>
+    public IReadOnlyList<UpsertSalaryComponentRequest>? Components { get; init; }
+}
+
+/// <summary>One row of the Schedule S salary breakup grid (Particular / Type / Total / Exempt).</summary>
+public sealed record UpsertSalaryComponentRequest(
+    string Label,
+    SalaryComponentCategory Category,
+    decimal Total,
+    decimal Exempt,
+    bool IsHra);
 
 public sealed record SalaryDetailDto(
     Guid Id,
@@ -87,7 +119,17 @@ public sealed record SalaryDetailDto(
     decimal ExemptAllowances,
     decimal HraExemption,
     decimal StdDeduction,
-    decimal ProfessionalTax);
+    decimal ProfessionalTax,
+    IReadOnlyList<SalaryComponentDto> Components);
+
+public sealed record SalaryComponentDto(
+    Guid Id,
+    string Label,
+    SalaryComponentCategory Category,
+    decimal Total,
+    decimal Exempt,
+    decimal Taxable,
+    bool IsHra);
 
 // ----------------------------------------------------------------- house property
 

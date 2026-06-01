@@ -49,7 +49,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var hp = HousePropertyIncome(ctx.Houses);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = gti - hp - other;                       // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites);
+        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
         var us16 = Math.Max(0m, grossSalary - salExempt - salaryNet);
 
@@ -89,7 +89,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var hp = HousePropertyIncome(ctx.Houses);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = gti - hp - other - business;            // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites);
+        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
 
         return new Dictionary<string, object?>
         {
@@ -136,7 +136,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var cgTotal = cgShort + cgLong;
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = gti - hp - cgTotal - other;            // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites);
+        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
 
         return new Dictionary<string, object?>
         {
@@ -182,7 +182,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var business = ctx.Businesses.Sum(PresumptiveIncome);  // PresumptiveIncome returns NetProfit when not presumptive
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = gti - hp - cgTotal - business - other; // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites);
+        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
 
         return new Dictionary<string, object?>
         {

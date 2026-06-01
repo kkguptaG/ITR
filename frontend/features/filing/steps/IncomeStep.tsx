@@ -138,6 +138,13 @@ export function IncomeStep() {
                           hraExemption: item.hraExemption,
                           stdDeduction: item.stdDeduction,
                           professionalTax: item.professionalTax,
+                          components: (item.components ?? []).map((c) => ({
+                            label: c.label,
+                            category: c.category,
+                            total: c.total,
+                            exempt: c.exempt,
+                            isHra: c.isHra,
+                          })),
                         }
                       : undefined
                   }
@@ -327,11 +334,16 @@ export function IncomeStep() {
               )}
               renderForm={(item, done) => (
                 <OtherIncomeForm
-                  defaultValues={item ? { label: item.label ?? '', amount: item.amount } : undefined}
+                  defaultValues={item ? { label: item.label ?? '', amount: item.amount, nature: parseNature(item.sourceMetaJson) } : undefined}
                   loading={other.addMutation.isPending || other.updateMutation.isPending}
                   onCancel={done}
                   onSubmit={(v) => {
-                    const body = { type: 'OtherSources' as const, label: v.label, amount: v.amount };
+                    const body = {
+                      type: 'OtherSources' as const,
+                      label: v.label,
+                      amount: v.amount,
+                      sourceMetaJson: v.nature && v.nature !== 'normal' ? JSON.stringify({ nature: v.nature }) : null,
+                    };
                     const op = item
                       ? other.updateMutation.mutateAsync({ id: item.id, body })
                       : other.addMutation.mutateAsync(body);
@@ -372,5 +384,19 @@ function houseTypeKey(type: HousePropertyDto['type']): string {
       return 'deemedLetOut';
     default:
       return 'selfOccupied';
+  }
+}
+
+type OtherNature = 'normal' | 'interest' | 'dividend' | 'lottery_115bb' | 'agricultural';
+
+/** Read the {"nature":"…"} tag back out of an income source's sourceMetaJson for the edit form. */
+function parseNature(metaJson: string | null | undefined): OtherNature {
+  if (!metaJson) return 'normal';
+  try {
+    const n = (JSON.parse(metaJson) as { nature?: string })?.nature;
+    const valid: OtherNature[] = ['normal', 'interest', 'dividend', 'lottery_115bb', 'agricultural'];
+    return valid.includes(n as OtherNature) ? (n as OtherNature) : 'normal';
+  } catch {
+    return 'normal';
   }
 }

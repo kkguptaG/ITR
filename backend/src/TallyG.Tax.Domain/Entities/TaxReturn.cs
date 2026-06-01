@@ -37,6 +37,16 @@ public class TaxReturn : BaseEntity, ITenantScoped, ISoftDeletable
     public DateTimeOffset? SubmittedAt { get; set; }
     public DateTimeOffset? EVerifiedAt { get; set; }
 
+    // --- Prepaid taxes (credits) + brought-forward losses captured on the return ---
+    public decimal TdsPaid { get; set; }
+    public decimal TcsPaid { get; set; }
+    public decimal AdvanceTaxPaid { get; set; }
+    public decimal SelfAssessmentTaxPaid { get; set; }
+    public decimal BroughtForwardHousePropertyLoss { get; set; }
+    public decimal BroughtForwardBusinessLoss { get; set; }
+    public decimal BroughtForwardShortTermCapitalLoss { get; set; }
+    public decimal BroughtForwardLongTermCapitalLoss { get; set; }
+
     public DateTimeOffset? DeletedAt { get; set; }
 
     // Navigation

@@ -146,14 +146,14 @@ retail tenant:
 
 | Login (email *or* mobile) | Role  | Use for |
 |---------------------------|-------|---------|
-| `admin@tallyg.test` (`+919000000001`) | Admin | Admin / back-office screens |
-| `demo@tallyg.test`  (`+919000000002`) | User  | The taxpayer filing journey |
+| `admin@itrhelp.com` (`+919000000001`) | Admin | Admin / back-office screens |
+| `demo@itrhelp.com`  (`+919000000002`) | User  | The taxpayer filing journey |
 
 **In `Development`, the OTP code is returned directly in the API response as `devOtp`** — so you
 can log in with no SMS/email provider configured. Both Docker (path A) and local dev (path B) run
 in Development, so this works everywhere out of the box. The flow:
 
-1. `POST /api/v1/auth/otp/request` with `{ "identifier": "demo@tallyg.test", "purpose": "login" }`
+1. `POST /api/v1/auth/otp/request` with `{ "identifier": "demo@itrhelp.com", "purpose": "login" }`
    → returns `{ otpToken, expiresInSeconds, devOtp }`.
 2. `POST /api/v1/auth/otp/verify` with `{ "otpToken": "...", "code": "<devOtp>" }`
    → returns `{ accessToken, refreshToken, user }`.

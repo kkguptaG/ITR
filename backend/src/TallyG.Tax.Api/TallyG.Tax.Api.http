@@ -2,8 +2,8 @@
 ### Base URL (foundation pins the backend to 5080). Run with: dotnet run --project src/TallyG.Tax.Api
 ### In Development the database is Sqlite and OTPs are returned as "devOtp" so you can log in
 ### without an SMS provider. Two users are seeded:
-###   admin@tallyg.test  / +919000000001  (role: Admin)
-###   demo@tallyg.test   / +919000000002  (role: User)
+###   admin@itrhelp.com  / +919000000001  (role: Admin)
+###   demo@itrhelp.com   / +919000000002  (role: User)
 
 @baseUrl = http://localhost:5080/api/v1
 
@@ -27,7 +27,7 @@ POST {{baseUrl}}/auth/otp/request
 Content-Type: application/json
 
 {
-  "identifier": "demo@tallyg.test",
+  "identifier": "demo@itrhelp.com",
   "purpose": "login"
 }
 

@@ -18,6 +18,7 @@ import type { TaxComputationResultDto } from '../types';
 import { useWizard } from '../WizardContext';
 import { WizardStep, WizardFooter } from '../components/WizardStep';
 import { TaxSummaryPanel } from '../components/TaxSummaryPanel';
+import { PrepaidTaxesCard } from '../components/PrepaidTaxesCard';
 
 export function SummaryStep() {
   const t = useTranslations('wizard');
@@ -60,6 +61,7 @@ export function SummaryStep() {
   return (
     <>
       <WizardStep title={t('summaryTitle')} description={t('summarySubtitle')}>
+        <PrepaidTaxesCard returnId={returnId} detail={detail} />
         {computeQuery.isLoading ? (
           <div className="flex flex-col items-center gap-2 py-10 text-sm text-ink-500">
             <Spinner />

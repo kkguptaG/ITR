@@ -47,7 +47,11 @@ public sealed record TaxCalculatorRequest(
     decimal TcsPaid,
     decimal AdvanceTaxPaid,
     decimal SelfAssessmentTaxPaid,
-    Regime? Regime);
+    Regime? Regime,
+    decimal BroughtForwardHousePropertyLoss = 0m,
+    decimal BroughtForwardBusinessLoss = 0m,
+    decimal BroughtForwardShortTermCapitalLoss = 0m,
+    decimal BroughtForwardLongTermCapitalLoss = 0m);
 
 public sealed record SalaryInputDto(
     string? Employer,
@@ -86,7 +90,7 @@ public sealed record BusinessIncomeInputDto(
     decimal NetProfit,
     bool Speculative);
 
-public sealed record OtherIncomeInputDto(string Label, decimal Amount);
+public sealed record OtherIncomeInputDto(string Label, decimal Amount, string? Nature = null);
 
 public sealed record DeductionInputDto(string Section, decimal ClaimedAmount, string? SubType);
 
