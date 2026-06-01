@@ -27,10 +27,16 @@ public static class DeductionRecommender
 
         var suggestions = new List<DeductionSuggestion>();
 
-        // 80D (health insurance) — ranked first for its utility (cover) at the same ROI.
+        // 80D (health insurance) — ranked first for its utility (cover) at the same ROI. The self cap is
+        // age-aware (senior ₹50k, else ₹25k); parents carry a SEPARATE limit on top.
+        var selfCap = input.Age >= 60 ? caps.Section80DSelfSenior : caps.Section80DSelfBelow60;
         AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80D",
             "Health insurance (s.80D, self)", used.GetValueOrDefault("80D_SELF"),
-            caps.Section80DSelfBelow60, lockInYears: 0, liquidity: 1.0m, utilityNote: "Annual cover; protective, not locked.");
+            selfCap, lockInYears: 0, liquidity: 1.0m, utilityNote: "Annual cover; protective, not locked.");
+
+        AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80D_PARENTS",
+            "Health insurance (s.80D, parents)", used.GetValueOrDefault("80D_PARENTS"),
+            caps.Section80DParentsSenior, lockInYears: 0, liquidity: 1.0m, utilityNote: "Separate 80D limit for parents' cover (senior ₹50k).");
 
         // 80CCD(1B) additional NPS — ₹50k over and above 80C.
         AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80CCD1B",
