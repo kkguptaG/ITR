@@ -61,6 +61,11 @@ export function SummaryStep() {
   return (
     <>
       <WizardStep title={t('summaryTitle')} description={t('summarySubtitle')}>
+        <Alert variant="warning" title="Provisional — verify before you file" className="mb-4">
+          These figures are computed by software to assist you. They are <strong>not</strong> a substitute for
+          professional advice and are not yet certified by a Chartered Accountant. Check every income,
+          deduction and exemption against your own documents — and a tax professional if in doubt — before filing.
+        </Alert>
         <PrepaidTaxesCard returnId={returnId} detail={detail} />
         {computeQuery.isLoading ? (
           <div className="flex flex-col items-center gap-2 py-10 text-sm text-ink-500">
