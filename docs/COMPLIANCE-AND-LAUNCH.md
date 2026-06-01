@@ -333,3 +333,20 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
 - Live-verified: 6 rapid requests for one identifier → five 200s then 429. Tests 51/51; build clean.
 - Note: per-identifier (stops targeted SMS-bombing / cost abuse). A global per-IP limiter
   (ASP.NET Core RateLimiter) at the edge is still worth adding for distributed abuse before public launch.
+
+**2026-06-01 — Filable ITR JSON now reflects the engine's prepaid + interest depth:**
+- `ItrJsonGenerationService.TaxPaidNode` previously hard-zeroed **TCS** and **self-assessment tax** and
+  folded TDS+TCS / advance+SA together — so the *downloadable* ITR JSON (what a user uploads to the
+  ITD portal in offline mode) understated the prepaid-tax schedule even though the engine had the data.
+  Now it pulls the **4-way breakdown straight off the return** (TDS / TCS / advance / self-assessment),
+  each as its own head, with a faithful total. (The totals still reconcile with the engine's
+  `RefundOrPayable`, so the net Balance-Payable line is unchanged.)
+- `TaxComputationNode` (PartB-TTI) now itemises **234 interest** (`IntrstPay` = total 234A/B/C; the
+  per-section split lives in the computation trace) plus an `AggregateLiability` = tax + interest, and
+  `TotalTaxPayable` is now that aggregate so it ties out with Balance-Payable.
+- Live-verified end-to-end (admin@itrhelp.com → create AY2026-27 return → PATCH TDS 11111 / TCS 2222 /
+  advance 3333 / SA 444 → generate → download): JSON `TaxesPaid` = {TDS 11111, TCS 2222, AdvanceTax 3333,
+  SelfAssessmentTax 444, Total 17110}, `IntrstPay` present. Tests 51/51; build clean.
+- Caveat unchanged: the ITR JSON shape is modelled on the well-known ITD schema but is **not yet
+  reconciled field-for-field against the official AY2026-27 schema** — that reconciliation (plus ERI/CA
+  sign-off) remains a hard gate before any real upload.

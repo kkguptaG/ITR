@@ -74,7 +74,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
                 ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
             },
             ["ITR1_TaxComputation"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(c),
+            ["TaxPaid"] = TaxPaidNode(ctx, c),
             ["Refund"] = RefundNode(ctx, c),
             ["Verification"] = Verification(ctx)
         };
@@ -120,7 +120,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
                 }).ToList()
             },
             ["ITR4_TaxComputation"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(c),
+            ["TaxPaid"] = TaxPaidNode(ctx, c),
             ["Refund"] = RefundNode(ctx, c),
             ["Verification"] = Verification(ctx)
         };
@@ -165,7 +165,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
                 ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
             },
             ["PartB_TTI"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(c),
+            ["TaxPaid"] = TaxPaidNode(ctx, c),
             ["Refund"] = RefundNode(ctx, c),
             ["Verification"] = Verification(ctx)
         };
@@ -224,7 +224,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
                 ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
             },
             ["PartB_TTI"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(c),
+            ["TaxPaid"] = TaxPaidNode(ctx, c),
             ["Refund"] = RefundNode(ctx, c),
             ["Verification"] = Verification(ctx)
         };
@@ -302,24 +302,32 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             ["EducationCess"] = R(c?.Cess ?? 0m),
             ["GrossTaxLiability"] = R(c?.TotalTax ?? 0m),
             ["NetTaxLiability"] = R(c?.TotalTax ?? 0m),
-            ["TotalTaxPayable"] = R(c?.TotalTax ?? 0m)
+            ["IntrstPay"] = R(c?.InterestPenalty ?? 0m),       // total interest u/s 234A/B/C (per-section split lives in the trace)
+            ["AggregateLiability"] = R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m)),
+            ["TotalTaxPayable"] = R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m))  // tax + 234 interest
         };
     }
 
-    private static Dictionary<string, object?> TaxPaidNode(TaxComputation? c)
+    private static Dictionary<string, object?> TaxPaidNode(ItrFilingContext ctx, TaxComputation? c)
     {
-        var tds = c?.TdsPaid ?? 0m;
-        var adv = c?.AdvanceTax ?? 0m;
-        var total = tds + adv;
+        // Pull the prepaid-tax breakdown straight from the return so the schedule is
+        // faithful (TDS / TCS / advance / self-assessment as separate heads). The engine
+        // folds these into c.TdsPaid (= TDS + TCS) and c.AdvanceTax (= advance + SA) for
+        // the refund math, so the total below reconciles with c.RefundOrPayable.
+        var tds = ctx.Return.TdsPaid;
+        var tcs = ctx.Return.TcsPaid;
+        var adv = ctx.Return.AdvanceTaxPaid;
+        var sa = ctx.Return.SelfAssessmentTaxPaid;
+        var total = tds + tcs + adv + sa;
         var refundOrPayable = c?.RefundOrPayable ?? 0m;       // +ve = refund, -ve = payable
         return new Dictionary<string, object?>
         {
             ["TaxesPaid"] = new Dictionary<string, object?>
             {
                 ["TDS"] = R(tds),
-                ["TCS"] = 0,
+                ["TCS"] = R(tcs),
                 ["AdvanceTax"] = R(adv),
-                ["SelfAssessmentTax"] = 0,
+                ["SelfAssessmentTax"] = R(sa),
                 ["TotalTaxesPaid"] = R(total)
             },
             ["BalTaxPayable"] = R(Math.Max(0m, -refundOrPayable))
