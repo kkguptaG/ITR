@@ -14,6 +14,15 @@ const money = z
 
 const optionalMoney = money.optional().default(0);
 
+// Signed money: may be negative (e.g. a regular business net LOSS). The engine sets off / carries
+// forward the loss; only presumptive income is constrained to be non-negative (see the schema refine).
+const optionalSignedMoney = z
+  .number({ invalid_type_error: 'Enter an amount.' })
+  .min(-1_000_000_000_000, 'Amount looks too large')
+  .max(1_000_000_000_000, 'Amount looks too large')
+  .optional()
+  .default(0);
+
 // PAN: 5 letters, 4 digits, 1 letter.
 const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
@@ -105,13 +114,17 @@ export const businessIncomeSchema = z
     turnover: optionalMoney,
     grossReceiptsDigital: optionalMoney,
     grossReceiptsCash: optionalMoney,
-    netProfit: optionalMoney,
+    netProfit: optionalSignedMoney,
     speculativeFlag: z.boolean().default(false),
     gstTurnoverReported: optionalMoney,
   })
   .refine((v) => !v.isPresumptive || !!v.presumptiveSection, {
     message: 'Select a presumptive section (44AD/44ADA).',
     path: ['presumptiveSection'],
+  })
+  .refine((v) => !v.isPresumptive || (v.netProfit ?? 0) >= 0, {
+    message: 'Presumptive income cannot be a loss.',
+    path: ['netProfit'],
   });
 export type BusinessIncomeFormValues = z.infer<typeof businessIncomeSchema>;
 

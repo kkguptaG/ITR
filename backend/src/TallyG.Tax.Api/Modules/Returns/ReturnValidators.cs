@@ -129,15 +129,20 @@ public sealed class UpsertBusinessIncomeRequestValidator : AbstractValidator<Ups
         RuleFor(x => x.Turnover).GreaterThanOrEqualTo(0);
         RuleFor(x => x.GrossReceiptsDigital).GreaterThanOrEqualTo(0);
         RuleFor(x => x.GrossReceiptsCash).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.NetProfit).GreaterThanOrEqualTo(0);
         RuleFor(x => x.GstTurnoverReported).GreaterThanOrEqualTo(0);
         RuleFor(x => x.NatureOfBusinessCode).MaximumLength(32);
 
+        // NetProfit may be a LOSS (negative) for a regular (non-presumptive) business — that loss is
+        // set off / carried forward by the engine (s.71/72/73). Only PRESUMPTIVE income, declared at a
+        // statutory minimum rate of turnover, cannot be a loss.
         When(x => x.IsPresumptive, () =>
+        {
+            RuleFor(x => x.NetProfit).GreaterThanOrEqualTo(0).WithMessage("Presumptive income cannot be a loss.");
             RuleFor(x => x.PresumptiveSection)
                 .NotEmpty().WithMessage("A presumptive section (44AD/44ADA/44AE) is required.")
                 .Must(s => s is not null && PresumptiveSections.Contains(s.Trim().ToUpperInvariant()))
-                .WithMessage("Presumptive section must be one of: 44AD, 44ADA, 44AE."));
+                .WithMessage("Presumptive section must be one of: 44AD, 44ADA, 44AE.");
+        });
     }
 }
 

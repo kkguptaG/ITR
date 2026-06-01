@@ -12,6 +12,8 @@ export interface CurrencyInputProps
   /** Called with the parsed number (or null when cleared). */
   onValueChange?: (value: number | null) => void;
   invalid?: boolean;
+  /** Allow a leading minus so the field can capture a negative amount (e.g. a business loss). */
+  allowNegative?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface CurrencyInputProps
  * `value`/`onValueChange`; designed to bind to react-hook-form's Controller.
  */
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
-  function CurrencyInput({ value, onValueChange, invalid, className, onBlur, ...props }, ref) {
+  function CurrencyInput({ value, onValueChange, invalid, allowNegative, className, onBlur, ...props }, ref) {
     const [display, setDisplay] = useState<string>(
       value === null || value === undefined ? '' : formatNumber(value),
     );
@@ -55,10 +57,15 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           value={display}
           onChange={(e) => {
             const raw = e.target.value;
-            // Allow only digits, comma, dot while typing.
-            const cleaned = raw.replace(/[^\d.,]/g, '');
+            // Allow digits, comma, dot (and a single leading minus when negatives are permitted).
+            let cleaned = raw.replace(allowNegative ? /[^\d.,-]/g : /[^\d.,]/g, '');
+            if (allowNegative) {
+              const negative = cleaned.startsWith('-');
+              cleaned = (negative ? '-' : '') + cleaned.replace(/-/g, '');
+            }
             setDisplay(cleaned);
-            if (cleaned.trim() === '') {
+            // Empty, or a lone minus mid-typing, clears the value.
+            if (cleaned.trim() === '' || cleaned.trim() === '-') {
               onValueChange?.(null);
             } else {
               onValueChange?.(parseInr(cleaned));

@@ -33,12 +33,14 @@ function MoneyField<T extends Record<string, unknown>>({
   label,
   hint,
   error,
+  allowNegative,
 }: {
   control: Control<T>;
   name: Path<T>;
   label: string;
   hint?: string;
   error?: string;
+  allowNegative?: boolean;
 }) {
   return (
     <Field label={label} hint={hint} error={error}>
@@ -50,6 +52,7 @@ function MoneyField<T extends Record<string, unknown>>({
             value={(field.value as number) ?? null}
             onValueChange={(v) => field.onChange(v ?? 0)}
             onBlur={field.onBlur}
+            allowNegative={allowNegative}
           />
         )}
       />
@@ -486,7 +489,7 @@ export function BusinessIncomeForm({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <MoneyField control={control} name="turnover" label={t('turnover')} />
-          <MoneyField control={control} name="netProfit" label={t('netProfit')} />
+          <MoneyField control={control} name="netProfit" label={t('netProfit')} hint={t('netProfitHint')} error={errors.netProfit?.message} allowNegative />
         </div>
       )}
 
