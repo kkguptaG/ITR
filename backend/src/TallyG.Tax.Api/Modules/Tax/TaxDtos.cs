@@ -124,6 +124,9 @@ public sealed record TaxComputationResultDto(
     decimal AmtCreditSetOff,
     decimal Relief89,
     decimal Relief90And91,
+    decimal HousePropertyLossCarriedForward,
+    decimal BusinessLossCarriedForward,
+    decimal SpeculativeLossCarriedForward,
     IReadOnlyList<TraceLineDto> Trace);
 
 /// <summary>One explainable line of the computation pipeline.</summary>

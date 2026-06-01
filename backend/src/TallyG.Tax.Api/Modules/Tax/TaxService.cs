@@ -187,6 +187,9 @@ public sealed class TaxService : ITaxService
         AmtCreditSetOff = r.AmtCreditSetOff,
         Relief89 = r.Relief89,
         Relief90And91 = r.Relief90And91,
+        HousePropertyLossCarriedForward = r.HousePropertyLossCarriedForward,
+        BusinessLossCarriedForward = r.BusinessLossCarriedForward,
+        SpeculativeLossCarriedForward = r.SpeculativeLossCarriedForward,
         IsRecommended = recommended,
         TraceJson = JsonSerializer.Serialize(r.Trace, TraceJsonOptions),
         ComputedAt = now,
@@ -385,6 +388,9 @@ public sealed class TaxService : ITaxService
             r.AmtCreditSetOff,
             r.Relief89,
             r.Relief90And91,
+            r.HousePropertyLossCarriedForward,
+            r.BusinessLossCarriedForward,
+            r.SpeculativeLossCarriedForward,
             r.Trace.Select(t => new TraceLineDto(t.Step, t.Description, t.Amount, t.RuleRef)).ToList());
 
     private static RegimeSlabsDto ToRegimeSlabsDto(RegimeRules rr)

@@ -42,6 +42,11 @@ public class TaxComputation : BaseEntity, ITenantScoped
     public decimal Relief89 { get; set; }
     public decimal Relief90And91 { get; set; }
 
+    // Current-year losses carried forward after inter-head set-off (s.71); 0 when none. Feed next year's b/f.
+    public decimal HousePropertyLossCarriedForward { get; set; }   // s.71B (8 years, vs HP income)
+    public decimal BusinessLossCarriedForward { get; set; }        // s.72 (8 years, vs business income)
+    public decimal SpeculativeLossCarriedForward { get; set; }     // s.73 (4 years, vs speculative income)
+
     public bool IsRecommended { get; set; }
 
     /// <summary>Line-by-line computation trace (jsonb on Postgres, text on Sqlite).</summary>

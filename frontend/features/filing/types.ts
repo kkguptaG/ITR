@@ -266,6 +266,10 @@ export interface TaxComputationResultDto {
   amtCreditSetOff: number;
   relief89: number;
   relief90And91: number;
+  // Current-year losses carried forward after inter-head set-off (s.71); 0 when none.
+  housePropertyLossCarriedForward: number;
+  businessLossCarriedForward: number;
+  speculativeLossCarriedForward: number;
   trace: TraceLineDto[];
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */

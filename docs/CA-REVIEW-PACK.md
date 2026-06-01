@@ -125,9 +125,9 @@ scenario through `/api/v1/tax/regime-compare` and read the line‑by‑line `tra
 2. **AMT surcharge** — surcharge on AMT computed without marginal relief; confirm acceptable.
 3. **Ordering** — FTC (90/91) and relief 89 are applied after the max(regular, AMT) determination; confirm the interaction order.
 4. **80GG / 80G base** — "total income / adjusted GTI" approximated as income before those two deductions (excludes special‑rate income); confirm.
-5. **CG asset gating** — engine trusts the section the filer picks (does not hard‑gate 54EC to land/building only); confirm or require gating.
+5. **CG asset gating** — ✓ **implemented**: s.54EC is now gated to land/building only (ignored for other assets, per `CapitalGainsCalculator`). Confirm, or specify gating for further sections.
 6. **234B stop‑date / 234C late‑income proviso** — simplified; confirm.
-7. **Current‑year business loss** — floored (not inter‑head set off / carried forward); confirm scope.
+7. **Current‑year inter‑head set‑off & carry‑forward** — ✓ **implemented** (`LossSetOff`): s.71 inter‑head; s.71(2A) a business loss is NOT set off vs salary; s.71(3A) house‑property inter‑head set‑off capped ₹2,00,000; s.71B/72/73 carry‑forward surfaced; speculative loss ring‑fenced; VDA (115BBH) / casual (115BB) income never reduced. Confirm the absorption ordering (slab‑rate income before special‑rate CG buckets) and that ordinary other‑sources losses correctly lapse.
 8. **87A vs special‑rate / agri** — rebate applied against slab tax on normal income only; confirm.
 9. **Rounding** — 288A income to ₹10, 288B tax to ₹1; confirm method (round‑half‑up).
 

@@ -56,6 +56,10 @@ export interface TaxComputationDto {
   amtCreditSetOff: DecimalString;
   relief89: DecimalString;
   relief90And91: DecimalString;
+  // Current-year losses carried forward after inter-head set-off (s.71); "0" when none.
+  housePropertyLossCarriedForward: DecimalString;
+  businessLossCarriedForward: DecimalString;
+  speculativeLossCarriedForward: DecimalString;
   isRecommended: boolean;
   computedAt: IsoDateTime;
 }

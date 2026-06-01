@@ -158,6 +158,9 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     amtCreditSetOff: num(c.amtCreditSetOff),
     relief89: num(c.relief89),
     relief90And91: num(c.relief90And91),
+    housePropertyLossCarriedForward: num(c.housePropertyLossCarriedForward),
+    businessLossCarriedForward: num(c.businessLossCarriedForward),
+    speculativeLossCarriedForward: num(c.speculativeLossCarriedForward),
     trace: [],
   };
 }

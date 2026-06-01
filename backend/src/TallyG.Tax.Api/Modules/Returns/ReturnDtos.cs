@@ -297,5 +297,8 @@ public sealed record TaxComputationDto(
     decimal AmtCreditSetOff,
     decimal Relief89,
     decimal Relief90And91,
+    decimal HousePropertyLossCarriedForward,
+    decimal BusinessLossCarriedForward,
+    decimal SpeculativeLossCarriedForward,
     bool IsRecommended,
     DateTimeOffset ComputedAt);

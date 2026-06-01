@@ -155,6 +155,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             },
             ["ScheduleOS"] = new Dictionary<string, object?> { ["TotIncFromOS"] = R(other) },
             ["ScheduleVIA"] = ChapterViaSchedule(ctx),
+            ["ScheduleCFL"] = ScheduleCflNode(c),
             ["PartB_TI"] = new Dictionary<string, object?>
             {
                 ["Salaries"] = R(salaryNet),
@@ -213,6 +214,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             },
             ["ScheduleOS"] = new Dictionary<string, object?> { ["TotIncFromOS"] = R(other) },
             ["ScheduleVIA"] = ChapterViaSchedule(ctx),
+            ["ScheduleCFL"] = ScheduleCflNode(c),
             ["PartB_TI"] = new Dictionary<string, object?>
             {
                 ["Salaries"] = R(salaryNet),
@@ -285,6 +287,24 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             _ => "RES"
         }
     };
+
+    /// <summary>
+    /// Schedule CFL — current-year losses carried forward after inter-head set-off (s.71B/72/73).
+    /// ITR-2/ITR-3 only. All-zero is a valid empty schedule (no losses to carry).
+    /// </summary>
+    private static Dictionary<string, object?> ScheduleCflNode(TaxComputation? c)
+    {
+        var hp = c?.HousePropertyLossCarriedForward ?? 0m;
+        var biz = c?.BusinessLossCarriedForward ?? 0m;
+        var spec = c?.SpeculativeLossCarriedForward ?? 0m;
+        return new Dictionary<string, object?>
+        {
+            ["HousePropertyLossCF"] = R(hp),     // s.71B — 8 years, vs HP income
+            ["BusinessLossCF"] = R(biz),         // s.72  — 8 years, vs business income
+            ["SpeculativeBusinessLossCF"] = R(spec),  // s.73 — 4 years, vs speculative income
+            ["TotalLossCarriedForward"] = R(hp + biz + spec)
+        };
+    }
 
     private static Dictionary<string, object?> TaxComputationNode(TaxComputation? c)
     {

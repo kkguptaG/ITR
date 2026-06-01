@@ -1144,6 +1144,9 @@ public sealed class ReturnService : IReturnService
             AmtCreditSetOff = result.AmtCreditSetOff,
             Relief89 = result.Relief89,
             Relief90And91 = result.Relief90And91,
+            HousePropertyLossCarriedForward = result.HousePropertyLossCarriedForward,
+            BusinessLossCarriedForward = result.BusinessLossCarriedForward,
+            SpeculativeLossCarriedForward = result.SpeculativeLossCarriedForward,
             IsRecommended = true,
             TraceJson = JsonSerializer.Serialize(result.Trace, SnapshotJsonOptions),
             ComputedAt = _clock.UtcNow
@@ -1278,7 +1281,9 @@ public sealed class ReturnService : IReturnService
         c.Id, c.Regime, c.GrossTotalIncome, c.TotalDeductions, c.TaxableIncome, c.TaxBeforeCess,
         c.Cess, c.Rebate87A, c.Surcharge, c.TotalTax, c.TdsPaid, c.AdvanceTax, c.InterestPenalty,
         c.RefundOrPayable, c.AdjustedTotalIncome, c.AlternativeMinimumTax, c.AmtCreditGenerated,
-        c.AmtCreditSetOff, c.Relief89, c.Relief90And91, c.IsRecommended, c.ComputedAt);
+        c.AmtCreditSetOff, c.Relief89, c.Relief90And91,
+        c.HousePropertyLossCarriedForward, c.BusinessLossCarriedForward, c.SpeculativeLossCarriedForward,
+        c.IsRecommended, c.ComputedAt);
 
     // --- misc helpers ---
 
