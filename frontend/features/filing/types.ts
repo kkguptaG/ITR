@@ -259,6 +259,13 @@ export interface TaxComputationResultDto {
   interestPenalty: number;
   /** Positive = refund due, negative = payable. */
   refundOrPayable: number;
+  // AMT (s.115JC/JD) + reliefs (s.89/90/91); 0 when not applicable.
+  adjustedTotalIncome: number;
+  alternativeMinimumTax: number;
+  amtCreditGenerated: number;
+  amtCreditSetOff: number;
+  relief89: number;
+  relief90And91: number;
   trace: TraceLineDto[];
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */

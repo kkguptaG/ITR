@@ -73,8 +73,13 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
           {comp.rebate87A > 0 && <Line label={t('rebate87A')} value={comp.rebate87A} tone="subtract" indent />}
           {comp.surcharge > 0 && <Line label={t('surcharge')} value={comp.surcharge} indent />}
           <Line label={t('cess')} value={comp.cess} indent />
+          {comp.alternativeMinimumTax > 0 && <Line label="Alternate Minimum Tax (s.115JC)" value={comp.alternativeMinimumTax} indent />}
+          {comp.amtCreditSetOff > 0 && <Line label="Less: AMT credit set off (s.115JD)" value={comp.amtCreditSetOff} tone="subtract" indent />}
+          {comp.relief89 > 0 && <Line label="Less: relief u/s 89 (arrears)" value={comp.relief89} tone="subtract" indent />}
+          {comp.relief90And91 > 0 && <Line label="Less: relief u/s 90/91 (foreign tax)" value={comp.relief90And91} tone="subtract" indent />}
           {comp.interestPenalty > 0 && <Line label={t('interestPenalty')} value={comp.interestPenalty} indent />}
           <Line label={t('totalTax')} value={comp.totalTax} strong />
+          {comp.amtCreditGenerated > 0 && <Line label="AMT credit carried forward (s.115JD)" value={comp.amtCreditGenerated} tone="muted" indent />}
         </div>
         <div className="py-1.5">
           <Line label={t('tdsPaid')} value={comp.tdsPaid} tone="subtract" />
