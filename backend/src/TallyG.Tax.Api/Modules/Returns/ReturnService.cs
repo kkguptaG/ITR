@@ -197,6 +197,12 @@ public sealed class ReturnService : IReturnService
         if (request.BroughtForwardBusinessLoss is { } bl) ret.BroughtForwardBusinessLoss = Math.Max(0m, bl);
         if (request.BroughtForwardShortTermCapitalLoss is { } stcl) ret.BroughtForwardShortTermCapitalLoss = Math.Max(0m, stcl);
         if (request.BroughtForwardLongTermCapitalLoss is { } ltcl) ret.BroughtForwardLongTermCapitalLoss = Math.Max(0m, ltcl);
+        // AMT credit (s.115JD) + reliefs (s.89/90/91).
+        if (request.BroughtForwardAmtCredit is { } amtc) ret.BroughtForwardAmtCredit = Math.Max(0m, amtc);
+        if (request.Relief89 is { } r89) ret.Relief89 = Math.Max(0m, r89);
+        if (request.ForeignIncomeDoublyTaxed is { } fdi) ret.ForeignIncomeDoublyTaxed = Math.Max(0m, fdi);
+        if (request.ForeignTaxPaid is { } ftp) ret.ForeignTaxPaid = Math.Max(0m, ftp);
+        if (request.ForeignDtaaApplies is { } dtaa) ret.ForeignDtaaApplies = dtaa;
 
         // Touching the working draft moves it out of the pristine Draft state.
         if (ret.Status == ReturnStatus.Draft)
@@ -1004,7 +1010,12 @@ public sealed class ReturnService : IReturnService
             ret.BroughtForwardHousePropertyLoss,
             ret.BroughtForwardBusinessLoss,
             ret.BroughtForwardShortTermCapitalLoss,
-            ret.BroughtForwardLongTermCapitalLoss);
+            ret.BroughtForwardLongTermCapitalLoss,
+            ret.BroughtForwardAmtCredit,
+            ret.Relief89,
+            ret.ForeignIncomeDoublyTaxed,
+            ret.ForeignTaxPaid,
+            ret.ForeignDtaaApplies);
     }
 
     /// <summary>

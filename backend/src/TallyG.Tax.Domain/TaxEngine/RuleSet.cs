@@ -56,6 +56,28 @@ public sealed class RuleSet
     /// <summary>Agricultural income above this is aggregated for rate (partial integration). Default ₹5,000.</summary>
     public decimal AgriIntegrationThreshold { get; init; } = 5000m;
 
+    /// <summary>Alternate Minimum Tax rate u/s 115JC (non-corporate). Default 18.5%.</summary>
+    public decimal AmtRate { get; init; } = 0.185m;
+
+    /// <summary>AMT (for individual/HUF/AOP/BOI) applies only if adjusted total income EXCEEDS this. Default ₹20,00,000.</summary>
+    public decimal AmtThresholdIndividual { get; init; } = 2000000m;
+
+    /// <summary>Master switch for AMT u/s 115JC. Default true.</summary>
+    public bool AmtEnabled { get; init; } = true;
+
+    /// <summary>
+    /// Chapter VI-A Part-C (profit-linked) sections + 10AA/35AD added back to total income to form the
+    /// "adjusted total income" for AMT (s.115JC(2)). Excludes 80P. Stored canonically (alphanumerics
+    /// only, upper-case) so "80-IAC", "80 IAC" and "80iac" all match.
+    /// </summary>
+    public IReadOnlySet<string> AmtAddBackSections { get; init; } = DefaultAmtAddBackSections;
+
+    private static readonly IReadOnlySet<string> DefaultAmtAddBackSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "80IA", "80IAB", "80IAC", "80IB", "80IBA", "80IC", "80ID", "80IE",
+        "80JJA", "80JJAA", "80LA", "80QQB", "80RRB", "10AA", "35AD",
+    };
+
     public required RegimeRules Old { get; init; }
     public required RegimeRules New { get; init; }
 
@@ -113,6 +135,10 @@ public sealed class RuleSet
                 AdvanceTaxThreshold = GetDecimal(root, "advance_tax_threshold") ?? 10000m,
                 CasualIncome115BBRate = GetDecimal(root, "casual_income_115bb_rate") ?? 0.30m,
                 AgriIntegrationThreshold = GetDecimal(root, "agri_integration_threshold") ?? 5000m,
+                AmtRate = GetDecimal(root, "amt_rate") ?? 0.185m,
+                AmtThresholdIndividual = GetDecimal(root, "amt_threshold_individual") ?? 2000000m,
+                AmtEnabled = GetBool(root, "amt_enabled") ?? true,
+                AmtAddBackSections = ParseCanonicalSet(root, "amt_addback_sections", DefaultAmtAddBackSections),
                 New = ParseRegime(newEl),
                 Old = ParseRegime(oldEl),
                 DeductionCaps = ParseDeductionCaps(root),
@@ -374,6 +400,30 @@ public sealed class RuleSet
         }
 
         return set;
+    }
+
+    /// <summary>Canonicalise a section label to alphanumerics-only, upper-case ("80-IAC" → "80IAC").</summary>
+    public static string CanonicalSection(string? section)
+        => new string((section ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+
+    /// <summary>Parse an array of section labels into a canonical set; falls back to <paramref name="fallback"/> if absent/empty.</summary>
+    private static IReadOnlySet<string> ParseCanonicalSet(JsonElement el, string name, IReadOnlySet<string> fallback)
+    {
+        if (!el.TryGetProperty(name, out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return fallback;
+        }
+
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
+            {
+                set.Add(CanonicalSection(s));
+            }
+        }
+
+        return set.Count > 0 ? set : fallback;
     }
 }
 

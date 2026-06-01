@@ -91,6 +91,23 @@ public sealed record TaxComputationInput
 
     /// <summary>Brought-forward long-term capital loss (sets off ONLY vs current LTCG; 8-year c/f).</summary>
     public decimal BroughtForwardLongTermCapitalLoss { get; init; }
+
+    // --- Alternate Minimum Tax (s.115JC/JD) + reliefs (s.89/90/91) ---
+
+    /// <summary>Brought-forward AMT credit u/s 115JD; set off in a year where regular tax exceeds AMT.</summary>
+    public decimal BroughtForwardAmtCredit { get; init; }
+
+    /// <summary>Relief u/s 89(1) for salary arrears (Form 10E), pre-computed (see <see cref="Section89Calculator"/>); subtracted from tax.</summary>
+    public decimal Relief89 { get; init; }
+
+    /// <summary>Foreign income that is doubly taxed (India + abroad), eligible for FTC u/s 90/90A/91.</summary>
+    public decimal ForeignIncomeDoublyTaxed { get; init; }
+
+    /// <summary>Foreign tax actually paid on that income (the credit ceiling).</summary>
+    public decimal ForeignTaxPaid { get; init; }
+
+    /// <summary>True ⇒ a DTAA exists with the source country (relief u/s 90/90A); false ⇒ unilateral relief u/s 91.</summary>
+    public bool ForeignDtaaApplies { get; init; }
 }
 
 /// <summary>One advance-tax payment (amount + date paid) used for exact s.234C deferment interest.</summary>
@@ -171,6 +188,26 @@ public sealed record ComputationResult
 
     /// <summary>Positive ⇒ refund due; negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; init; }
+
+    // --- AMT (s.115JC/JD) + reliefs (s.89/90/91); all zero when not applicable ---
+
+    /// <summary>Adjusted Total Income for AMT (total income + Part-C/10AA/35AD add-backs). 0 when AMT N/A.</summary>
+    public decimal AdjustedTotalIncome { get; init; }
+
+    /// <summary>Alternate Minimum Tax u/s 115JC (incl. its surcharge + cess). 0 when AMT N/A.</summary>
+    public decimal AlternativeMinimumTax { get; init; }
+
+    /// <summary>AMT credit generated this year and carried forward u/s 115JD (AMT − regular tax, when AMT is higher).</summary>
+    public decimal AmtCreditGenerated { get; init; }
+
+    /// <summary>Brought-forward AMT credit set off this year u/s 115JD (when regular tax exceeds AMT).</summary>
+    public decimal AmtCreditSetOff { get; init; }
+
+    /// <summary>Relief u/s 89(1) for salary arrears (Form 10E) applied against the tax.</summary>
+    public decimal Relief89 { get; init; }
+
+    /// <summary>Relief u/s 90/90A/91 — credit for foreign tax on doubly-taxed income.</summary>
+    public decimal Relief90And91 { get; init; }
 
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();

@@ -60,6 +60,12 @@ internal static class TaxComputationInputFactory
             BroughtForwardBusinessLoss = ret.BroughtForwardBusinessLoss,
             BroughtForwardShortTermCapitalLoss = ret.BroughtForwardShortTermCapitalLoss,
             BroughtForwardLongTermCapitalLoss = ret.BroughtForwardLongTermCapitalLoss,
+            // AMT credit (s.115JD) + reliefs (s.89/90/91).
+            BroughtForwardAmtCredit = ret.BroughtForwardAmtCredit,
+            Relief89 = ret.Relief89,
+            ForeignIncomeDoublyTaxed = ret.ForeignIncomeDoublyTaxed,
+            ForeignTaxPaid = ret.ForeignTaxPaid,
+            ForeignDtaaApplies = ret.ForeignDtaaApplies,
             // s.234A/B/C interest context: dates from the AY; "as of" = submitted date or today (draft).
             FilingDueDate = ay?.DueDateNonAudit,
             ActualFilingDate = ret.SubmittedAt is { } sub ? DateOnly.FromDateTime(sub.UtcDateTime) : asOf,

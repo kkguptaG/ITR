@@ -389,3 +389,33 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   + **no "Now listening"**; key `"abc"` → `"…too short for HMAC-SHA256"`; Development → boots, `/health` 200.
   `render.yaml` already sets a real `Auth__Jwt__SigningKey`, so this is a guardrail against future
   misconfig, not a change to the current deploy. Build clean; engine tests unaffected (51/51).
+
+**2026-06-01 — Engine depth: AMT (s.115JC/JD) + reliefs u/s 89, 90/90A, 91:**
+- **AMT (s.115JC) + credit (s.115JD)** — new `AmtCalculator`, wired into the pipeline between regular
+  tax and the prepaid/interest stage. Old-regime only (does NOT apply to a 115BAC/new-regime opter);
+  applies only when profit-linked deductions are claimed (Chapter VI-A **Part C** s.80-IA…80RRB except
+  80P, plus 10AA/35AD — a rule-set-driven, canonicalised add-back set) AND adjusted total income
+  exceeds ₹20L (individual threshold, rule-set driven). AMT = 18.5% of ATI + surcharge + cess; if it
+  exceeds the regular tax it becomes payable and the excess is an **AMT credit carried forward** (15 AY);
+  a brought-forward credit is **set off** when regular tax later exceeds AMT. Guard: zero add-backs ⇒
+  chapter skipped (prevents a false 18.5% trigger). New rule-set keys `amt_rate` / `amt_threshold_individual`
+  / `amt_enabled` / `amt_addback_sections` (defaults baked in; the AY2025-26/26-27 seeds use defaults).
+- **Relief u/s 89(1)** (salary arrears, Form 10E) — new pure `Section89Calculator` (relief = current-year
+  extra tax − Σ origin-year extra tax, floored at 0; the caller supplies per-year tax figures so no wrong
+  year's slabs are ever applied to historical income). The engine applies a supplied relief amount.
+- **Relief u/s 90/90A (DTAA) + 91 (unilateral)** — new pure `ForeignTaxCreditCalculator`: relief =
+  doubly-taxed income × lower of (average Indian rate, foreign rate), capped at foreign tax paid; the
+  `ForeignDtaaApplies` flag picks the 90/90A vs 91 label. Wired into the pipeline.
+- **Capture + persistence**: `TaxReturn` gains `BroughtForwardAmtCredit / Relief89 / ForeignIncomeDoublyTaxed
+  / ForeignTaxPaid / ForeignDtaaApplies`; mapped in the single `TaxComputationInputFactory`; exposed on
+  `UpdateReturnRequest` + `ReturnDetailDto` + the ad-hoc `TaxCalculatorRequest`; the six AMT/relief OUTPUTS
+  are added to `TaxComputationResultDto`. New EF migration `AddAmtAndReliefInputs` (Npgsql, snake_case).
+  Frontend: the Summary-step card now captures the four amounts + a DTAA toggle and recomputes.
+- **Verified**: 12 new unit tests (engine **51 → 63**, all green) covering AMT payable / below-threshold /
+  new-regime-N/A / no-deduction / credit set-off, the 89 formula (positive / zero / multi-year + engine
+  application), and FTC (lower-rate / cap / engine application). Live end-to-end (admin@itrhelp.com,
+  AY2026-27): 80-IAC ₹35L on ₹50L salary ⇒ ATI ₹49.5L, AMT ₹9,52,380, credit ₹6,94,980 replacing the
+  ₹2,57,400 regular tax; reliefs ₹50k (89) + ₹30k (90) persisted and applied (₹4,13,400 → ₹3,33,400).
+- **PENDING CA REVIEW (documented):** firm/LLP (no ₹20L threshold) vs individual; surcharge-marginal-relief
+  on AMT; the FTC-vs-AMT and 89-vs-AMT interaction ordering; Form 10E / Form 67 capture detail. These are
+  modelled as documented simplifications — figures remain provisional until a CA signs off.

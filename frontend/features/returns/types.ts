@@ -85,6 +85,12 @@ export interface ReturnDetailDto {
   broughtForwardBusinessLoss: number;
   broughtForwardShortTermCapitalLoss: number;
   broughtForwardLongTermCapitalLoss: number;
+  // AMT credit (s.115JD) + reliefs (s.89/90/91).
+  broughtForwardAmtCredit: number;
+  relief89: number;
+  foreignIncomeDoublyTaxed: number;
+  foreignTaxPaid: number;
+  foreignDtaaApplies: boolean;
 }
 
 

@@ -124,7 +124,31 @@ public sealed class TaxCalculator : ITaxCalculator
             $"Health & Education Cess @ {rs.Cess:P0} on ₹{cessBase:N0}", cess, "Ch.3 §3.4.2.10"));
 
         var totalTax = TaxMath.RoundTax(taxAfterRebate + surcharge + cess, rs.Rounding);
-        trace.Add(new TraceLine("TotalTax", "Total tax liability (after rebate, surcharge, cess)", totalTax, null));
+        trace.Add(new TraceLine("TotalTax", "Regular income-tax liability (after rebate, surcharge, cess)", totalTax, null));
+
+        // --- Stage 11b: Alternate Minimum Tax (s.115JC) + AMT credit (s.115JD) — old regime only ---
+        var amt = AmtCalculator.Compute(regime, input.Deductions, totalTaxableIncome, totalTax,
+            input.BroughtForwardAmtCredit, regimeRules, rs, trace);
+        var liabilityAfterAmt = amt.LiabilityTax; // max(regular, AMT), or regular − AMT-credit set-off
+
+        // --- Stage 11c: relief u/s 89(1) for salary arrears (Form 10E), pre-computed by the caller ---
+        var relief89 = Math.Min(TaxMath.NonNegative(input.Relief89), liabilityAfterAmt);
+        if (relief89 > 0m)
+        {
+            trace.Add(new TraceLine("Relief.89", "Less: relief u/s 89(1) for salary arrears (Form 10E)", relief89, "s.89"));
+        }
+
+        // --- Stage 11d: relief u/s 90/90A/91 — foreign tax credit on doubly-taxed income ---
+        var ftc = ForeignTaxCreditCalculator.Compute(
+            input.ForeignIncomeDoublyTaxed, input.ForeignTaxPaid, totalTax, totalTaxableIncome, input.ForeignDtaaApplies, trace);
+        var relief9091 = Math.Min(ftc.Relief, TaxMath.NonNegative(liabilityAfterAmt - relief89));
+
+        // Net tax liability after AMT determination and reliefs — this is what interest/refund run on.
+        var finalTax = TaxMath.RoundTax(TaxMath.NonNegative(liabilityAfterAmt - relief89 - relief9091), rs.Rounding);
+        if (finalTax != totalTax)
+        {
+            trace.Add(new TraceLine("NetTaxLiability", "Net tax liability (after AMT/credit and reliefs 89/90/91)", finalTax, null));
+        }
 
         // --- Stage 12: less prepaid taxes ---
         var prepaid = input.TdsPaid + input.TcsPaid + input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid;
@@ -135,10 +159,10 @@ public sealed class TaxCalculator : ITaxCalculator
         }
 
         // --- Stage 13: interest u/s 234A/B/C (0 unless the filing/PY dates are supplied) ---
-        var interest = InterestCalculator.Compute(input, totalTax, rs, trace);
+        var interest = InterestCalculator.Compute(input, finalTax, rs, trace);
 
         // --- Stage 14: net refund (positive) or payable (negative) ---
-        var refundOrPayable = TaxMath.RoundTax(prepaid - totalTax - interest, rs.Rounding);
+        var refundOrPayable = TaxMath.RoundTax(prepaid - finalTax - interest, rs.Rounding);
         trace.Add(new TraceLine("RefundOrPayable",
             refundOrPayable >= 0m ? "Refund due" : "Balance tax payable", refundOrPayable, null));
 
@@ -155,11 +179,17 @@ public sealed class TaxCalculator : ITaxCalculator
             Rebate87A = rebate,
             Surcharge = surcharge,
             Cess = cess,
-            TotalTax = totalTax,
+            TotalTax = finalTax,
             TdsPaid = input.TdsPaid + input.TcsPaid,
             AdvanceTax = input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid,
             InterestPenalty = interest,
             RefundOrPayable = refundOrPayable,
+            AdjustedTotalIncome = amt.AdjustedTotalIncome,
+            AlternativeMinimumTax = amt.Amt,
+            AmtCreditGenerated = amt.CreditGenerated,
+            AmtCreditSetOff = amt.CreditSetOff,
+            Relief89 = relief89,
+            Relief90And91 = relief9091,
             Trace = trace,
         };
     }

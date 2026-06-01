@@ -26,7 +26,12 @@ public sealed record UpdateReturnRequest(
     decimal? BroughtForwardHousePropertyLoss = null,
     decimal? BroughtForwardBusinessLoss = null,
     decimal? BroughtForwardShortTermCapitalLoss = null,
-    decimal? BroughtForwardLongTermCapitalLoss = null);
+    decimal? BroughtForwardLongTermCapitalLoss = null,
+    decimal? BroughtForwardAmtCredit = null,
+    decimal? Relief89 = null,
+    decimal? ForeignIncomeDoublyTaxed = null,
+    decimal? ForeignTaxPaid = null,
+    bool? ForeignDtaaApplies = null);
 
 /// <summary>List-row projection for GET /returns.</summary>
 public sealed record ReturnSummaryDto(
@@ -72,7 +77,12 @@ public sealed record ReturnDetailDto(
     decimal BroughtForwardHousePropertyLoss,
     decimal BroughtForwardBusinessLoss,
     decimal BroughtForwardShortTermCapitalLoss,
-    decimal BroughtForwardLongTermCapitalLoss);
+    decimal BroughtForwardLongTermCapitalLoss,
+    decimal BroughtForwardAmtCredit,
+    decimal Relief89,
+    decimal ForeignIncomeDoublyTaxed,
+    decimal ForeignTaxPaid,
+    bool ForeignDtaaApplies);
 
 // ----------------------------------------------------------------- income sources
 

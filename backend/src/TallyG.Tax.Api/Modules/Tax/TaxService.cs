@@ -239,6 +239,11 @@ public sealed class TaxService : ITaxService
             BroughtForwardBusinessLoss = r.BroughtForwardBusinessLoss,
             BroughtForwardShortTermCapitalLoss = r.BroughtForwardShortTermCapitalLoss,
             BroughtForwardLongTermCapitalLoss = r.BroughtForwardLongTermCapitalLoss,
+            BroughtForwardAmtCredit = r.BroughtForwardAmtCredit,
+            Relief89 = r.Relief89,
+            ForeignIncomeDoublyTaxed = r.ForeignIncomeDoublyTaxed,
+            ForeignTaxPaid = r.ForeignTaxPaid,
+            ForeignDtaaApplies = r.ForeignDtaaApplies,
         };
     }
 
@@ -368,6 +373,12 @@ public sealed class TaxService : ITaxService
             r.AdvanceTax,
             r.InterestPenalty,
             r.RefundOrPayable,
+            r.AdjustedTotalIncome,
+            r.AlternativeMinimumTax,
+            r.AmtCreditGenerated,
+            r.AmtCreditSetOff,
+            r.Relief89,
+            r.Relief90And91,
             r.Trace.Select(t => new TraceLineDto(t.Step, t.Description, t.Amount, t.RuleRef)).ToList());
 
     private static RegimeSlabsDto ToRegimeSlabsDto(RegimeRules rr)

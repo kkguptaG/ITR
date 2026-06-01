@@ -91,6 +91,11 @@ export interface UpdateReturnBody {
   broughtForwardBusinessLoss?: number;
   broughtForwardShortTermCapitalLoss?: number;
   broughtForwardLongTermCapitalLoss?: number;
+  broughtForwardAmtCredit?: number;
+  relief89?: number;
+  foreignIncomeDoublyTaxed?: number;
+  foreignTaxPaid?: number;
+  foreignDtaaApplies?: boolean;
 }
 export const updateReturn = (id: string, body: UpdateReturnBody) =>
   apiPatch<ReturnDetailDto>(`/returns/${id}`, body);

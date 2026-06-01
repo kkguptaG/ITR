@@ -51,7 +51,12 @@ public sealed record TaxCalculatorRequest(
     decimal BroughtForwardHousePropertyLoss = 0m,
     decimal BroughtForwardBusinessLoss = 0m,
     decimal BroughtForwardShortTermCapitalLoss = 0m,
-    decimal BroughtForwardLongTermCapitalLoss = 0m);
+    decimal BroughtForwardLongTermCapitalLoss = 0m,
+    decimal BroughtForwardAmtCredit = 0m,
+    decimal Relief89 = 0m,
+    decimal ForeignIncomeDoublyTaxed = 0m,
+    decimal ForeignTaxPaid = 0m,
+    bool ForeignDtaaApplies = false);
 
 public sealed record SalaryInputDto(
     string? Employer,
@@ -111,6 +116,12 @@ public sealed record TaxComputationResultDto(
     decimal AdvanceTax,
     decimal InterestPenalty,
     decimal RefundOrPayable,
+    decimal AdjustedTotalIncome,
+    decimal AlternativeMinimumTax,
+    decimal AmtCreditGenerated,
+    decimal AmtCreditSetOff,
+    decimal Relief89,
+    decimal Relief90And91,
     IReadOnlyList<TraceLineDto> Trace);
 
 /// <summary>One explainable line of the computation pipeline.</summary>

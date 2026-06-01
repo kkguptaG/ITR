@@ -47,6 +47,22 @@ public class TaxReturn : BaseEntity, ITenantScoped, ISoftDeletable
     public decimal BroughtForwardShortTermCapitalLoss { get; set; }
     public decimal BroughtForwardLongTermCapitalLoss { get; set; }
 
+    // --- AMT credit (s.115JD) + reliefs (s.89/90/91) captured on the return ---
+    /// <summary>Brought-forward AMT credit u/s 115JD (set off when regular tax exceeds AMT).</summary>
+    public decimal BroughtForwardAmtCredit { get; set; }
+
+    /// <summary>Relief u/s 89(1) for salary arrears (Form 10E), as computed by the assessee/CA.</summary>
+    public decimal Relief89 { get; set; }
+
+    /// <summary>Foreign income doubly taxed (India + abroad), for FTC u/s 90/90A/91.</summary>
+    public decimal ForeignIncomeDoublyTaxed { get; set; }
+
+    /// <summary>Foreign tax actually paid on that income (the credit ceiling).</summary>
+    public decimal ForeignTaxPaid { get; set; }
+
+    /// <summary>True ⇒ a DTAA exists with the source country (s.90/90A); false ⇒ unilateral relief u/s 91.</summary>
+    public bool ForeignDtaaApplies { get; set; }
+
     public DateTimeOffset? DeletedAt { get; set; }
 
     // Navigation
