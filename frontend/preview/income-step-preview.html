@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TallyG Tax — Filing wizard · Income step (design preview)</title>
+<style>
+  :root{
+    --brand-50:#eef2ff;--brand-100:#e0e7ff;--brand-600:#4f46e5;--brand-700:#4338ca;--brand-900:#312e81;
+    --ink-50:#f8fafc;--ink-100:#f1f5f9;--ink-200:#e2e8f0;--ink-300:#cbd5e1;--ink-400:#94a3b8;--ink-500:#64748b;--ink-600:#475569;--ink-700:#334155;--ink-900:#0f172a;
+    --money-50:#ecfdf5;--money-100:#d1fae5;--money-600:#059669;--money-700:#047857;
+    --amber-50:#fffbeb;--amber-200:#fde68a;--amber-700:#b45309;--amber-900:#78350f;
+    --shadow:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;background:var(--ink-100);color:var(--ink-900);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 22px 40px}
+  .card{background:#fff;border:1px solid var(--ink-200);border-radius:16px;box-shadow:var(--shadow)}
+
+  /* Stepper */
+  .stepper{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid var(--ink-200);border-radius:14px;padding:12px 14px;margin-bottom:18px}
+  .stp{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ink-400)}
+  .stp .n{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;background:var(--ink-100);color:var(--ink-500);border:1px solid var(--ink-200)}
+  .stp.done .n{background:var(--money-600);color:#fff;border-color:var(--money-600)}
+  .stp.done{color:var(--ink-600)}
+  .stp.active .n{background:var(--brand-600);color:#fff;border-color:var(--brand-600)}
+  .stp.active{color:var(--brand-700)}
+  .sep{width:14px;height:2px;background:var(--ink-200);border-radius:2px}
+
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .head h1{font-size:22px;font-weight:600}
+  .head p{margin-top:4px;font-size:13.5px;color:var(--ink-500);max-width:560px}
+  .itrbadge{display:inline-flex;align-items:center;gap:8px;background:var(--brand-50);color:var(--brand-700);border:1px solid var(--brand-100);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700}
+  .itrbadge small{display:block;font-weight:500;color:var(--brand-600);font-size:11px}
+  .itrbadge a{color:var(--brand-600);font-weight:600;font-size:12px;margin-left:4px}
+
+  /* running total bar */
+  .gtibar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:linear-gradient(90deg,var(--brand-700),var(--brand-600));color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:18px}
+  .gtibar .l{font-size:13px;opacity:.9}
+  .gtibar .v{font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .gtibar .prov{font-size:11px;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:999px;font-weight:600}
+
+  .layout{display:grid;grid-template-columns:1.7fr 1fr;gap:20px;align-items:start}
+  @media(max-width:880px){.layout{grid-template-columns:1fr}}
+
+  /* head cards */
+  .heads{display:flex;flex-direction:column;gap:12px}
+  .hc{overflow:hidden}
+  .hc-top{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer}
+  .hc-ic{width:38px;height:38px;border-radius:10px;background:var(--brand-50);color:var(--brand-600);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .hc-ic svg{width:20px;height:20px}
+  .hc-title{font-size:14.5px;font-weight:600;flex:1}
+  .hc-title .s{display:block;font-size:12px;color:var(--ink-400);font-weight:500;margin-top:1px}
+  .hc-amt{font-size:14px;font-weight:700;color:var(--ink-700)}
+  .hc-amt.neg{color:#b91c1c}
+  .chev{color:var(--ink-300);margin-left:8px}
+  .hc-body{border-top:1px solid var(--ink-100);padding:14px 16px;background:var(--ink-50)}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 9px}
+  .chip.ok{background:var(--money-50);color:var(--money-700)}
+  .chip.muted{background:var(--ink-100);color:var(--ink-500)}
+
+  /* form */
+  .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.formgrid{grid-template-columns:1fr}}
+  .fld label{display:block;font-size:12px;font-weight:600;color:var(--ink-600);margin-bottom:5px}
+  .fld input,.fld select{width:100%;border:1px solid var(--ink-200);border-radius:10px;padding:9px 11px;font-size:13.5px;background:#fff;color:var(--ink-900)}
+  .fld .hint{font-size:11px;color:var(--ink-400);margin-top:4px}
+  .fld.full{grid-column:1/-1}
+  .rupee{position:relative}
+  .rupee span{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-400);font-size:13px}
+  .rupee input{padding-left:24px}
+  .formact{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:var(--brand-600);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--brand-700)}
+  .btn.ghost{background:#fff;color:var(--ink-600);border:1px solid var(--ink-200)}
+  .btn.sm{padding:7px 12px;font-size:12.5px}
+  .btn svg{width:15px;height:15px}
+
+  /* saved row */
+  .saved{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--ink-200);border-radius:10px;padding:10px 12px;font-size:13px}
+  .saved .nm{font-weight:600}
+  .saved .meta{font-size:11.5px;color:var(--ink-400);margin-top:1px}
+  .saved .amt{font-weight:700}
+  .addrow{margin-top:10px}
+
+  /* rail */
+  .rail{display:flex;flex-direction:column;gap:16px;position:sticky;top:18px}
+  .rail .card{padding:16px}
+  .rail h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-400);margin-bottom:10px}
+  .calc{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-top:1px dashed var(--ink-200)}
+  .calc:first-of-type{border-top:none}
+  .calc .lbl{color:var(--ink-600)}
+  .calc .num{font-weight:600}
+  .calc.total{border-top:2px solid var(--ink-200);margin-top:4px;padding-top:10px;font-size:15px}
+  .calc.total .num{color:var(--brand-700);font-weight:800}
+  .pend{display:flex;gap:9px;align-items:flex-start;background:var(--amber-50);border:1px solid var(--amber-200);border-radius:11px;padding:10px 12px;margin-top:12px;font-size:11.5px;color:var(--amber-900);line-height:1.45}
+  .pend svg{width:15px;height:15px;color:var(--amber-700);flex-shrink:0;margin-top:1px}
+  .next{display:flex;gap:9px;align-items:center;font-size:12.5px;color:var(--ink-500);margin-top:12px}
+
+  .navbar{display:flex;justify-content:space-between;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Wizard stepper -->
+  <div class="stepper">
+    <span class="stp done"><span class="n">✓</span>Personal</span><span class="sep"></span>
+    <span class="stp done"><span class="n">✓</span>Documents</span><span class="sep"></span>
+    <span class="stp active"><span class="n">3</span>Income</span><span class="sep"></span>
+    <span class="stp"><span class="n">4</span>Deductions</span><span class="sep"></span>
+    <span class="stp"><span class="n">5</span>Regime</span><span class="sep"></span>
+    <span class="stp"><span class="n">6</span>Summary</span><span class="sep"></span>
+    <span class="stp"><span class="n">7</span>Payment</span><span class="sep"></span>
+    <span class="stp"><span class="n">8</span>File</span>
+  </div>
+
+  <!-- Title + auto-selected ITR -->
+  <div class="head">
+    <div>
+      <h1>Your income</h1>
+      <p>We show only the income heads that apply to you. Add each source — your tax updates live on the right. AY 2026-27 · Income-tax Act, 1961.</p>
+    </div>
+    <div class="itrbadge">
+      <span>ITR-3<small>auto-selected</small></span>
+      <a>Why? · Change</a>
+    </div>
+  </div>
+
+  <!-- Running Gross Total Income -->
+  <div class="gtibar">
+    <div><div class="l">Gross Total Income so far (5 heads aggregated)</div></div>
+    <div style="display:flex;align-items:center;gap:12px"><span class="v">₹20,03,000</span><span class="prov">Provisional · pending CA</span></div>
+  </div>
+
+  <div class="layout">
+    <!-- HEAD CARDS -->
+    <div class="heads">
+
+      <!-- Salary (expanded form) -->
+      <div class="card hc">
+        <div class="hc-top">
+          <span class="hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+          <span class="hc-title">Salary / Pension <span class="s">Head 1 · from Form 16</span></span>
+          <span class="hc-amt">₹10,05,000</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="hc-body">
+          <div style="margin-bottom:12px"><span class="chip ok">✓ Prefilled from Form 16 (Part B) — please review</span></div>
+          <div class="formgrid">
+            <div class="fld"><label>Employer name</label><input value="Acme Pvt Ltd" /></div>
+            <div class="fld"><label>Employer TAN</label><input value="DELA12345B" /></div>
+            <div class="fld"><label>Gross salary (17(1))</label><div class="rupee"><span>₹</span><input value="12,00,000" /></div></div>
+            <div class="fld"><label>HRA received</label><div class="rupee"><span>₹</span><input value="2,40,000" /></div></div>
+            <div class="fld"><label>HRA exemption (10(13A))</label><div class="rupee"><span>₹</span><input value="1,20,000" /></div><div class="hint">Least-of-three computed by engine</div></div>
+            <div class="fld"><label>Perquisites (17(2))</label><div class="rupee"><span>₹</span><input value="0" /></div></div>
+            <div class="fld"><label>Standard deduction</label><div class="rupee"><span>₹</span><input value="75,000" /></div><div class="hint">Auto · ₹75k (New regime)</div></div>
+            <div class="fld"><label>Professional tax</label><div class="rupee"><span>₹</span><input value="2,400" /></div></div>
+          </div>
+          <div class="formact"><span class="chip muted">Income from Salary → ₹10,05,000</span><button class="btn sm">Save</button></div>
+        </div>
+      </div>
+
+      <!-- House property (collapsed, 1 saved) -->
+      <div class="card hc">
+        <div class="hc-top">
+          <span class="hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg></span>
+          <span class="hc-title">House Property <span class="s">Head 2 · let-out / self-occupied</span></span>
+          <span class="hc-amt">₹88,000</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="hc-body">
+          <div class="saved"><div><div class="nm">Flat, MG Road — Let-out</div><div class="meta">Rent ₹3,60,000 · municipal tax ₹20,000 · interest ₹1,50,000</div></div><div class="amt">₹88,000</div></div>
+          <div class="addrow"><button class="btn ghost sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add another property</button></div>
+        </div>
+      </div>
+
+      <!-- Capital gains (collapsed) -->
+      <div class="card hc">
+        <div class="hc-top">
+          <span class="hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17 9 11l4 4 8-8"/><path d="M21 7v6h-6"/></svg></span>
+          <span class="hc-title">Capital Gains <span class="s">Head 3 · equity / property / debt</span></span>
+          <span class="hc-amt">₹1,50,000</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="hc-body">
+          <div class="saved"><div><div class="nm">Listed equity — LTCG (112A)</div><div class="meta">Sale ₹6,50,000 · cost ₹5,00,000 · ₹1.25L exempt → ₹25,000 taxable @12.5%</div></div><div class="amt">₹1,50,000</div></div>
+          <div class="addrow"><button class="btn ghost sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add capital gain</button></div>
+        </div>
+      </div>
+
+      <!-- Business (collapsed) -->
+      <div class="card hc">
+        <div class="hc-top">
+          <span class="hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+          <span class="hc-title">Business / Profession <span class="s">Head 4 · regular books · incl. F&amp;O</span></span>
+          <span class="hc-amt">₹8,00,000</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="hc-body">
+          <div class="saved"><div><div class="nm">Trading &amp; consultancy — Regular books</div><div class="meta">Turnover ₹62,00,000 · net profit ₹8,00,000 · F&amp;O = non-speculative</div></div><div class="amt">₹8,00,000</div></div>
+          <div class="addrow"><button class="btn ghost sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add business / profession</button></div>
+        </div>
+      </div>
+
+      <!-- Other sources (collapsed) -->
+      <div class="card hc">
+        <div class="hc-top">
+          <span class="hc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <span class="hc-title">Other Sources <span class="s">Head 5 · interest, dividend</span></span>
+          <span class="hc-amt">₹60,000</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="hc-body">
+          <div class="saved"><div><div class="nm">Savings + FD interest, dividend</div><div class="meta">SB ₹18,000 · FD ₹42,000 (80TTA/TTB applied at Deductions)</div></div><div class="amt">₹60,000</div></div>
+          <div class="addrow"><button class="btn ghost sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add other income</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RAIL: live computation -->
+    <div class="rail">
+      <div class="card">
+        <h3>Computation so far</h3>
+        <div class="calc"><span class="lbl">① Salary</span><span class="num">₹10,05,000</span></div>
+        <div class="calc"><span class="lbl">② House property</span><span class="num">₹88,000</span></div>
+        <div class="calc"><span class="lbl">③ Capital gains</span><span class="num">₹1,50,000</span></div>
+        <div class="calc"><span class="lbl">④ Business/profession</span><span class="num">₹8,00,000</span></div>
+        <div class="calc"><span class="lbl">⑤ Other sources</span><span class="num">₹60,000</span></div>
+        <div class="calc total"><span class="lbl">Gross Total Income</span><span class="num">₹20,03,000</span></div>
+        <div class="next">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Next: Chapter VI-A deductions → taxable income → old vs new tax
+        </div>
+        <div class="pend">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          One engine computes all five heads from a single data model. Figures provisional — pending CA validation.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="navbar">
+    <button class="btn ghost">← Back to Documents</button>
+    <button class="btn">Continue to Deductions →</button>
+  </div>
+</div>
+</body>
+</html>

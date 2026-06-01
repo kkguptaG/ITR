@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["frontend/preview/_serve.js"],
+      "port": 8137
+    },
+    {
+      "name": "income-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["frontend/preview/_serve.js", "8138", "income-step-preview.html"],
+      "port": 8138
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "C:\\Users\\kkgup\\node20\\node.exe",
+      "runtimeArgs": ["D:\\TallyGTax\\frontend\\_start.js"],
+      "port": 3000
+    }
+  ]
+}

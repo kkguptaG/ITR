@@ -1,0 +1,376 @@
+'use client';
+
+// ---------------------------------------------------------------------------
+// Step 3 — Income. Conditional income-head editors driven by the ITR type
+// (see steps.ts incomeHeads): salary, house property, capital gains, business,
+// other sources. Each head is a list with inline add/edit/delete persisted to
+// /returns/{id}/<head>. Saving is immediate per row; "Continue" just advances.
+// ---------------------------------------------------------------------------
+
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui';
+import { formatInr } from '@/lib/format';
+import {
+  addBusinessIncome,
+  addCapitalGain,
+  addHouseProperty,
+  addIncomeSource,
+  addSalary,
+  deleteBusinessIncome,
+  deleteCapitalGain,
+  deleteHouseProperty,
+  deleteIncomeSource,
+  deleteSalary,
+  filingKeys,
+  listBusinessIncomes,
+  listCapitalGains,
+  listHouseProperties,
+  listIncomeSources,
+  listSalaries,
+  updateBusinessIncome,
+  updateCapitalGain,
+  updateHouseProperty,
+  updateIncomeSource,
+  updateSalary,
+} from '../api';
+import type {
+  BusinessIncomeDto,
+  CapitalGainDto,
+  HousePropertyDto,
+  IncomeSourceDto,
+  SalaryDetailDto,
+} from '../types';
+import { incomeHeads } from '../steps';
+import { useWizard } from '../WizardContext';
+import { useInvalidateReturn } from '../useReturn';
+import { useHeadCrud } from '../useHeadCrud';
+import { WizardStep, WizardFooter } from '../components/WizardStep';
+import { EditableList } from '../components/EditableList';
+import {
+  BusinessIncomeForm,
+  CapitalGainForm,
+  HousePropertyForm,
+  OtherIncomeForm,
+  SalaryForm,
+} from '../components/income-forms';
+
+export function IncomeStep() {
+  const t = useTranslations('wizard');
+  const ti = useTranslations('income');
+  const tc = useTranslations('common');
+  const { returnId, detail, goNext } = useWizard();
+  const invalidate = useInvalidateReturn(returnId);
+  const heads = incomeHeads(detail.itrType);
+
+  // ------- salary
+  const salary = useHeadCrud<SalaryDetailDto, Parameters<typeof addSalary>[1]>(
+    returnId,
+    filingKeys.salaries(returnId),
+    { list: listSalaries, add: addSalary, update: updateSalary, remove: deleteSalary },
+    invalidate,
+  );
+
+  // ------- house property
+  const house = useHeadCrud<HousePropertyDto, Parameters<typeof addHouseProperty>[1]>(
+    returnId,
+    filingKeys.houses(returnId),
+    { list: listHouseProperties, add: addHouseProperty, update: updateHouseProperty, remove: deleteHouseProperty },
+    invalidate,
+  );
+
+  // ------- capital gains
+  const gains = useHeadCrud<CapitalGainDto, Parameters<typeof addCapitalGain>[1]>(
+    returnId,
+    filingKeys.gains(returnId),
+    { list: listCapitalGains, add: addCapitalGain, update: updateCapitalGain, remove: deleteCapitalGain },
+    invalidate,
+  );
+
+  // ------- business
+  const business = useHeadCrud<BusinessIncomeDto, Parameters<typeof addBusinessIncome>[1]>(
+    returnId,
+    filingKeys.business(returnId),
+    { list: listBusinessIncomes, add: addBusinessIncome, update: updateBusinessIncome, remove: deleteBusinessIncome },
+    invalidate,
+  );
+
+  // ------- other sources
+  const other = useHeadCrud<IncomeSourceDto, Parameters<typeof addIncomeSource>[1]>(
+    returnId,
+    filingKeys.incomeSources(returnId),
+    { list: listIncomeSources, add: addIncomeSource, update: updateIncomeSource, remove: deleteIncomeSource },
+    invalidate,
+  );
+
+  const otherSources = (other.query.data ?? []).filter((s) => s.type === 'OtherSources');
+
+  return (
+    <>
+      <WizardStep title={t('incomeTitle')} description={t('incomeSubtitle')}>
+        {/* Salary */}
+        {heads.salary && (
+          <Section title={ti('salaryHead')}>
+            <EditableList<SalaryDetailDto>
+              items={salary.query.data ?? []}
+              getKey={(s) => s.id}
+              addLabel={ti('addSalary')}
+              emptyLabel={ti('noSalary')}
+              deleting={salary.deleteMutation.isPending}
+              onDelete={(s) => salary.deleteMutation.mutate(s.id)}
+              renderSummary={(s) => (
+                <div>
+                  <div className="font-medium text-ink-800">{s.employer}</div>
+                  <div className="text-sm text-ink-500">{ti('grossSalary')}: {formatInr(s.gross)}</div>
+                </div>
+              )}
+              renderForm={(item, done) => (
+                <SalaryForm
+                  defaultValues={
+                    item
+                      ? {
+                          employer: item.employer,
+                          tan: item.tan ?? '',
+                          gross: item.gross,
+                          hra: item.hra,
+                          perquisites: item.perquisites,
+                          profitsInLieu: item.profitsInLieu,
+                          exemptAllowances: item.exemptAllowances,
+                          hraExemption: item.hraExemption,
+                          stdDeduction: item.stdDeduction,
+                          professionalTax: item.professionalTax,
+                        }
+                      : undefined
+                  }
+                  loading={salary.addMutation.isPending || salary.updateMutation.isPending}
+                  onCancel={done}
+                  onSubmit={(v) => {
+                    const body = { ...v, tan: v.tan || null };
+                    const op = item
+                      ? salary.updateMutation.mutateAsync({ id: item.id, body })
+                      : salary.addMutation.mutateAsync(body);
+                    void op.then(done);
+                  }}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* House property */}
+        {heads.houseProperty && (
+          <Section title={ti('houseHead')}>
+            <EditableList<HousePropertyDto>
+              items={house.query.data ?? []}
+              getKey={(h) => h.id}
+              addLabel={ti('addHouse')}
+              emptyLabel={ti('noHouse')}
+              maxOneReached={heads.singleHouseProperty && (house.query.data?.length ?? 0) >= 1}
+              deleting={house.deleteMutation.isPending}
+              onDelete={(h) => house.deleteMutation.mutate(h.id)}
+              renderSummary={(h) => (
+                <div>
+                  <div className="font-medium text-ink-800">{ti(houseTypeKey(h.type))}</div>
+                  <div className="text-sm text-ink-500">{ti('netIncome')}: {formatInr(h.netIncome)}</div>
+                </div>
+              )}
+              renderForm={(item, done) => (
+                <HousePropertyForm
+                  defaultValues={
+                    item
+                      ? {
+                          type: item.type,
+                          address: item.address ?? '',
+                          annualValue: item.annualValue,
+                          annualRent: item.annualRent,
+                          municipalTaxPaid: item.municipalTaxPaid,
+                          interestOnLoan: item.interestOnLoan,
+                          coOwnerSharePct: item.coOwnerSharePct,
+                        }
+                      : undefined
+                  }
+                  loading={house.addMutation.isPending || house.updateMutation.isPending}
+                  onCancel={done}
+                  onSubmit={(v) => {
+                    const body = { ...v, address: v.address || null };
+                    const op = item
+                      ? house.updateMutation.mutateAsync({ id: item.id, body })
+                      : house.addMutation.mutateAsync(body);
+                    void op.then(done);
+                  }}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* Capital gains */}
+        {heads.capitalGains && (
+          <Section title={ti('capitalGainsHead')}>
+            <EditableList<CapitalGainDto>
+              items={gains.query.data ?? []}
+              getKey={(g) => g.id}
+              addLabel={ti('addCapitalGain')}
+              emptyLabel={ti('noCapitalGains')}
+              deleting={gains.deleteMutation.isPending}
+              onDelete={(g) => gains.deleteMutation.mutate(g.id)}
+              renderSummary={(g) => (
+                <div>
+                  <div className="font-medium text-ink-800">
+                    {ti(`asset.${g.assetType}`)} · {g.term === 'Long' ? ti('longTerm') : ti('shortTerm')}
+                  </div>
+                  <div className="text-sm text-ink-500">{ti('gain')}: {formatInr(g.gain)}</div>
+                </div>
+              )}
+              renderForm={(item, done) => (
+                <CapitalGainForm
+                  defaultValues={
+                    item
+                      ? {
+                          assetType: item.assetType,
+                          term: item.term,
+                          acquisitionDate: item.acquisitionDate ?? '',
+                          transferDate: item.transferDate ?? '',
+                          salePrice: item.salePrice,
+                          costOfAcquisition: item.costOfAcquisition,
+                          costOfImprovement: item.costOfImprovement,
+                          expensesOnTransfer: item.expensesOnTransfer,
+                          exemptionAmount: item.exemptionAmount,
+                        }
+                      : undefined
+                  }
+                  loading={gains.addMutation.isPending || gains.updateMutation.isPending}
+                  onCancel={done}
+                  onSubmit={(v) => {
+                    const body = {
+                      ...v,
+                      acquisitionDate: v.acquisitionDate || null,
+                      transferDate: v.transferDate || null,
+                    };
+                    const op = item
+                      ? gains.updateMutation.mutateAsync({ id: item.id, body })
+                      : gains.addMutation.mutateAsync(body);
+                    void op.then(done);
+                  }}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* Business income */}
+        {heads.business && (
+          <Section title={ti('businessHead')}>
+            <EditableList<BusinessIncomeDto>
+              items={business.query.data ?? []}
+              getKey={(b) => b.id}
+              addLabel={ti('addBusiness')}
+              emptyLabel={ti('noBusiness')}
+              deleting={business.deleteMutation.isPending}
+              onDelete={(b) => business.deleteMutation.mutate(b.id)}
+              renderSummary={(b) => (
+                <div>
+                  <div className="font-medium text-ink-800">
+                    {b.isPresumptive ? `${ti('presumptive')} ${b.presumptiveSection ?? ''}` : ti('regularBooks')}
+                  </div>
+                  <div className="text-sm text-ink-500">
+                    {ti('turnover')}: {formatInr(b.turnover)} · {ti('netProfit')}: {formatInr(b.netProfit)}
+                  </div>
+                </div>
+              )}
+              renderForm={(item, done) => (
+                <BusinessIncomeForm
+                  presumptiveOnly={heads.businessPresumptiveOnly}
+                  defaultValues={
+                    item
+                      ? {
+                          isPresumptive: item.isPresumptive,
+                          presumptiveSection: (item.presumptiveSection as '44AD' | '44ADA' | '44AE') ?? '44AD',
+                          turnover: item.turnover,
+                          grossReceiptsDigital: item.grossReceiptsDigital,
+                          grossReceiptsCash: item.grossReceiptsCash,
+                          netProfit: item.netProfit,
+                          speculativeFlag: item.speculativeFlag,
+                          gstTurnoverReported: item.gstTurnoverReported,
+                        }
+                      : undefined
+                  }
+                  loading={business.addMutation.isPending || business.updateMutation.isPending}
+                  onCancel={done}
+                  onSubmit={(v) => {
+                    const body = { ...v, presumptiveSection: v.isPresumptive ? v.presumptiveSection : null };
+                    const op = item
+                      ? business.updateMutation.mutateAsync({ id: item.id, body })
+                      : business.addMutation.mutateAsync(body);
+                    void op.then(done);
+                  }}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* Other sources */}
+        {heads.otherSources && (
+          <Section title={ti('otherHead')}>
+            <EditableList<IncomeSourceDto>
+              items={otherSources}
+              getKey={(s) => s.id}
+              addLabel={ti('addOther')}
+              emptyLabel={ti('noOther')}
+              deleting={other.deleteMutation.isPending}
+              onDelete={(s) => other.deleteMutation.mutate(s.id)}
+              renderSummary={(s) => (
+                <div>
+                  <div className="font-medium text-ink-800">{s.label || ti('otherHead')}</div>
+                  <div className="text-sm text-ink-500">{formatInr(s.amount)}</div>
+                </div>
+              )}
+              renderForm={(item, done) => (
+                <OtherIncomeForm
+                  defaultValues={item ? { label: item.label ?? '', amount: item.amount } : undefined}
+                  loading={other.addMutation.isPending || other.updateMutation.isPending}
+                  onCancel={done}
+                  onSubmit={(v) => {
+                    const body = { type: 'OtherSources' as const, label: v.label, amount: v.amount };
+                    const op = item
+                      ? other.updateMutation.mutateAsync({ id: item.id, body })
+                      : other.addMutation.mutateAsync(body);
+                    void op.then(done);
+                  }}
+                />
+              )}
+            />
+          </Section>
+        )}
+      </WizardStep>
+
+      <WizardFooter
+        primary={
+          <Button type="button" onClick={goNext}>
+            {tc('continue')}
+          </Button>
+        }
+      />
+    </>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-500">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function houseTypeKey(type: HousePropertyDto['type']): string {
+  switch (type) {
+    case 'LetOut':
+      return 'letOut';
+    case 'DeemedLetOut':
+      return 'deemedLetOut';
+    default:
+      return 'selfOccupied';
+  }
+}

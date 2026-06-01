@@ -1,0 +1,82 @@
+### TallyG Tax API — Auth flow walkthrough
+### Base URL (foundation pins the backend to 5080). Run with: dotnet run --project src/TallyG.Tax.Api
+### In Development the database is Sqlite and OTPs are returned as "devOtp" so you can log in
+### without an SMS provider. Two users are seeded:
+###   admin@tallyg.test  / +919000000001  (role: Admin)
+###   demo@tallyg.test   / +919000000002  (role: User)
+
+@baseUrl = http://localhost:5080/api/v1
+
+### 0. Liveness probe (no auth)
+GET http://localhost:5080/health
+
+### 1. (Optional) Register a brand-new user. Returns { userId }.
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Asha Verma",
+  "email": "asha.verma@example.com",
+  "mobile": "+919812345678"
+}
+
+### 2. Request a login OTP for a SEEDED user. In Development the response includes devOtp.
+# @name otpRequest
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{
+  "identifier": "demo@tallyg.test",
+  "purpose": "login"
+}
+
+### 3. Verify the OTP. Copy "otpToken" from step 2's response and "devOtp" as the code.
+###    On success you get { accessToken, refreshToken, user }.
+# @name otpVerify
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "otpToken": "{{otpRequest.response.body.otpToken}}",
+  "code": "{{otpRequest.response.body.devOtp}}"
+}
+
+### 4. Call an authenticated endpoint with the access token.
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{otpVerify.response.body.accessToken}}
+
+### 5. Rotate the refresh token (issues a NEW access + refresh pair; old refresh is revoked).
+# @name refresh
+POST {{baseUrl}}/auth/token/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{otpVerify.response.body.refreshToken}}"
+}
+
+### 6. Reuse detection: replaying the ORIGINAL (now-rotated) refresh token revokes the whole
+###    session family and returns 401 AUTH.REFRESH_REUSE. Re-run this after step 5.
+POST {{baseUrl}}/auth/token/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{otpVerify.response.body.refreshToken}}"
+}
+
+### 7. Logout (revokes the session's current refresh token). 204 No Content.
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh.response.body.refreshToken}}"
+}
+
+### 8. Validation example: a malformed request renders RFC 7807 problem+json with code VALIDATION.FAILED.
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{
+  "identifier": "",
+  "purpose": "banana"
+}

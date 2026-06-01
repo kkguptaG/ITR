@@ -1,0 +1,26 @@
+# Keep the build context small; dependencies + build are produced inside the image.
+node_modules/
+.next/
+out/
+build/
+
+# Env files (NEXT_PUBLIC_API_URL is injected at build/runtime via compose)
+.env
+.env.*
+!.env.example
+
+# IDE / editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs + VCS
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.git/
+.gitignore
+
+# The Dockerfile itself doesn't need to be in the context
+Dockerfile
+.dockerignore

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Domain: pure POCOs, enums, the tax-engine contract, and service interfaces.
+       NO external package dependencies (project rule). -->
+  <PropertyGroup>
+    <AssemblyName>TallyG.Tax.Domain</AssemblyName>
+    <RootNamespace>TallyG.Tax.Domain</RootNamespace>
+  </PropertyGroup>
+
+</Project>

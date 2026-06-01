@@ -1,0 +1,108 @@
+# =============================================================================
+# TallyG Tax Portal — one-command local stack
+#
+#   docker compose -f infra/docker-compose.yml up --build
+#   then open  http://localhost:3000   (web)  and  http://localhost:5080/swagger (api)
+#
+# Services:
+#   db    — PostgreSQL 16 (the API runs on Postgres here, not the Sqlite demo)
+#   redis — Redis 7 (sessions / rate-limit / cache per architecture Ch 6)
+#   api   — ASP.NET Core 9 API, migrates + idempotently seeds on boot, :5080
+#   web   — Next.js 14 frontend, :3000
+#
+# Env defaults live in infra/.env.example — copy it to infra/.env to override.
+# Compose automatically loads a .env file sitting next to this compose file.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16
+    container_name: tallyg-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tallyg_tax}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Runs once on first init of an empty data dir: enables pgcrypto, etc.
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tallyg_tax}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: tallyg-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: tallyg-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Development keeps Swagger enabled and returns the OTP code (devOtp) in the
+      # API response so you can log in without a real SMS/email provider.
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5080
+      # Run against Postgres (the no-infra demo defaults to Sqlite instead).
+      Database__Provider: Postgres
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-tallyg_tax};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      # The demo file store + presigned URLs (appsettings points at a Windows path;
+      # override to a Linux path inside the container).
+      Storage__LocalRoot: /app/.localstore
+      Storage__PublicBaseUrl: "http://localhost:5080/api/v1"
+      # Allow the browser app to call the API.
+      Cors__Origins__0: "http://localhost:3000"
+    ports:
+      - "5080:5080"
+    volumes:
+      # Persist uploaded demo documents across restarts.
+      - api-store:/app/.localstore
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked into the client bundle at build time AND set at runtime below.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5080/api/v1}
+    container_name: tallyg-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # Browser-facing: must be reachable from the user's machine, hence localhost
+      # (not the internal "api" service name).
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5080/api/v1}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:
+  api-store:

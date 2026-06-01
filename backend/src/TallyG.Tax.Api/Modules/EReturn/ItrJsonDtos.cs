@@ -1,0 +1,67 @@
+// EReturn module — offline-filing ITR JSON: generate → validate → save to a list → download,
+// for manual upload on the Income Tax e-filing portal (pre-ERI model). camelCase on the wire.
+
+using TallyG.Tax.Domain.Entities;
+using TallyG.Tax.Domain.Enums;
+
+namespace TallyG.Tax.Api.Modules.EReturn;
+
+/// <summary>One validation finding. Severity is "error" (blocks filing) or "warning". Every finding
+/// carries a concrete <see cref="Suggestion"/> for how to resolve it.</summary>
+public sealed record ValidationIssueDto(string Severity, string Code, string Path, string Message, string Suggestion);
+
+/// <summary>Result of validating a generated ITR JSON before portal upload.</summary>
+public sealed record ValidationReportDto(
+    bool IsValid,
+    int ErrorCount,
+    int WarningCount,
+    IReadOnlyList<ValidationIssueDto> Issues,
+    string Notice);
+
+/// <summary>A saved ITR JSON artifact in the "ready to file" list (metadata only).</summary>
+public sealed record ItrJsonArtifactDto(
+    Guid Id,
+    Guid ReturnId,
+    string AssessmentYear,
+    ItrType ItrType,
+    string SchemaVersion,
+    ItrFilingStatus Status,
+    bool IsValid,
+    int ErrorCount,
+    int WarningCount,
+    string FileName,
+    long SizeBytes,
+    string? JsonHash,
+    DateTimeOffset GeneratedAt,
+    DateTimeOffset? ValidatedAt);
+
+/// <summary>POST .../itr-json:generate response — the saved artifact + its validation report.</summary>
+public sealed record GenerateItrJsonResponse(ItrJsonArtifactDto Artifact, ValidationReportDto Validation);
+
+/// <summary>Bytes to stream for a JSON download.</summary>
+public sealed record ItrJsonDownload(byte[] Content, string FileName);
+
+/// <summary>The generator's output: the JSON document + the ITD schema version + form name.</summary>
+public sealed record GeneratedItrJson(string Json, string SchemaVersion, string FormName);
+
+/// <summary>
+/// Everything the generator/validator need for one return, loaded once by the orchestrator.
+/// Regime-agnostic: the heads are the common capture model; the form is a mapping over it.
+/// </summary>
+public sealed class ItrFilingContext
+{
+    public required TaxReturn Return { get; init; }
+    public required User User { get; init; }
+    public UserProfile? Profile { get; init; }
+    public AssessmentYear? Ay { get; init; }
+    public TaxComputation? Computation { get; init; }
+    public IReadOnlyList<SalaryDetail> Salaries { get; init; } = Array.Empty<SalaryDetail>();
+    public IReadOnlyList<HouseProperty> Houses { get; init; } = Array.Empty<HouseProperty>();
+    public IReadOnlyList<CapitalGain> Gains { get; init; } = Array.Empty<CapitalGain>();
+    public IReadOnlyList<BusinessIncome> Businesses { get; init; } = Array.Empty<BusinessIncome>();
+    public IReadOnlyList<IncomeSource> OtherIncomes { get; init; } = Array.Empty<IncomeSource>();
+    public IReadOnlyList<Deduction> Deductions { get; init; } = Array.Empty<Deduction>();
+
+    public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
+    public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
+}

@@ -1,0 +1,141 @@
+using FluentValidation;
+
+namespace TallyG.Tax.Api.Modules.Returns;
+
+/// <summary>
+/// FluentValidation rules for the Returns request DTOs. Auto-discovered by the assembly scan in
+/// Program.cs and invoked by the global <c>RequestValidationFilter</c>; failures render as 422
+/// problem+json with field-level errors (docs 04 §4.6).
+/// </summary>
+public sealed class CreateReturnRequestValidator : AbstractValidator<CreateReturnRequest>
+{
+    public CreateReturnRequestValidator()
+    {
+        RuleFor(x => x.AssessmentYear)
+            .NotEmpty().WithMessage("Assessment year is required.")
+            .MaximumLength(16);
+
+        When(x => x.ItrType.HasValue, () =>
+            RuleFor(x => x.ItrType!.Value).IsInEnum().WithMessage("Unknown ITR type."));
+
+        When(x => x.Regime.HasValue, () =>
+            RuleFor(x => x.Regime!.Value).IsInEnum().WithMessage("Unknown regime."));
+    }
+}
+
+public sealed class UpdateReturnRequestValidator : AbstractValidator<UpdateReturnRequest>
+{
+    public UpdateReturnRequestValidator()
+    {
+        When(x => x.ItrType.HasValue, () =>
+            RuleFor(x => x.ItrType!.Value).IsInEnum().WithMessage("Unknown ITR type."));
+
+        When(x => x.Regime.HasValue, () =>
+            RuleFor(x => x.Regime!.Value).IsInEnum().WithMessage("Unknown regime."));
+
+        When(x => x.AnswersJson is not null, () =>
+            RuleFor(x => x.AnswersJson!).MaximumLength(1_000_000).WithMessage("Answers payload is too large."));
+    }
+}
+
+public sealed class UpsertIncomeSourceRequestValidator : AbstractValidator<UpsertIncomeSourceRequest>
+{
+    public UpsertIncomeSourceRequestValidator()
+    {
+        RuleFor(x => x.Type).IsInEnum().WithMessage("Unknown income type.");
+        RuleFor(x => x.Amount).GreaterThanOrEqualTo(0).WithMessage("Amount cannot be negative.");
+        RuleFor(x => x.Label).MaximumLength(200);
+    }
+}
+
+public sealed class UpsertSalaryRequestValidator : AbstractValidator<UpsertSalaryRequest>
+{
+    public UpsertSalaryRequestValidator()
+    {
+        RuleFor(x => x.Employer)
+            .NotEmpty().WithMessage("Employer name is required.")
+            .MaximumLength(200);
+
+        RuleFor(x => x.Gross).GreaterThanOrEqualTo(0).WithMessage("Gross salary cannot be negative.");
+        RuleFor(x => x.Hra).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Perquisites).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ProfitsInLieu).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ExemptAllowances).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.HraExemption).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.StdDeduction).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ProfessionalTax).GreaterThanOrEqualTo(0);
+    }
+}
+
+public sealed class UpsertHousePropertyRequestValidator : AbstractValidator<UpsertHousePropertyRequest>
+{
+    public UpsertHousePropertyRequestValidator()
+    {
+        RuleFor(x => x.Type).IsInEnum().WithMessage("Unknown house-property type.");
+        RuleFor(x => x.AnnualValue).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.AnnualRent).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.MunicipalTaxPaid).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.InterestOnLoan).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CoOwnerSharePct)
+            .InclusiveBetween(0, 100).WithMessage("Co-owner share must be between 0 and 100 percent.");
+    }
+}
+
+public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<UpsertCapitalGainRequest>
+{
+    public UpsertCapitalGainRequestValidator()
+    {
+        RuleFor(x => x.AssetType).IsInEnum().WithMessage("Unknown asset type.");
+        RuleFor(x => x.Term).IsInEnum().WithMessage("Unknown capital-gain term.");
+        RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CostOfAcquisition).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CostOfImprovement).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ExpensesOnTransfer).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ExemptionAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TaxSection).MaximumLength(16);
+        RuleFor(x => x.Isin).MaximumLength(20);
+
+        When(x => x.AcquisitionDate.HasValue && x.TransferDate.HasValue, () =>
+            RuleFor(x => x.TransferDate!.Value)
+                .GreaterThanOrEqualTo(x => x.AcquisitionDate!.Value)
+                .WithMessage("Transfer date cannot precede the acquisition date."));
+    }
+}
+
+public sealed class UpsertBusinessIncomeRequestValidator : AbstractValidator<UpsertBusinessIncomeRequest>
+{
+    private static readonly string[] PresumptiveSections = { "44AD", "44ADA", "44AE" };
+
+    public UpsertBusinessIncomeRequestValidator()
+    {
+        RuleFor(x => x.Turnover).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.GrossReceiptsDigital).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.GrossReceiptsCash).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.NetProfit).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.GstTurnoverReported).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.NatureOfBusinessCode).MaximumLength(32);
+
+        When(x => x.IsPresumptive, () =>
+            RuleFor(x => x.PresumptiveSection)
+                .NotEmpty().WithMessage("A presumptive section (44AD/44ADA/44AE) is required.")
+                .Must(s => s is not null && PresumptiveSections.Contains(s.Trim().ToUpperInvariant()))
+                .WithMessage("Presumptive section must be one of: 44AD, 44ADA, 44AE."));
+    }
+}
+
+public sealed class UpsertDeductionRequestValidator : AbstractValidator<UpsertDeductionRequest>
+{
+    public UpsertDeductionRequestValidator()
+    {
+        RuleFor(x => x.Section)
+            .NotEmpty().WithMessage("Deduction section is required.")
+            .MaximumLength(16);
+
+        RuleFor(x => x.Amount).GreaterThanOrEqualTo(0).WithMessage("Deduction amount cannot be negative.");
+        RuleFor(x => x.SubType).MaximumLength(64);
+        RuleFor(x => x.Description).MaximumLength(256);
+
+        When(x => x.RegimeApplicable.HasValue, () =>
+            RuleFor(x => x.RegimeApplicable!.Value).IsInEnum().WithMessage("Unknown regime."));
+    }
+}

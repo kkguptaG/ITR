@@ -1,0 +1,25 @@
+# Keep the build context small and the image clean.
+# Build artifacts (rebuilt inside the image)
+**/bin/
+**/obj/
+
+# Local dev database + document store (Sqlite demo files)
+**/.localstore/
+*.db
+*.db-shm
+*.db-wal
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+**/*.user
+
+# VCS + misc
+.git/
+.gitignore
+**/.DS_Store
+
+# The Dockerfile itself doesn't need to be in the context
+Dockerfile
+.dockerignore

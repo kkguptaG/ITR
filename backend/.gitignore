@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+
+# Local dev artifacts
+.localstore/
+*.db
+*.db-shm
+*.db-wal
+
+# User-specific
+*.user
+.vs/

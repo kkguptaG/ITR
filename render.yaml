@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Render Blueprint — deploys the TallyG Tax stack as a PRIVATE STAGING preview:
+#   • a managed PostgreSQL database
+#   • the ASP.NET Core 9 API   (Docker, backend/Dockerfile)
+#   • the Next.js 14 web app   (Docker, frontend/Dockerfile)
+# Connect this repo in Render → New + → Blueprint. See infra/DEPLOY-RENDER.md.
+#
+# NOT for public production: this runs in Development mode (devOtp login, no SMS)
+# and the tax figures are provisional / pending-CA. Lock it down + add the
+# compliance gates (ERI, CA sign-off, audit) before any public launch.
+# ---------------------------------------------------------------------------
+
+databases:
+  - name: tallyg-db
+    plan: free                 # free Postgres is fine for staging; upgrade for persistence
+    databaseName: tallyg
+    user: tallyg
+
+services:
+  # ---------------- ASP.NET Core API ----------------
+  - type: web
+    name: tallyg-api
+    runtime: docker
+    plan: free                 # free web service (spins down when idle; ~30s cold start)
+    region: singapore          # closest Render region to India for staging
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Development       # STAGING ONLY: returns devOtp so you can log in without an SMS provider
+      - key: ASPNETCORE_URLS
+        value: http://+:10000    # Render routes to port 10000 by default
+      - key: Database__Provider
+        value: Postgres
+      - key: ConnectionStrings__Default
+        fromDatabase:
+          name: tallyg-db
+          property: connectionString   # postgresql:// URI — normalized to Npgsql format in code
+      - key: Jwt__Secret
+        generateValue: true            # Render generates + stores a strong secret
+      - key: Jwt__Issuer
+        value: https://api.itrhelp.com
+      - key: Jwt__Audience
+        value: https://itrhelp.com
+      - key: Cors__Origins__0
+        value: https://itrhelp.com
+      - key: Cors__Origins__1
+        value: https://www.itrhelp.com
+
+  # ---------------- Next.js web ----------------
+  - type: web
+    name: tallyg-web
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: frontend/Dockerfile
+    dockerContext: frontend
+    autoDeploy: true
+    envVars:
+      # Baked into the client bundle at build time (matches ARG NEXT_PUBLIC_API_URL in the Dockerfile).
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.itrhelp.com/api/v1
