@@ -350,3 +350,21 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
 - Caveat unchanged: the ITR JSON shape is modelled on the well-known ITD schema but is **not yet
   reconciled field-for-field against the official AY2026-27 schema** — that reconciliation (plus ERI/CA
   sign-off) remains a hard gate before any real upload.
+
+**2026-06-01 — Production hardening #3: security response headers (PII-safe, anti-clickjacking):**
+- New `SecurityHeadersMiddleware` (registered first in the pipeline, writes via `OnStarting` so the
+  headers land on *every* response incl. errors). On all API responses:
+  `Cache-Control: no-store, no-cache, must-revalidate` + `Pragma: no-cache` (the headline control — no
+  browser/proxy/CDN may ever retain a tax/PII response; a DPDP/data-minimisation requirement),
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+  `X-Permitted-Cross-Domain-Policies: none`. `Strict-Transport-Security` (2y, incl. subdomains) is
+  emitted **only in Production over HTTPS** so plain-HTTP local dev is never HSTS-pinned.
+- Kestrel `AddServerHeader = false` + a defensive `Server` strip in the middleware → no server-software
+  banner leaks.
+- Live-verified via `curl -D-`: `/health` and `/api/v1/...` both carry the no-store + nosniff + frame +
+  referrer + cross-domain headers and **no `Server` header**; HSTS correctly absent on dev HTTP. Build
+  clean; engine tests unaffected (51/51 — middleware is HTTP-pipeline-only, no integration tests touch it).
+- Follow-up (browser-facing): set the equivalent headers + a tuned Content-Security-Policy on the
+  **Next.js frontend** (`next.config` `headers()`), where clickjacking/MIME/referrer protections matter
+  most for the actual HTML document. CSP needs per-app tuning (Next inline/runtime chunks) so it is
+  deliberately deferred rather than shipped loose.

@@ -14,6 +14,9 @@ using TallyG.Tax.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Don't advertise the server software in the "Server" response header (info-leak hygiene).
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
 // --- Logging (Serilog) ---
 builder.Host.UseSerilog((ctx, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
@@ -135,6 +138,8 @@ var app = builder.Build();
 // --- Pipeline ---
 // Correlation id first so every log line (and any error response) carries it.
 app.UseMiddleware<CorrelationIdMiddleware>();
+// Security response headers (no-store for PII/tax data, nosniff, HSTS in prod) on every response.
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 
