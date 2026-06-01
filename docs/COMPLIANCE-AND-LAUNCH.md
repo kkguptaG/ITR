@@ -324,3 +324,12 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   nature; a new input field is edited in one place. (Snapshot age still defaults to an adult slab — documented.)
 - **Dedup:** `ExtractNature` now lives once in the factory (was copied in two services).
 - Tests 51/51; backend + frontend build clean; live compute on a real return reflects all of the above.
+
+**2026-06-01 — Production hardening #2: OTP request throttle (anti-flooding):**
+- `RequestOtpAsync` now rate-limits code requests **per identifier** (default **5 per 15-min window**,
+  data-driven via `Auth:OtpMaxRequestsPerWindow` / `Auth:OtpRequestWindowSeconds`) → **429
+  `AUTH.OTP_RATE_LIMITED`**. Complements the existing per-OTP attempt cap (5) + expiry + single-use +
+  HMAC-hashed codes in `VerifyOtpAsync`. Closes the code's own "rate-limit deferred to gateway" TODO.
+- Live-verified: 6 rapid requests for one identifier → five 200s then 429. Tests 51/51; build clean.
+- Note: per-identifier (stops targeted SMS-bombing / cost abuse). A global per-IP limiter
+  (ASP.NET Core RateLimiter) at the edge is still worth adding for distributed abuse before public launch.

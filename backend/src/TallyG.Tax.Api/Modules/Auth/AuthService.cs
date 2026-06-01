@@ -33,6 +33,8 @@ public sealed class AuthService : IAuthService
     private readonly int _accessTokenMinutes;
     private readonly int _refreshTokenDays;
     private readonly int _otpTtlSeconds;
+    private readonly int _otpMaxRequestsPerWindow;
+    private readonly int _otpRequestWindowSeconds;
     private readonly bool _allowSelfRegistration;
 
     public AuthService(
@@ -62,6 +64,8 @@ public sealed class AuthService : IAuthService
         _accessTokenMinutes = ParseInt(jwt["AccessTokenMinutes"], 15);
         _refreshTokenDays = ParseInt(jwt["RefreshTokenDays"], 30);
         _otpTtlSeconds = ParseInt(config["Auth:OtpTtlSeconds"], 300);
+        _otpMaxRequestsPerWindow = ParseInt(config["Auth:OtpMaxRequestsPerWindow"], 5);
+        _otpRequestWindowSeconds = ParseInt(config["Auth:OtpRequestWindowSeconds"], 900);
         // Lock-down switch: when "false", no new accounts can be created (neither the register
         // endpoint nor the signup-OTP path). Existing/seeded accounts can still sign in.
         _allowSelfRegistration = !string.Equals(
@@ -165,8 +169,20 @@ public sealed class AuthService : IAuthService
             _logger.LogInformation("Login OTP requested for unknown identifier; returning opaque token without delivery.");
         }
 
-        var code = _tokens.GenerateCode();
         var now = _clock.UtcNow;
+
+        // Throttle code requests per identifier (anti-flooding / SMS-cost control). The per-OTP attempt
+        // cap is enforced in VerifyOtpAsync; this bounds how many codes can be requested in a window.
+        var windowStart = now.AddSeconds(-_otpRequestWindowSeconds);
+        var recentRequests = await _db.OtpTokens.CountAsync(
+            o => o.Identifier == identifier && o.CreatedAt >= windowStart, ct);
+        if (recentRequests >= _otpMaxRequestsPerWindow)
+        {
+            throw new AppException("AUTH.OTP_RATE_LIMITED",
+                "Too many verification-code requests for this account. Please wait a few minutes before trying again.", 429);
+        }
+
+        var code = _tokens.GenerateCode();
 
         var otp = new OtpToken
         {
