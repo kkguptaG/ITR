@@ -35,6 +35,20 @@ public sealed class UpdateReturnRequestValidator : AbstractValidator<UpdateRetur
 
         When(x => x.AnswersJson is not null, () =>
             RuleFor(x => x.AnswersJson!).MaximumLength(1_000_000).WithMessage("Answers payload is too large."));
+
+        // Prepaid taxes, brought-forward losses, AMT credit and reliefs must be non-negative when supplied.
+        When(x => x.TdsPaid.HasValue, () => RuleFor(x => x.TdsPaid!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.TcsPaid.HasValue, () => RuleFor(x => x.TcsPaid!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.AdvanceTaxPaid.HasValue, () => RuleFor(x => x.AdvanceTaxPaid!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.SelfAssessmentTaxPaid.HasValue, () => RuleFor(x => x.SelfAssessmentTaxPaid!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.BroughtForwardHousePropertyLoss.HasValue, () => RuleFor(x => x.BroughtForwardHousePropertyLoss!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.BroughtForwardBusinessLoss.HasValue, () => RuleFor(x => x.BroughtForwardBusinessLoss!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.BroughtForwardShortTermCapitalLoss.HasValue, () => RuleFor(x => x.BroughtForwardShortTermCapitalLoss!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.BroughtForwardLongTermCapitalLoss.HasValue, () => RuleFor(x => x.BroughtForwardLongTermCapitalLoss!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.BroughtForwardAmtCredit.HasValue, () => RuleFor(x => x.BroughtForwardAmtCredit!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.Relief89.HasValue, () => RuleFor(x => x.Relief89!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.ForeignIncomeDoublyTaxed.HasValue, () => RuleFor(x => x.ForeignIncomeDoublyTaxed!.Value).GreaterThanOrEqualTo(0));
+        When(x => x.ForeignTaxPaid.HasValue, () => RuleFor(x => x.ForeignTaxPaid!.Value).GreaterThanOrEqualTo(0));
     }
 }
 
@@ -92,6 +106,10 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
         RuleFor(x => x.CostOfImprovement).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ExpensesOnTransfer).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ExemptionAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ReinvestmentAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.ExemptionSection)
+            .Must(s => string.IsNullOrWhiteSpace(s) || new[] { "54", "54F", "54EC" }.Contains(s.Trim().ToUpperInvariant()))
+            .WithMessage("Exemption section must be 54, 54F or 54EC.");
         RuleFor(x => x.TaxSection).MaximumLength(16);
         RuleFor(x => x.Isin).MaximumLength(20);
 
