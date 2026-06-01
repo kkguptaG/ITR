@@ -82,7 +82,9 @@ export function DeductionsStep() {
               loading={deductions.addMutation.isPending || deductions.updateMutation.isPending}
               onCancel={done}
               onSubmit={(v) => {
-                const body = { section: v.section, description: v.description || null, amount: v.amount };
+                // The free-text note doubles as the engine sub-type ("severe" for 80U/80DD; an 80G
+                // category like "100 no limit"). Blank ⇒ the section's default treatment.
+                const body = { section: v.section, subType: v.description || null, description: v.description || null, amount: v.amount };
                 const op = item
                   ? deductions.updateMutation.mutateAsync({ id: item.id, body })
                   : deductions.addMutation.mutateAsync(body);

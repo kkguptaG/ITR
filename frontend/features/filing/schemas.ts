@@ -131,16 +131,25 @@ export type OtherIncomeFormValues = z.infer<typeof otherIncomeSchema>;
 export const DEDUCTION_SECTIONS = [
   '80C',
   '80CCD(1B)',
+  '80CCD(2)',
   '80D',
+  '80DD',
+  '80DDB',
   '80E',
+  '80EEA',
+  '80EEB',
   '80G',
+  '80GG',
   '80TTA',
   '80TTB',
+  '80U',
   '24(b)',
 ] as const;
 
 export const deductionSchema = z.object({
   section: z.enum(DEDUCTION_SECTIONS),
+  // Free-text note that also doubles as the engine "sub-type": e.g. "severe" for 80U/80DD, or
+  // "100 no limit" / "50 no limit" for an 80G category. Blank ⇒ the section's default treatment.
   description: z.string().trim().max(200).optional().or(z.literal('')),
   amount: money,
 });
