@@ -11,6 +11,7 @@ import { Controller, useFieldArray, useForm, type Control, type DefaultValues, t
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Button, CurrencyInput, Field, Input, Select } from '@/components/ui';
+import { Alert } from '@/components/ui/Alert';
 import {
   businessIncomeSchema,
   capitalGainSchema,
@@ -365,7 +366,7 @@ export function CapitalGainForm({
 }) {
   const t = useTranslations('income');
   const tc = useTranslations('common');
-  const { control, register, handleSubmit, formState: { errors } } = useForm<CapitalGainFormValues>({
+  const { control, register, handleSubmit, watch, formState: { errors } } = useForm<CapitalGainFormValues>({
     resolver: zodResolver(capitalGainSchema),
     defaultValues: {
       assetType: 'ListedEquityShare', term: 'Long', acquisitionDate: '', transferDate: '',
@@ -414,6 +415,14 @@ export function CapitalGainForm({
         </Field>
         <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54F/54EC)" />
       </div>
+      {watch('exemptionSection') ? (
+        <Alert variant="warning">
+          Reinvestment exemptions carry strict conditions &amp; timelines — <strong>54EC</strong>: NHAI/REC
+          bonds within 6 months, capped ₹50L, 5‑yr lock‑in; <strong>54 / 54F</strong>: buy a house 1 yr before
+          or 2 yr after the sale (or construct within 3 yr), parking the amount in the Capital Gains Account
+          Scheme until then. Claim only if you genuinely meet the conditions and hold proof.
+        </Alert>
+      ) : null}
       <FormActions onCancel={onCancel} loading={loading} submitLabel={tc('save')} />
     </form>
   );

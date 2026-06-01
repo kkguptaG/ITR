@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { Button, CurrencyInput, Field, Select, Spinner } from '@/components/ui';
+import { Alert } from '@/components/ui/Alert';
 import { formatInr } from '@/lib/format';
 import {
   addDeduction,
@@ -53,6 +54,12 @@ export function DeductionsStep() {
   return (
     <>
       <WizardStep title={t('deductionsTitle')} description={t('deductionsSubtitle')}>
+        <Alert variant="warning" title="Claim only what you can substantiate" className="mb-4">
+          Claim a deduction or exemption only if you meet its conditions and hold valid proof — e.g. 80C / 80D
+          premium receipts, an 80G donation certificate (Form 10BE), rent receipts for HRA / 80GG, the
+          prescribed medical certificate for 80U / 80DD / 80DDB, or reinvestment proof for 54 / 54F / 54EC.
+          Most are old‑regime only. These figures are software‑assisted — verify before you file.
+        </Alert>
         <EditableList<DeductionDto>
           items={deductions.query.data ?? []}
           getKey={(d) => d.id}

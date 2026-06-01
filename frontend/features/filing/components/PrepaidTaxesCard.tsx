@@ -105,6 +105,10 @@ export function PrepaidTaxesCard({ returnId, detail }: { returnId: string; detai
             DTAA exists (s.90/90A; else s.91)
           </label>
         </div>
+        <p className="mt-2 text-xs text-payable-700">
+          Relief u/s 89 needs Form 10E filed on the e‑filing portal, and foreign‑tax credit (90/90A/91) needs
+          Form 67 before filing. Enter these only if eligible and documented — figures are provisional.
+        </p>
       </div>
 
       {mutation.isSuccess && !mutation.isPending && (
