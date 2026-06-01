@@ -84,7 +84,7 @@ public sealed class TaxCalculator : ITaxCalculator
             "Gross Total Income (all heads, incl. special-rate + casual income)", grossTotalIncome, "Ch.3 §3.4.2.4"));
 
         // --- Stage 5: Chapter VI-A deductions (regime-gated, capped) ---
-        var (chapterViaTotal, deductionTrace) = ComputeChapterViaDeductions(input, regime, regimeRules, rs, salaryIncome);
+        var (chapterViaTotal, deductionTrace) = ComputeChapterViaDeductions(input, regime, regimeRules, rs, salaryIncome, normalGti);
         trace.AddRange(deductionTrace);
 
         // Chapter VI-A reduces only the NORMAL income (never special-rate income).
@@ -500,7 +500,7 @@ public sealed class TaxCalculator : ITaxCalculator
     // ------------------------------------------------------- Chapter VI-A
 
     private static (decimal Total, List<TraceLine> Trace) ComputeChapterViaDeductions(
-        TaxComputationInput input, Regime regime, RegimeRules regimeRules, RuleSet rs, decimal salaryIncome)
+        TaxComputationInput input, Regime regime, RegimeRules regimeRules, RuleSet rs, decimal salaryIncome, decimal normalIncomeBeforeVia)
     {
         var trace = new List<TraceLine>();
         var caps = rs.DeductionCaps;
@@ -509,7 +509,7 @@ public sealed class TaxCalculator : ITaxCalculator
         decimal claimed80C = 0m, claimed80Ccd1B = 0m, claimed80Ccd2 = 0m;
         decimal claimed80DSelf = 0m, claimed80DParents = 0m, claimed80DPreventive = 0m;
         decimal claimed80Tta = 0m, claimed80Ttb = 0m;
-        decimal claimed80Ddb = 0m, claimed80Eea = 0m, claimed80Eeb = 0m;
+        decimal claimed80Ddb = 0m, claimed80Eea = 0m, claimed80Eeb = 0m, claimed80Gg = 0m;
         bool has80U = false, has80Dd = false, severe80U = false, severe80Dd = false;
         decimal claimedOther = 0m; // 80E/80G/80GG + profit-linked (80-IA/IAC...) — deducted in full (old regime)
         var otherAllowed = 0m;
@@ -532,6 +532,7 @@ public sealed class TaxCalculator : ITaxCalculator
                 case "80DDB": claimed80Ddb += d.ClaimedAmount; break;
                 case "80EEA": claimed80Eea += d.ClaimedAmount; break;
                 case "80EEB": claimed80Eeb += d.ClaimedAmount; break;
+                case "80GG": claimed80Gg += d.ClaimedAmount; break;
                 default:
                     // Other Chapter VI-A (80E/80G/80GG/80U...). Disallowed in new regime unless explicitly allowed.
                     if (regime == Regime.New && !regimeRules.AllowedChapterVia.Contains(d.Section))
@@ -647,7 +648,25 @@ public sealed class TaxCalculator : ITaxCalculator
         {
             otherAllowed = claimedOther;
             total += otherAllowed;
-            trace.Add(new TraceLine("Deduction.Other", "Other Chapter VI-A deductions (80E/80G/80U...)", otherAllowed, "Ch.VI-A"));
+            trace.Add(new TraceLine("Deduction.Other", "Other Chapter VI-A deductions (80E / 80G / profit-linked 80-IA…)", otherAllowed, "Ch.VI-A"));
+        }
+
+        // s.80GG rent paid where no HRA is received — least of: ₹5,000/month, 25% of total income, and
+        // rent paid minus 10% of total income. "Total income" here = income before this deduction (GTI
+        // less the other Chapter VI-A deductions) — a documented simplification, pending CA review.
+        if (regime == Regime.Old && claimed80Gg > 0m)
+        {
+            var totalIncomeFor80Gg = TaxMath.NonNegative(normalIncomeBeforeVia - total);
+            var capAnnual = caps.Section80GgMonthly * 12m;
+            var quarterOfIncome = 0.25m * totalIncomeFor80Gg;
+            var rentOverTenPct = TaxMath.NonNegative(claimed80Gg - 0.10m * totalIncomeFor80Gg);
+            var allowed = Math.Max(0m, Math.Min(Math.Min(capAnnual, quarterOfIncome), rentOverTenPct));
+            if (allowed > 0m)
+            {
+                total += allowed;
+                trace.Add(new TraceLine("Deduction.80GG",
+                    "s.80GG rent paid (least of ₹60,000 / 25% of income / rent − 10% of income)", allowed, "s.80GG"));
+            }
         }
 
         trace.Add(new TraceLine("Deduction.Total", "Total Chapter VI-A deductions", total, "Ch.3 §3.4.2.5"));
@@ -681,6 +700,7 @@ public sealed class TaxCalculator : ITaxCalculator
             "80DDB" or "80_DDB" => "80DDB",
             "80EEA" or "80_EEA" => "80EEA",
             "80EEB" or "80_EEB" => "80EEB",
+            "80GG" or "80_GG" => "80GG",
             _ => s,
         };
     }

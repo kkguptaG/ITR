@@ -435,3 +435,14 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   below-60 vs senior cap, 80EEA in-cap, 80EEB over-cap, hyphenated label, and new-regime disallowance.
 - Still uncapped / deferred (documented): **80G** (needs the 10%-of-adjusted-GTI qualifying limit) and
   **80GG** (rent-paid least-of formula) — next deduction-depth increment.
+
+**2026-06-01 — Chapter VI-A depth (cont.): 80GG rent-paid (no HRA):**
+- **80GG** now computes the statutory **least of** (a) ₹5,000/month = ₹60,000/yr (rule-set
+  `deduction_caps.80GG_monthly_cap`), (b) 25% of total income, (c) rent paid − 10% of total income —
+  old-regime only. "Total income" base = income before this deduction (GTI less the other Chapter VI-A
+  deductions), a documented simplification pending CA review (strict s.80GG excludes LTCG/STCG too, which
+  this normal-income base already does). `NormalizeSection` accepts "80GG"/"80-GG".
+- Verified: **3 new tests** (engine **72 → 75**, all green) — ₹60k cap arm binds, rent−10% arm binds,
+  and new-regime disallowance.
+- Remaining deferred: **80G** donations (100%/50% × no-limit vs the 10%-of-adjusted-GTI qualifying limit)
+  — the one remaining common Chapter VI-A section still in the uncapped bucket; next increment.

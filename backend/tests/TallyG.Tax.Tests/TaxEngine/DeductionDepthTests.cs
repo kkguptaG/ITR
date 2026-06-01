@@ -92,4 +92,32 @@ public class DeductionDepthTests
 
         r.Trace.Should().NotContain(t => t.Step == "Deduction.80U");
     }
+
+    [Fact]
+    public void Section80GG_rent_relief_is_capped_at_60k_per_year()
+    {
+        // Salary ₹8L − ₹50k = ₹7.5L income; rent ₹1.8L. Least of ₹60k / 25%×7.5L=₹1.875L /
+        // (1.8L − 10%×7.5L = ₹1.05L) ⇒ the ₹60k annual cap binds.
+        var r = _engine.Compute(RuleSetFixture.Salaried(800_000m, deductions: D("80GG", 180_000m)), Regime.Old);
+
+        r.Trace.Should().Contain(t => t.Step == "Deduction.80GG" && t.Amount == 60_000m);
+        r.TaxableIncome.Should().Be(690_000m); // 7,50,000 − 60,000
+    }
+
+    [Fact]
+    public void Section80GG_rent_minus_ten_percent_arm_can_bind()
+    {
+        // Rent ₹1.2L, income ₹7.5L ⇒ rent − 10% income = 1.2L − 75k = ₹45k, below the ₹60k cap and 25% arm.
+        var r = _engine.Compute(RuleSetFixture.Salaried(800_000m, deductions: D("80GG", 120_000m)), Regime.Old);
+
+        r.Trace.Should().Contain(t => t.Step == "Deduction.80GG" && t.Amount == 45_000m);
+    }
+
+    [Fact]
+    public void Section80GG_is_disallowed_under_the_new_regime()
+    {
+        var r = _engine.Compute(RuleSetFixture.Salaried(800_000m, deductions: D("80GG", 180_000m)), Regime.New);
+
+        r.Trace.Should().NotContain(t => t.Step == "Deduction.80GG");
+    }
 }

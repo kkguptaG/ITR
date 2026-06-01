@@ -277,6 +277,7 @@ public sealed class RuleSet
             Section80DdbSenior = GetDecimal(d, "80DDB_senior") ?? 100000m,
             Section80Eea = GetDecimal(d, "80EEA") ?? 150000m,
             Section80Eeb = GetDecimal(d, "80EEB") ?? 150000m,
+            Section80GgMonthly = GetDecimal(d, "80GG_monthly_cap") ?? 5000m,
             HousePropertyLossSetoffCap = GetDecimal(d, "house_property_loss_setoff_cap") ?? 200000m,
         };
     }
@@ -522,6 +523,9 @@ public sealed class DeductionCaps
 
     /// <summary>s.80EEB electric-vehicle loan interest cap ₹1,50,000.</summary>
     public decimal Section80Eeb { get; init; } = 150000m;
+
+    /// <summary>s.80GG rent-paid monthly cap (one arm of the least-of-three formula): ₹5,000/month.</summary>
+    public decimal Section80GgMonthly { get; init; } = 5000m;
 
     public decimal HousePropertyLossSetoffCap { get; init; } = 200000m;
 }
