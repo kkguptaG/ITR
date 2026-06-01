@@ -419,3 +419,19 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
 - **PENDING CA REVIEW (documented):** firm/LLP (no ₹20L threshold) vs individual; surcharge-marginal-relief
   on AMT; the FTC-vs-AMT and 89-vs-AMT interaction ordering; Form 10E / Form 67 capture detail. These are
   modelled as documented simplifications — figures remain provisional until a CA signs off.
+
+**2026-06-01 — Chapter VI-A depth: 80U / 80DD / 80DDB / 80EEA / 80EEB:**
+- Previously these fell into the uncapped "other Chapter VI-A" bucket (deducted in full). Now the engine
+  applies the correct statutory treatment (old-regime only; all disallowed under 115BAC):
+  **80U** self-disability — a FIXED ₹75,000 (₹1,25,000 "severe", via the deduction's sub-type), independent
+  of the amount entered (presence-based); **80DD** dependent-disability — likewise FIXED ₹75k / ₹1.25L;
+  **80DDB** specified-disease treatment — least of spend and ₹40,000 (₹1,00,000 for a senior, by age);
+  **80EEA** affordable-housing loan interest and **80EEB** EV-loan interest — capped ₹1,50,000 each. All
+  caps are rule-set driven (`deduction_caps` keys `80U` / `80U_severe` / `80DD` / `80DD_severe` /
+  `80DDB_below_60` / `80DDB_senior` / `80EEA` / `80EEB`; defaults baked in). `NormalizeSection` now also
+  accepts hyphen/space label variants (e.g. "80-EEB"). Profit-linked sections (80-IA/IAC…) still flow
+  through the uncapped bucket (correct — they're deducted in full and added back for AMT).
+- Verified: **9 new unit tests** (engine **63 → 72**, all green) — 80U fixed/severe, 80DD fixed, 80DDB
+  below-60 vs senior cap, 80EEA in-cap, 80EEB over-cap, hyphenated label, and new-regime disallowance.
+- Still uncapped / deferred (documented): **80G** (needs the 10%-of-adjusted-GTI qualifying limit) and
+  **80GG** (rent-paid least-of formula) — next deduction-depth increment.

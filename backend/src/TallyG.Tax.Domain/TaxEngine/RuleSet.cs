@@ -269,6 +269,14 @@ public sealed class RuleSet
             Section80DPreventiveHealthCheckup = GetDecimal(d, "80D_preventive_health_checkup") ?? 5000m,
             Section80Tta = GetDecimal(d, "80TTA") ?? 10000m,
             Section80Ttb = GetDecimal(d, "80TTB") ?? 50000m,
+            Section80U = GetDecimal(d, "80U") ?? 75000m,
+            Section80USevere = GetDecimal(d, "80U_severe") ?? 125000m,
+            Section80Dd = GetDecimal(d, "80DD") ?? 75000m,
+            Section80DdSevere = GetDecimal(d, "80DD_severe") ?? 125000m,
+            Section80DdbBelow60 = GetDecimal(d, "80DDB_below_60") ?? 40000m,
+            Section80DdbSenior = GetDecimal(d, "80DDB_senior") ?? 100000m,
+            Section80Eea = GetDecimal(d, "80EEA") ?? 150000m,
+            Section80Eeb = GetDecimal(d, "80EEB") ?? 150000m,
             HousePropertyLossSetoffCap = GetDecimal(d, "house_property_loss_setoff_cap") ?? 200000m,
         };
     }
@@ -496,6 +504,25 @@ public sealed class DeductionCaps
     public decimal Section80DPreventiveHealthCheckup { get; init; } = 5000m;
     public decimal Section80Tta { get; init; } = 10000m;
     public decimal Section80Ttb { get; init; } = 50000m;
+
+    /// <summary>s.80U self-disability (fixed): normal ₹75,000 / severe ₹1,25,000.</summary>
+    public decimal Section80U { get; init; } = 75000m;
+    public decimal Section80USevere { get; init; } = 125000m;
+
+    /// <summary>s.80DD dependent-disability maintenance (fixed): normal ₹75,000 / severe ₹1,25,000.</summary>
+    public decimal Section80Dd { get; init; } = 75000m;
+    public decimal Section80DdSevere { get; init; } = 125000m;
+
+    /// <summary>s.80DDB specified-disease treatment (capped): below-60 ₹40,000 / senior ₹1,00,000.</summary>
+    public decimal Section80DdbBelow60 { get; init; } = 40000m;
+    public decimal Section80DdbSenior { get; init; } = 100000m;
+
+    /// <summary>s.80EEA affordable-housing loan interest cap ₹1,50,000.</summary>
+    public decimal Section80Eea { get; init; } = 150000m;
+
+    /// <summary>s.80EEB electric-vehicle loan interest cap ₹1,50,000.</summary>
+    public decimal Section80Eeb { get; init; } = 150000m;
+
     public decimal HousePropertyLossSetoffCap { get; init; } = 200000m;
 }
 

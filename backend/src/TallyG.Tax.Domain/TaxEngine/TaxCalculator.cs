@@ -509,7 +509,9 @@ public sealed class TaxCalculator : ITaxCalculator
         decimal claimed80C = 0m, claimed80Ccd1B = 0m, claimed80Ccd2 = 0m;
         decimal claimed80DSelf = 0m, claimed80DParents = 0m, claimed80DPreventive = 0m;
         decimal claimed80Tta = 0m, claimed80Ttb = 0m;
-        decimal claimedOther = 0m; // 80E/80G/80U etc. (no engine cap in the demo, but regime-gated)
+        decimal claimed80Ddb = 0m, claimed80Eea = 0m, claimed80Eeb = 0m;
+        bool has80U = false, has80Dd = false, severe80U = false, severe80Dd = false;
+        decimal claimedOther = 0m; // 80E/80G/80GG + profit-linked (80-IA/IAC...) — deducted in full (old regime)
         var otherAllowed = 0m;
 
         foreach (var d in input.Deductions)
@@ -525,6 +527,11 @@ public sealed class TaxCalculator : ITaxCalculator
                 case "80D_PREVENTIVE": claimed80DPreventive += d.ClaimedAmount; break;
                 case "80TTA": claimed80Tta += d.ClaimedAmount; break;
                 case "80TTB": claimed80Ttb += d.ClaimedAmount; break;
+                case "80U": has80U = true; severe80U |= IsSevere(d.SubType); break;
+                case "80DD": has80Dd = true; severe80Dd |= IsSevere(d.SubType); break;
+                case "80DDB": claimed80Ddb += d.ClaimedAmount; break;
+                case "80EEA": claimed80Eea += d.ClaimedAmount; break;
+                case "80EEB": claimed80Eeb += d.ClaimedAmount; break;
                 default:
                     // Other Chapter VI-A (80E/80G/80GG/80U...). Disallowed in new regime unless explicitly allowed.
                     if (regime == Regime.New && !regimeRules.AllowedChapterVia.Contains(d.Section))
@@ -592,6 +599,49 @@ public sealed class TaxCalculator : ITaxCalculator
             trace.Add(new TraceLine("Deduction.80TTB", $"s.80TTB senior interest (capped at ₹{caps.Section80Ttb:N0})", allowed, "s.80TTB"));
         }
 
+        // --- Disability / medical / loan-interest sections (OLD regime only; disallowed under 115BAC) ---
+
+        // s.80U self-disability — a FIXED deduction (₹75k / ₹1.25L severe), independent of amount spent.
+        if (regime == Regime.Old && has80U)
+        {
+            var allowed = severe80U ? caps.Section80USevere : caps.Section80U;
+            total += allowed;
+            trace.Add(new TraceLine("Deduction.80U", $"s.80U self-disability ({(severe80U ? "severe" : "normal")}, fixed)", allowed, "s.80U"));
+        }
+
+        // s.80DD dependent-disability maintenance — FIXED (₹75k / ₹1.25L severe).
+        if (regime == Regime.Old && has80Dd)
+        {
+            var allowed = severe80Dd ? caps.Section80DdSevere : caps.Section80Dd;
+            total += allowed;
+            trace.Add(new TraceLine("Deduction.80DD", $"s.80DD dependent-disability ({(severe80Dd ? "severe" : "normal")}, fixed)", allowed, "s.80DD"));
+        }
+
+        // s.80DDB specified-disease treatment — least of actual spend and the cap (senior ₹1L, else ₹40k).
+        if (regime == Regime.Old && claimed80Ddb > 0m)
+        {
+            var cap = input.Age >= 60 ? caps.Section80DdbSenior : caps.Section80DdbBelow60;
+            var allowed = Math.Min(claimed80Ddb, cap);
+            total += allowed;
+            trace.Add(new TraceLine("Deduction.80DDB", $"s.80DDB medical treatment (capped at ₹{cap:N0})", allowed, "s.80DDB"));
+        }
+
+        // s.80EEA affordable-housing loan interest — capped ₹1.5L.
+        if (regime == Regime.Old && claimed80Eea > 0m)
+        {
+            var allowed = Math.Min(claimed80Eea, caps.Section80Eea);
+            total += allowed;
+            trace.Add(new TraceLine("Deduction.80EEA", $"s.80EEA housing-loan interest (capped at ₹{caps.Section80Eea:N0})", allowed, "s.80EEA"));
+        }
+
+        // s.80EEB electric-vehicle loan interest — capped ₹1.5L.
+        if (regime == Regime.Old && claimed80Eeb > 0m)
+        {
+            var allowed = Math.Min(claimed80Eeb, caps.Section80Eeb);
+            total += allowed;
+            trace.Add(new TraceLine("Deduction.80EEB", $"s.80EEB EV-loan interest (capped at ₹{caps.Section80Eeb:N0})", allowed, "s.80EEB"));
+        }
+
         // Other Chapter VI-A claims (already regime-filtered above).
         if (claimedOther > 0m)
         {
@@ -626,9 +676,18 @@ public sealed class TaxCalculator : ITaxCalculator
             "80DPREVENTIVE" or "80D_PREVENTIVE" => "80D_PREVENTIVE",
             "80TTA" => "80TTA",
             "80TTB" => "80TTB",
+            "80U" => "80U",
+            "80DD" or "80_DD" => "80DD",
+            "80DDB" or "80_DDB" => "80DDB",
+            "80EEA" or "80_EEA" => "80EEA",
+            "80EEB" or "80_EEB" => "80EEB",
             _ => s,
         };
     }
+
+    /// <summary>True when a deduction's sub-type marks a "severe" (≥80%) disability (drives the 80U/80DD cap).</summary>
+    private static bool IsSevere(string? subType)
+        => subType is not null && subType.Contains("severe", StringComparison.OrdinalIgnoreCase);
 
     // ------------------------------------------------------------- slab tax
 
