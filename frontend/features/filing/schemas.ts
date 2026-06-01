@@ -92,6 +92,8 @@ export const capitalGainSchema = z.object({
   costOfImprovement: optionalMoney,
   expensesOnTransfer: optionalMoney,
   exemptionAmount: optionalMoney,
+  exemptionSection: z.string().optional().or(z.literal('')),
+  reinvestmentAmount: optionalMoney,
 });
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 

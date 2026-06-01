@@ -178,6 +178,7 @@ public sealed record UpsertCapitalGainRequest(
     decimal ExpensesOnTransfer,
     string? ExemptionSection,
     decimal ExemptionAmount,
+    decimal ReinvestmentAmount,
     string? Isin);
 
 public sealed record CapitalGainDto(
@@ -194,6 +195,7 @@ public sealed record CapitalGainDto(
     decimal ExpensesOnTransfer,
     string? ExemptionSection,
     decimal ExemptionAmount,
+    decimal ReinvestmentAmount,
     decimal Gain,
     string? Isin);
 

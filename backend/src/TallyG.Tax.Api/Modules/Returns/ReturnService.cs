@@ -507,6 +507,7 @@ public sealed class ReturnService : IReturnService
             ExpensesOnTransfer = request.ExpensesOnTransfer,
             ExemptionSection = request.ExemptionSection?.Trim(),
             ExemptionAmount = request.ExemptionAmount,
+            ReinvestmentAmount = request.ReinvestmentAmount,
             Isin = request.Isin?.Trim()
         };
 
@@ -535,6 +536,7 @@ public sealed class ReturnService : IReturnService
         entity.ExpensesOnTransfer = request.ExpensesOnTransfer;
         entity.ExemptionSection = request.ExemptionSection?.Trim();
         entity.ExemptionAmount = request.ExemptionAmount;
+        entity.ReinvestmentAmount = request.ReinvestmentAmount;
         entity.Isin = request.Isin?.Trim();
 
         ApplyCapitalGainDerived(entity);
@@ -1259,7 +1261,7 @@ public sealed class ReturnService : IReturnService
     private static CapitalGainDto ToCapitalGainDto(CapitalGain c) => new(
         c.Id, c.AssetType, c.Term, c.TaxSection, c.AcquisitionDate, c.TransferDate, c.SalePrice,
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
-        c.ExemptionSection, c.ExemptionAmount, c.Gain, c.Isin);
+        c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin);
 
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,

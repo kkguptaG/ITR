@@ -27,6 +27,9 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     public string? ExemptionSection { get; set; }
     public decimal ExemptionAmount { get; set; }
 
+    /// <summary>Amount reinvested (new house u/s 54/54F, or NHAI/REC bonds u/s 54EC) driving the computed LTCG exemption.</summary>
+    public decimal ReinvestmentAmount { get; set; }
+
     public decimal Gain { get; set; }
     public string? Isin { get; set; }
 

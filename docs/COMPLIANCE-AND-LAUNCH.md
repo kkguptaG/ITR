@@ -475,3 +475,16 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   proportion, manual exemption now applied, and STCG unaffected.
 - PENDING CA REVIEW: the engine does not yet hard-gate each section to its eligible asset class (e.g. 54EC
   to land/building only) — it trusts the section the filer selects. Documented simplification.
+
+**2026-06-01 — CG reinvestment exemption: end-to-end capture + persistence:**
+- The capital-gain entity already stored `ExemptionSection` + `ExemptionAmount`, but **the input factory
+  was never passing `ExemptionSection` to the engine** (the saved-return path silently lost the 54/54F/54EC
+  choice) and there was no `ReinvestmentAmount` to drive the computed exemption. Both are now wired:
+  `ReinvestmentAmount` added to the `CapitalGain` entity (+ EF migration `AddCgReinvestmentAmount`), the
+  `UpsertCapitalGainRequest`/`CapitalGainDto`, the create/update service mappings, and the factory now
+  feeds `ExemptionSection` + `ReinvestmentAmount` into the engine.
+- Frontend capital-gains form now has a **reinvestment-section selector** (None/54/54F/54EC) and an
+  **amount-reinvested** field (types + zod schema + edit-mapping updated). `next build` clean.
+- So 54/54F/54EC reinvestment exemptions now work from the **saved-return filing path** (not just the
+  ad-hoc calculator). Tests unchanged at 84 (the engine logic was already covered); backend + frontend
+  build clean; dev DB reset for the new column; live (API + frontend up).

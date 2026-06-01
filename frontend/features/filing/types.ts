@@ -151,6 +151,7 @@ export interface CapitalGainDto {
   expensesOnTransfer: number;
   exemptionSection: string | null;
   exemptionAmount: number;
+  reinvestmentAmount: number;
   gain: number;
   isin: string | null;
 }
@@ -166,6 +167,7 @@ export interface UpsertCapitalGainRequest {
   expensesOnTransfer: number;
   exemptionSection?: string | null;
   exemptionAmount: number;
+  reinvestmentAmount?: number;
   isin?: string | null;
 }
 

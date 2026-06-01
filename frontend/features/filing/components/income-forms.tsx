@@ -370,6 +370,7 @@ export function CapitalGainForm({
     defaultValues: {
       assetType: 'ListedEquityShare', term: 'Long', acquisitionDate: '', transferDate: '',
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
+      exemptionSection: '', reinvestmentAmount: 0,
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
@@ -403,6 +404,15 @@ export function CapitalGainForm({
         <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
         <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
         <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
+        <Field label="Reinvestment exemption section">
+          <Select {...register('exemptionSection')}>
+            <option value="">None / manual amount</option>
+            <option value="54">54 — residential house</option>
+            <option value="54F">54F — any asset (proportionate)</option>
+            <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+          </Select>
+        </Field>
+        <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54F/54EC)" />
       </div>
       <FormActions onCancel={onCancel} loading={loading} submitLabel={tc('save')} />
     </form>

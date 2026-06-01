@@ -43,7 +43,9 @@ internal static class TaxComputationInputFactory
                 c.AssetType, c.Term, c.TaxSection, c.SalePrice, c.CostOfAcquisition, c.CostOfImprovement,
                 c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate,
                 FairMarketValueOnGrandfatherDate: null,
-                IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null)).ToList(),
+                IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null,
+                ExemptionSection: c.ExemptionSection,
+                ReinvestmentAmount: c.ReinvestmentAmount)).ToList(),
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
                 b.NetProfit, b.SpeculativeFlag)).ToList(),

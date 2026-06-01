@@ -242,6 +242,8 @@ export function IncomeStep() {
                           costOfImprovement: item.costOfImprovement,
                           expensesOnTransfer: item.expensesOnTransfer,
                           exemptionAmount: item.exemptionAmount,
+                          exemptionSection: item.exemptionSection ?? '',
+                          reinvestmentAmount: item.reinvestmentAmount,
                         }
                       : undefined
                   }
