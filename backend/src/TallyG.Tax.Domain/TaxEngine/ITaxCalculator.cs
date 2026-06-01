@@ -213,6 +213,17 @@ public sealed record ComputationResult
     /// <summary>Relief u/s 90/90A/91 — credit for foreign tax on doubly-taxed income.</summary>
     public decimal Relief90And91 { get; init; }
 
+    // --- Current-year losses carried forward after inter-head set-off (s.71); feed next year's b/f. ---
+
+    /// <summary>Current-year house-property loss carried forward u/s 71B (8 years, vs HP income). 0 if none.</summary>
+    public decimal HousePropertyLossCarriedForward { get; init; }
+
+    /// <summary>Current-year non-speculative business loss carried forward u/s 72 (8 years, vs business income). 0 if none.</summary>
+    public decimal BusinessLossCarriedForward { get; init; }
+
+    /// <summary>Current-year speculative business loss carried forward u/s 73 (4 years, vs speculative income). 0 if none.</summary>
+    public decimal SpeculativeLossCarriedForward { get; init; }
+
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();
 }

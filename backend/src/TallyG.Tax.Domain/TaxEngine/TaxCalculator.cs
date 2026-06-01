@@ -53,31 +53,40 @@ public sealed class TaxCalculator : ITaxCalculator
         var regimeRules = rs.For(regime);
         var trace = new List<TraceLine>();
 
-        // --- Stage 1: gross income per head ---
+        // --- Stage 1: gross income per head (each SIGNED — a negative head is a current-year loss) ---
         var (salaryIncome, hraExemptApplied, professionalTax) = ComputeSalaryHead(input, regime, regimeRules, rs, trace);
         var housePropertyIncome = ComputeHousePropertyHead(input, regime, regimeRules, rs, trace);
-        var (capitalGains, slabRateCgIncome) = ComputeCapitalGainsHead(input, rs, trace);
-        var businessIncome = ComputeBusinessHead(input, trace);
+        var (capitalGains, _) = ComputeCapitalGainsHead(input, rs, trace);
+        var (businessIncome, speculativeIncome) = ComputeBusinessHead(input, trace);
         var (otherIncome, casual115BB, agriculturalIncome) = ComputeOtherSourcesHead(input, trace);
 
         // Brought-forward (earlier-year) losses set off against the SAME head's current income.
         housePropertyIncome = SetOffBroughtForwardLoss(housePropertyIncome, input.BroughtForwardHousePropertyLoss, "HouseProperty", trace);
         businessIncome = SetOffBroughtForwardLoss(businessIncome, input.BroughtForwardBusinessLoss, "Business", trace);
 
-        // Special-rate (flat) income is taxed OUTSIDE the slab; slab-rate CG folds into normal income.
         // Brought-forward capital losses (STCL/LTCL) set off against this year's capital-gain buckets.
-        var specialBuckets = ApplyBroughtForwardCapitalLosses(
+        var broughtForwardAdjustedBuckets = ApplyBroughtForwardCapitalLosses(
             capitalGains.Buckets, input.BroughtForwardShortTermCapitalLoss, input.BroughtForwardLongTermCapitalLoss, trace);
-        slabRateCgIncome = TaxMath.NonNegative(specialBuckets.SlabRateGains);
+
+        // --- Stage 3b: current-year INTER-HEAD set-off (s.71) + carry-forward (s.71B/72/73) ---
+        // Distributes each head's current-year loss across the other heads under the statutory
+        // restrictions, then reports what carries forward. Special-rate (flat) income is taxed OUTSIDE
+        // the slab; slab-rate CG folds into normal income.
+        var setOff = LossSetOff.Apply(
+            salaryIncome, housePropertyIncome, businessIncome, speculativeIncome, otherIncome,
+            broughtForwardAdjustedBuckets, rs.DeductionCaps.HousePropertyLossSetoffCap, trace);
+
+        var specialBuckets = setOff.BucketsAfter;
+        var slabRateCgIncome = TaxMath.NonNegative(specialBuckets.SlabRateGains);
         var specialRateIncome = specialBuckets.TotalSpecialRateIncome;
 
-        // --- Stage 4: Gross Total Income (normal, slab-taxed portion) ---
+        // --- Stage 4: Gross Total Income (normal, slab-taxed portion), after all set-offs ---
         var normalGti =
-            salaryIncome +
-            housePropertyIncome +
+            setOff.SalaryAfter +
+            setOff.HousePropertyAfter +
             slabRateCgIncome +
-            businessIncome +
-            otherIncome;
+            setOff.BusinessAfter +
+            setOff.OtherSourcesAfter;
 
         var grossTotalIncome = normalGti + specialRateIncome + casual115BB;
         trace.Add(new TraceLine("GrossTotalIncome",
@@ -190,6 +199,9 @@ public sealed class TaxCalculator : ITaxCalculator
             AmtCreditSetOff = amt.CreditSetOff,
             Relief89 = relief89,
             Relief90And91 = relief9091,
+            HousePropertyLossCarriedForward = setOff.HousePropertyLossCarried,
+            BusinessLossCarriedForward = setOff.BusinessLossCarried,
+            SpeculativeLossCarriedForward = setOff.SpeculativeLossCarried,
             Trace = trace,
         };
     }
@@ -268,16 +280,19 @@ public sealed class TaxCalculator : ITaxCalculator
             decimal netIncome;
             if (hp.Type == HousePropertyType.SelfOccupied)
             {
-                // Self-occupied: annual value nil; interest on loan deductible (old regime),
-                // disallowed in new regime (24(b) self-occupied).
+                // Self-occupied: annual value nil; interest deductible (old regime), disallowed under
+                // new regime (24(b) self-occupied). The s.24(b) deduction is itself capped (₹2,00,000)
+                // — interest beyond the cap is NOT deductible and does NOT carry forward (unlike a
+                // let-out loss): cap it AT SOURCE so it never reaches s.71B.
                 var interest = regime == Regime.Old && !regimeRules.IsChapterViaDisallowed("24b_self_occupied")
-                    ? hp.InterestOnLoan
+                    ? Math.Min(hp.InterestOnLoan, rs.DeductionCaps.HousePropertyLossSetoffCap)
                     : 0m;
                 netIncome = -interest; // a self-occupied house only produces a (capped) loss
             }
             else
             {
-                // Let-out / deemed let-out: NAV - 30% std deduction - full interest.
+                // Let-out / deemed let-out: NAV - 30% std deduction - full interest (loss uncapped here —
+                // the s.71(3A) inter-head ₹2L cap and s.71B carry-forward are applied in LossSetOff).
                 var nav = TaxMath.NonNegative(hp.AnnualValue - hp.MunicipalTaxesPaid);
                 var stdDeduction30 = nav * 0.30m;
                 netIncome = nav - stdDeduction30 - hp.InterestOnLoan;
@@ -286,20 +301,11 @@ public sealed class TaxCalculator : ITaxCalculator
             total += netIncome;
         }
 
-        // House-property LOSS set-off against other heads is capped (₹2,00,000).
-        if (total < 0m)
-        {
-            var cap = regimeRules.IsChapterViaDisallowed("24b_self_occupied") && total < 0m
-                ? 0m // new regime: self-occupied interest already excluded above; let-out loss still allowed but capped
-                : rs.DeductionCaps.HousePropertyLossSetoffCap;
-
-            var allowedLoss = Math.Max(total, -cap);
-            trace.Add(new TraceLine("HouseProperty.Net",
-                $"Income/(loss) from house property (loss set-off capped at ₹{cap:N0})", allowedLoss, "Ch.3 §3.6.4"));
-            return allowedLoss;
-        }
-
-        trace.Add(new TraceLine("HouseProperty.Net", "Income from house property", total, "Schedule HP"));
+        // Return the raw signed head result. A loss travels to LossSetOff (s.71/71B); positive income
+        // flows into Gross Total Income. Intra-head netting across properties is the summation above.
+        trace.Add(new TraceLine("HouseProperty.Net",
+            total < 0m ? "Loss from house property (before inter-head set-off)" : "Income from house property",
+            total, "Schedule HP"));
         return total;
     }
 
@@ -344,21 +350,39 @@ public sealed class TaxCalculator : ITaxCalculator
         return (result, TaxMath.NonNegative(b.SlabRateGains));
     }
 
-    private static decimal ComputeBusinessHead(TaxComputationInput input, List<TraceLine> trace)
+    /// <summary>
+    /// Business/profession head, split into non-speculative and speculative (s.73). Both are returned
+    /// SIGNED — a loss travels to LossSetOff (a non-speculative loss may set off inter-head except vs
+    /// salary; a speculative loss is ring-fenced). The speculative split keeps a speculative loss from
+    /// wrongly reducing tax on other income.
+    /// </summary>
+    private static (decimal NonSpeculative, decimal Speculative) ComputeBusinessHead(TaxComputationInput input, List<TraceLine> trace)
     {
         if (input.BusinessIncomes.Count == 0)
         {
-            return 0m;
+            return (0m, 0m);
         }
 
-        decimal total = 0m;
+        decimal nonSpeculative = 0m, speculative = 0m;
         foreach (var bi in input.BusinessIncomes)
         {
-            total += bi.NetProfit;
+            if (bi.Speculative)
+            {
+                speculative += bi.NetProfit;
+            }
+            else
+            {
+                nonSpeculative += bi.NetProfit;
+            }
         }
 
-        trace.Add(new TraceLine("Business.Net", "Income from business/profession", total, "Schedule BP"));
-        return TaxMath.NonNegative(total);
+        trace.Add(new TraceLine("Business.Net", "Income/(loss) from business/profession", nonSpeculative, "Schedule BP"));
+        if (speculative != 0m)
+        {
+            trace.Add(new TraceLine("Business.Speculative", "Income/(loss) from speculative business (s.73)", speculative, "s.73"));
+        }
+
+        return (nonSpeculative, speculative);
     }
 
     /// <summary>
@@ -481,7 +505,11 @@ public sealed class TaxCalculator : ITaxCalculator
 
         if (normal != 0m)
         {
-            trace.Add(new TraceLine("OtherSources.Net", "Income from other sources", TaxMath.NonNegative(normal), "Schedule OS"));
+            // Signed: a negative net (e.g. s.57 expenses exceeding income) is an other-sources loss that
+            // may set off inter-head (s.71) in LossSetOff. Race-horse losses (s.74A) are out of scope.
+            trace.Add(new TraceLine("OtherSources.Net",
+                normal < 0m ? "Loss from other sources (before inter-head set-off)" : "Income from other sources",
+                normal, "Schedule OS"));
         }
 
         if (casual > 0m)
@@ -494,7 +522,7 @@ public sealed class TaxCalculator : ITaxCalculator
             trace.Add(new TraceLine("OtherSources.Agricultural", "Agricultural income (exempt; aggregated for rate)", agri, "s.10(1)"));
         }
 
-        return (TaxMath.NonNegative(normal), TaxMath.NonNegative(casual), TaxMath.NonNegative(agri));
+        return (normal, TaxMath.NonNegative(casual), TaxMath.NonNegative(agri));
     }
 
     // ------------------------------------------------------- Chapter VI-A
