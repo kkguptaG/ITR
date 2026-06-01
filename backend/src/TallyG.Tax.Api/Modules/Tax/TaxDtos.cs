@@ -127,6 +127,8 @@ public sealed record TaxComputationResultDto(
     decimal HousePropertyLossCarriedForward,
     decimal BusinessLossCarriedForward,
     decimal SpeculativeLossCarriedForward,
+    decimal ShortTermCapitalLossCarriedForward,
+    decimal LongTermCapitalLossCarriedForward,
     IReadOnlyList<TraceLineDto> Trace);
 
 /// <summary>One explainable line of the computation pipeline.</summary>

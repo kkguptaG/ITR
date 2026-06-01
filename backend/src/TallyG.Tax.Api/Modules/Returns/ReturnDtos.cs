@@ -300,5 +300,7 @@ public sealed record TaxComputationDto(
     decimal HousePropertyLossCarriedForward,
     decimal BusinessLossCarriedForward,
     decimal SpeculativeLossCarriedForward,
+    decimal ShortTermCapitalLossCarriedForward,
+    decimal LongTermCapitalLossCarriedForward,
     bool IsRecommended,
     DateTimeOffset ComputedAt);

@@ -297,12 +297,16 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var hp = c?.HousePropertyLossCarriedForward ?? 0m;
         var biz = c?.BusinessLossCarriedForward ?? 0m;
         var spec = c?.SpeculativeLossCarriedForward ?? 0m;
+        var stcl = c?.ShortTermCapitalLossCarriedForward ?? 0m;
+        var ltcl = c?.LongTermCapitalLossCarriedForward ?? 0m;
         return new Dictionary<string, object?>
         {
-            ["HousePropertyLossCF"] = R(hp),     // s.71B — 8 years, vs HP income
-            ["BusinessLossCF"] = R(biz),         // s.72  — 8 years, vs business income
-            ["SpeculativeBusinessLossCF"] = R(spec),  // s.73 — 4 years, vs speculative income
-            ["TotalLossCarriedForward"] = R(hp + biz + spec)
+            ["HousePropertyLossCF"] = R(hp),          // s.71B — 8 years, vs HP income
+            ["BusinessLossCF"] = R(biz),              // s.72  — 8 years, vs business income
+            ["SpeculativeBusinessLossCF"] = R(spec),  // s.73  — 4 years, vs speculative income
+            ["ShortTermCapitalLossCF"] = R(stcl),     // s.74  — 8 years, vs STCG/LTCG
+            ["LongTermCapitalLossCF"] = R(ltcl),      // s.74  — 8 years, vs LTCG only
+            ["TotalLossCarriedForward"] = R(hp + biz + spec + stcl + ltcl)
         };
     }
 

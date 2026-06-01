@@ -270,6 +270,8 @@ export interface TaxComputationResultDto {
   housePropertyLossCarriedForward: number;
   businessLossCarriedForward: number;
   speculativeLossCarriedForward: number;
+  shortTermCapitalLossCarriedForward: number;
+  longTermCapitalLossCarriedForward: number;
   trace: TraceLineDto[];
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */

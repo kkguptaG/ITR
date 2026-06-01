@@ -1147,6 +1147,8 @@ public sealed class ReturnService : IReturnService
             HousePropertyLossCarriedForward = result.HousePropertyLossCarriedForward,
             BusinessLossCarriedForward = result.BusinessLossCarriedForward,
             SpeculativeLossCarriedForward = result.SpeculativeLossCarriedForward,
+            ShortTermCapitalLossCarriedForward = result.ShortTermCapitalLossCarriedForward,
+            LongTermCapitalLossCarriedForward = result.LongTermCapitalLossCarriedForward,
             IsRecommended = true,
             TraceJson = JsonSerializer.Serialize(result.Trace, SnapshotJsonOptions),
             ComputedAt = _clock.UtcNow
@@ -1283,6 +1285,7 @@ public sealed class ReturnService : IReturnService
         c.RefundOrPayable, c.AdjustedTotalIncome, c.AlternativeMinimumTax, c.AmtCreditGenerated,
         c.AmtCreditSetOff, c.Relief89, c.Relief90And91,
         c.HousePropertyLossCarriedForward, c.BusinessLossCarriedForward, c.SpeculativeLossCarriedForward,
+        c.ShortTermCapitalLossCarriedForward, c.LongTermCapitalLossCarriedForward,
         c.IsRecommended, c.ComputedAt);
 
     // --- misc helpers ---

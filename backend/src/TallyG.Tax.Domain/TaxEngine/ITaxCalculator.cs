@@ -224,6 +224,12 @@ public sealed record ComputationResult
     /// <summary>Current-year speculative business loss carried forward u/s 73 (4 years, vs speculative income). 0 if none.</summary>
     public decimal SpeculativeLossCarriedForward { get; init; }
 
+    /// <summary>Current-year short-term capital loss carried forward u/s 74 (8 years, vs STCG/LTCG). 0 if none.</summary>
+    public decimal ShortTermCapitalLossCarriedForward { get; init; }
+
+    /// <summary>Current-year long-term capital loss carried forward u/s 74 (8 years, vs LTCG only). 0 if none.</summary>
+    public decimal LongTermCapitalLossCarriedForward { get; init; }
+
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();
 }

@@ -83,6 +83,8 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
           {comp.housePropertyLossCarriedForward > 0 && <Line label="House-property loss carried forward (s.71B)" value={comp.housePropertyLossCarriedForward} tone="muted" indent />}
           {comp.businessLossCarriedForward > 0 && <Line label="Business loss carried forward (s.72)" value={comp.businessLossCarriedForward} tone="muted" indent />}
           {comp.speculativeLossCarriedForward > 0 && <Line label="Speculative loss carried forward (s.73)" value={comp.speculativeLossCarriedForward} tone="muted" indent />}
+          {comp.shortTermCapitalLossCarriedForward > 0 && <Line label="Short-term capital loss carried forward (s.74)" value={comp.shortTermCapitalLossCarriedForward} tone="muted" indent />}
+          {comp.longTermCapitalLossCarriedForward > 0 && <Line label="Long-term capital loss carried forward (s.74)" value={comp.longTermCapitalLossCarriedForward} tone="muted" indent />}
         </div>
         <div className="py-1.5">
           <Line label={t('tdsPaid')} value={comp.tdsPaid} tone="subtract" />

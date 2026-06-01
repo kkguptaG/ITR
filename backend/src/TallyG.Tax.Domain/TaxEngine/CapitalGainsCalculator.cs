@@ -22,30 +22,57 @@ public static class CapitalGainsCalculator
             lines.Add(ApplyReinvestmentExemption(ComputeLine(g, rules), g, rules));
         }
 
-        // --- Intra-head set-off (Ch.3 §3.6.4), applied on the special-rate buckets ---
-        // STCL -> STCG or LTCG ; LTCL -> only LTCG. We keep it simple and deterministic:
-        // net within each statutory bucket first, then apply the 112A exemption on the net LTCG-112A.
-
+        // --- Intra-head set-off (Ch.3 §3.6.4 / s.70) ---
+        // Signed per-section nets: a NEGATIVE net is a current-year capital loss in that bucket.
         var stcg111A = SumSection(lines, "111A");
         var ltcg112AGross = SumSection(lines, "112A_gross");
         var ltcg112 = SumSection(lines, "112");
-        var crypto = SumSection(lines, "115BBH");
+        var crypto = TaxMath.NonNegative(SumSection(lines, "115BBH")); // VDA (s.115BBH): gains only — never reduced/carried
         var slabRateGains = SumSection(lines, "slab");
 
-        // 112A exemption applies to the NET 112A long-term gain (after grandfathering already in the line).
-        var ltcg112ATaxable = TaxMath.NonNegative(ltcg112AGross - rules.Ltcg112AExemption);
-        var ltcg112AExemptionUsed = Math.Min(ltcg112AGross < 0 ? 0m : ltcg112AGross, rules.Ltcg112AExemption);
+        // 112A ₹1.25L exemption applies only to a POSITIVE net 112A long-term gain (after grandfathering).
+        var ltcg112ATaxable = ltcg112AGross > 0m ? TaxMath.NonNegative(ltcg112AGross - rules.Ltcg112AExemption) : ltcg112AGross;
+        var ltcg112AExemptionUsed = ltcg112AGross > 0m ? Math.Min(ltcg112AGross, rules.Ltcg112AExemption) : 0m;
+
+        // Current-year set-off (s.70): LTCL (s.70(3)) sets off ONLY against LTCG; STCL (s.70(2)) against
+        // STCG then LTCG. VDA is isolated. Order matches the brought-forward convention
+        // (LTCL: 112 → 112A ; STCL: slab → 111A → 112 → 112A) — a documented default, pending CA.
+        decimal stcg111Ag = TaxMath.NonNegative(stcg111A), slabG = TaxMath.NonNegative(slabRateGains);
+        decimal ltcg112G = TaxMath.NonNegative(ltcg112), ltcg112AG = TaxMath.NonNegative(ltcg112ATaxable);
+        var stcl = TaxMath.NonNegative(-stcg111A) + TaxMath.NonNegative(-slabRateGains);
+        var ltcl = TaxMath.NonNegative(-ltcg112) + TaxMath.NonNegative(-ltcg112ATaxable);
+
+        Absorb(ref ltcl, ref ltcg112G);
+        Absorb(ref ltcl, ref ltcg112AG);
+        Absorb(ref stcl, ref slabG);
+        Absorb(ref stcl, ref stcg111Ag);
+        Absorb(ref stcl, ref ltcg112G);
+        Absorb(ref stcl, ref ltcg112AG);
 
         var buckets = new SpecialRateBuckets(
-            Stcg111A: TaxMath.NonNegative(stcg111A),
+            Stcg111A: stcg111Ag,
             Ltcg112AGross: TaxMath.NonNegative(ltcg112AGross),
             Ltcg112AExemptionApplied: ltcg112AExemptionUsed,
-            Ltcg112ATaxable: ltcg112ATaxable,
-            Ltcg112: TaxMath.NonNegative(ltcg112),
-            Crypto115Bbh: TaxMath.NonNegative(crypto),
-            SlabRateGains: slabRateGains);
+            Ltcg112ATaxable: ltcg112AG,
+            Ltcg112: ltcg112G,
+            Crypto115Bbh: crypto,
+            SlabRateGains: slabG);
 
-        return new CapitalGainsResult(lines, buckets);
+        // Unabsorbed current-year losses carry forward (s.74): STCL 8y (vs STCG/LTCG), LTCL 8y (vs LTCG).
+        return new CapitalGainsResult(lines, buckets, CurrentShortTermLossCarried: stcl, CurrentLongTermLossCarried: ltcl);
+    }
+
+    /// <summary>Set off <paramref name="loss"/> against <paramref name="gain"/>, reducing both by the lesser.</summary>
+    private static void Absorb(ref decimal loss, ref decimal gain)
+    {
+        if (loss <= 0m || gain <= 0m)
+        {
+            return;
+        }
+
+        var used = Math.Min(loss, gain);
+        gain -= used;
+        loss -= used;
     }
 
     private static CapitalGainLine ComputeLine(CapitalGainInput g, CapitalGainRules rules)
@@ -256,7 +283,10 @@ public sealed record SpecialRateBuckets(
     public decimal TotalSpecialRateIncome => Stcg111A + Ltcg112ATaxable + Ltcg112 + Crypto115Bbh;
 }
 
-/// <summary>Full capital-gains result: per-line detail + aggregated buckets.</summary>
+/// <summary>Full capital-gains result: per-line detail, aggregated buckets, and current-year losses
+/// (unabsorbed after s.70 intra-head set-off) that carry forward under s.74.</summary>
 public sealed record CapitalGainsResult(
     IReadOnlyList<CapitalGainLine> Lines,
-    SpecialRateBuckets Buckets);
+    SpecialRateBuckets Buckets,
+    decimal CurrentShortTermLossCarried = 0m,
+    decimal CurrentLongTermLossCarried = 0m);

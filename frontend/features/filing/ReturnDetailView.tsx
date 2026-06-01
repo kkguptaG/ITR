@@ -161,6 +161,8 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     housePropertyLossCarriedForward: num(c.housePropertyLossCarriedForward),
     businessLossCarriedForward: num(c.businessLossCarriedForward),
     speculativeLossCarriedForward: num(c.speculativeLossCarriedForward),
+    shortTermCapitalLossCarriedForward: num(c.shortTermCapitalLossCarriedForward),
+    longTermCapitalLossCarriedForward: num(c.longTermCapitalLossCarriedForward),
     trace: [],
   };
 }

@@ -202,6 +202,8 @@ public sealed class TaxCalculator : ITaxCalculator
             HousePropertyLossCarriedForward = setOff.HousePropertyLossCarried,
             BusinessLossCarriedForward = setOff.BusinessLossCarried,
             SpeculativeLossCarriedForward = setOff.SpeculativeLossCarried,
+            ShortTermCapitalLossCarriedForward = capitalGains.CurrentShortTermLossCarried,
+            LongTermCapitalLossCarriedForward = capitalGains.CurrentLongTermLossCarried,
             Trace = trace,
         };
     }
@@ -345,6 +347,18 @@ public sealed class TaxCalculator : ITaxCalculator
         if (b.SlabRateGains != 0m)
         {
             trace.Add(new TraceLine("CG.SlabRate", "Capital gains taxed at slab rate", b.SlabRateGains, "Schedule CG"));
+        }
+
+        // Current-year capital losses unabsorbed after intra-head set-off (s.70) carry forward (s.74).
+        if (result.CurrentShortTermLossCarried > 0m)
+        {
+            trace.Add(new TraceLine("CG.StclCarryForward",
+                "Short-term capital loss carried forward (s.74, 8 years, vs STCG/LTCG)", result.CurrentShortTermLossCarried, "s.74"));
+        }
+        if (result.CurrentLongTermLossCarried > 0m)
+        {
+            trace.Add(new TraceLine("CG.LtclCarryForward",
+                "Long-term capital loss carried forward (s.74, 8 years, vs LTCG)", result.CurrentLongTermLossCarried, "s.74"));
         }
 
         return (result, TaxMath.NonNegative(b.SlabRateGains));

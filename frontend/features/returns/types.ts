@@ -60,6 +60,8 @@ export interface TaxComputationDto {
   housePropertyLossCarriedForward: DecimalString;
   businessLossCarriedForward: DecimalString;
   speculativeLossCarriedForward: DecimalString;
+  shortTermCapitalLossCarriedForward: DecimalString;
+  longTermCapitalLossCarriedForward: DecimalString;
   isRecommended: boolean;
   computedAt: IsoDateTime;
 }
