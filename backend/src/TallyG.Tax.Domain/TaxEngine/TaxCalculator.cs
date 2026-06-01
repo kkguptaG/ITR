@@ -510,6 +510,7 @@ public sealed class TaxCalculator : ITaxCalculator
         decimal claimed80DSelf = 0m, claimed80DParents = 0m, claimed80DPreventive = 0m;
         decimal claimed80Tta = 0m, claimed80Ttb = 0m;
         decimal claimed80Ddb = 0m, claimed80Eea = 0m, claimed80Eeb = 0m, claimed80Gg = 0m;
+        decimal sum80G100NoLimit = 0m, sum80G50NoLimit = 0m, sum80G100Limit = 0m, sum80G50Limit = 0m;
         bool has80U = false, has80Dd = false, severe80U = false, severe80Dd = false;
         decimal claimedOther = 0m; // 80E/80G/80GG + profit-linked (80-IA/IAC...) — deducted in full (old regime)
         var otherAllowed = 0m;
@@ -533,6 +534,19 @@ public sealed class TaxCalculator : ITaxCalculator
                 case "80EEA": claimed80Eea += d.ClaimedAmount; break;
                 case "80EEB": claimed80Eeb += d.ClaimedAmount; break;
                 case "80GG": claimed80Gg += d.ClaimedAmount; break;
+                case "80G":
+                {
+                    // Sub-type convention: contains "100" ⇒ 100% (else 50%); "no_limit"/"without" ⇒ no
+                    // qualifying limit (else with-limit, the conservative default).
+                    var st = (d.SubType ?? string.Empty).ToLowerInvariant().Replace(" ", string.Empty).Replace("-", "_");
+                    var full = st.Contains("100");
+                    var noLimit = st.Contains("nolimit") || st.Contains("no_limit") || st.Contains("without");
+                    if (full && noLimit) sum80G100NoLimit += d.ClaimedAmount;
+                    else if (noLimit) sum80G50NoLimit += d.ClaimedAmount;
+                    else if (full) sum80G100Limit += d.ClaimedAmount;
+                    else sum80G50Limit += d.ClaimedAmount;
+                    break;
+                }
                 default:
                     // Other Chapter VI-A (80E/80G/80GG/80U...). Disallowed in new regime unless explicitly allowed.
                     if (regime == Regime.New && !regimeRules.AllowedChapterVia.Contains(d.Section))
@@ -648,18 +662,38 @@ public sealed class TaxCalculator : ITaxCalculator
         {
             otherAllowed = claimedOther;
             total += otherAllowed;
-            trace.Add(new TraceLine("Deduction.Other", "Other Chapter VI-A deductions (80E / 80G / profit-linked 80-IA…)", otherAllowed, "Ch.VI-A"));
+            trace.Add(new TraceLine("Deduction.Other", "Other Chapter VI-A deductions (80E / profit-linked 80-IA…)", otherAllowed, "Ch.VI-A"));
+        }
+
+        // Shared base for the income-linked sections (80G qualifying limit, 80GG least-of): the income
+        // before these deductions = GTI less every other Chapter VI-A deduction. Strict adjusted-GTI also
+        // excludes LTCG/STCG/casual, which this normal-income base already does. Documented, pending CA.
+        var baseIncomeForLimits = TaxMath.NonNegative(normalIncomeBeforeVia - total);
+
+        // s.80G donations: 100%/50% deductible; "with limit" categories are further capped, in aggregate,
+        // at 10% of adjusted GTI (the qualifying limit). 100% categories absorb the limit first.
+        if (regime == Regime.Old && (sum80G100NoLimit + sum80G50NoLimit + sum80G100Limit + sum80G50Limit) > 0m)
+        {
+            var noLimitDeduction = sum80G100NoLimit + 0.5m * sum80G50NoLimit;
+            var qualifyingLimit = 0.10m * baseIncomeForLimits;
+            var take100 = Math.Min(sum80G100Limit, qualifyingLimit);
+            var take50 = Math.Min(sum80G50Limit, TaxMath.NonNegative(qualifyingLimit - take100));
+            var allowed80G = noLimitDeduction + take100 + 0.5m * take50;
+            if (allowed80G > 0m)
+            {
+                total += allowed80G;
+                trace.Add(new TraceLine("Deduction.80G",
+                    "s.80G donations (100%/50%; with-limit categories capped at 10% of adjusted GTI)", allowed80G, "s.80G"));
+            }
         }
 
         // s.80GG rent paid where no HRA is received — least of: ₹5,000/month, 25% of total income, and
-        // rent paid minus 10% of total income. "Total income" here = income before this deduction (GTI
-        // less the other Chapter VI-A deductions) — a documented simplification, pending CA review.
+        // rent paid minus 10% of total income.
         if (regime == Regime.Old && claimed80Gg > 0m)
         {
-            var totalIncomeFor80Gg = TaxMath.NonNegative(normalIncomeBeforeVia - total);
             var capAnnual = caps.Section80GgMonthly * 12m;
-            var quarterOfIncome = 0.25m * totalIncomeFor80Gg;
-            var rentOverTenPct = TaxMath.NonNegative(claimed80Gg - 0.10m * totalIncomeFor80Gg);
+            var quarterOfIncome = 0.25m * baseIncomeForLimits;
+            var rentOverTenPct = TaxMath.NonNegative(claimed80Gg - 0.10m * baseIncomeForLimits);
             var allowed = Math.Max(0m, Math.Min(Math.Min(capAnnual, quarterOfIncome), rentOverTenPct));
             if (allowed > 0m)
             {
@@ -701,6 +735,7 @@ public sealed class TaxCalculator : ITaxCalculator
             "80EEA" or "80_EEA" => "80EEA",
             "80EEB" or "80_EEB" => "80EEB",
             "80GG" or "80_GG" => "80GG",
+            "80G" or "80_G" => "80G",
             _ => s,
         };
     }

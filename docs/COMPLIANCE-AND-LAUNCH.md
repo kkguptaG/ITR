@@ -446,3 +446,16 @@ authoring a **new versioned rule-set + questionnaire + form schema**, not rewrit
   and new-regime disallowance.
 - Remaining deferred: **80G** donations (100%/50% × no-limit vs the 10%-of-adjusted-GTI qualifying limit)
   — the one remaining common Chapter VI-A section still in the uncapped bucket; next increment.
+
+**2026-06-01 — Chapter VI-A depth (cont.): 80G donations (qualifying limit + 100%/50%):**
+- **80G** now applies the real structure (old-regime only): each donation row carries a sub-type
+  (contains "100" ⇒ 100% else 50%; "no_limit"/"without" ⇒ no qualifying limit, else with-limit — the
+  conservative default). No-limit donations are deducted at 100%/50% in full; **with-limit** donations are
+  capped *in aggregate* at **10% of adjusted GTI** (the qualifying limit), with the 100% category absorbing
+  the limit first, then 50%. Adjusted-GTI base = income before 80G/80GG (shared with 80GG), documented
+  pending CA. `NormalizeSection` accepts "80G"/"80-G" (distinct from "80GG").
+- Verified: **4 new tests** (engine **75 → 79**, all green) — 100% no-limit full, 50% with-limit capped to
+  10%→halved (₹47,500), blank sub-type defaulting to 50%-with-limit (₹20,000), and new-regime disallowance.
+- **Chapter VI-A depth is now complete** for the common sections: 80C/80CCD(1B)/80CCD(2)/80D/80TTA/80TTB
+  (caps), 80U/80DD (fixed), 80DDB (capped), 80EEA/80EEB (1.5L), 80GG (least-of), 80G (qualifying limit),
+  80E + profit-linked (full). Rarer sections (80GGA/80GGC/80RRB/…) still flow through the uncapped bucket.

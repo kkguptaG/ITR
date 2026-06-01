@@ -120,4 +120,39 @@ public class DeductionDepthTests
 
         r.Trace.Should().NotContain(t => t.Step == "Deduction.80GG");
     }
+
+    [Fact]
+    public void Section80G_100pct_no_limit_donation_is_fully_deductible()
+    {
+        var r = _engine.Compute(RuleSetFixture.Salaried(1_000_000m, deductions: D("80G", 50_000m, "100_no_limit")), Regime.Old);
+
+        r.Trace.Should().Contain(t => t.Step == "Deduction.80G" && t.Amount == 50_000m);
+    }
+
+    [Fact]
+    public void Section80G_with_limit_is_capped_at_10pct_of_adjusted_gti_then_halved()
+    {
+        // Income ₹9.5L ⇒ qualifying limit 10% = ₹95,000. A ₹3L "50% with-limit" donation is capped to
+        // ₹95k, then halved ⇒ ₹47,500.
+        var r = _engine.Compute(RuleSetFixture.Salaried(1_000_000m, deductions: D("80G", 300_000m, "50_with_limit")), Regime.Old);
+
+        r.Trace.Should().Contain(t => t.Step == "Deduction.80G" && t.Amount == 47_500m);
+    }
+
+    [Fact]
+    public void Section80G_defaults_to_50pct_with_limit_when_subtype_is_blank()
+    {
+        // ₹40k donation is within the ₹95k qualifying limit, so the default 50% applies ⇒ ₹20,000.
+        var r = _engine.Compute(RuleSetFixture.Salaried(1_000_000m, deductions: D("80G", 40_000m)), Regime.Old);
+
+        r.Trace.Should().Contain(t => t.Step == "Deduction.80G" && t.Amount == 20_000m);
+    }
+
+    [Fact]
+    public void Section80G_is_disallowed_under_the_new_regime()
+    {
+        var r = _engine.Compute(RuleSetFixture.Salaried(1_000_000m, deductions: D("80G", 50_000m, "100_no_limit")), Regime.New);
+
+        r.Trace.Should().NotContain(t => t.Step == "Deduction.80G");
+    }
 }
