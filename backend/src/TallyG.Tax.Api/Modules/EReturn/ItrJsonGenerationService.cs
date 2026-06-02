@@ -157,6 +157,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         };
         AddScheduleS(root, ctx);
         AddScheduleHp(root, ctx);
+        AddScheduleCg(root, ctx);
         AddScheduleOs(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
@@ -182,6 +183,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         OverlayItr3Figures(skel, ctx);
         AddScheduleS(skel, ctx);
         AddScheduleHp(skel, ctx);
+        AddScheduleCg(skel, ctx);
         AddScheduleOs(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;

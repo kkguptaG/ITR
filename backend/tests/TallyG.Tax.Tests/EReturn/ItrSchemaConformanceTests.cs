@@ -123,6 +123,26 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_itemizes_capital_gains_into_scheduleCG()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGains: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule CG must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var cg = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleCGFor23");
+
+        cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(50_000);
+        cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(200_000);
+        cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(250_000);
+        // 111A equity STCG → the 20% bucket; 112A LTCG → the 12.5% bucket (AY2025-26).
+        cg.GetProperty("CurrYrLosses").GetProperty("InStcg20Per").GetProperty("CurrYearIncome").GetInt64().Should().Be(50_000);
+        cg.GetProperty("CurrYrLosses").GetProperty("InLtcg12_5Per").GetProperty("CurrYearIncome").GetInt64().Should().Be(200_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_house_property_into_scheduleHP()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true);
@@ -198,7 +218,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false)
     {
         var user = new User
         {
@@ -266,6 +286,14 @@ public class ItrSchemaConformanceTests
             Houses = withHouse
                 ? new[] { new HouseProperty { Type = HousePropertyType.LetOut, Address = "12 MG Road", AnnualValue = 300_000m, MunicipalTaxPaid = 20_000m, InterestOnLoan = 50_000m, CoOwnerSharePct = 100m } }
                 : Array.Empty<HouseProperty>(),
+            // An equity STCG (111A) + an equity LTCG (112A) so the ITR-2/3 gate exercises Schedule CG.
+            Gains = withGains
+                ? new[]
+                {
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
+                }
+                : Array.Empty<CapitalGain>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]
