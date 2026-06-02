@@ -185,6 +185,7 @@ public sealed class ItrJsonService : IItrJsonService
             Profile = profile,
             Ay = ret.AssessmentYear,
             Computation = comp,
+            GeneratedOn = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
             Salaries = await _db.SalaryDetails.Where(s => s.TaxReturnId == returnId).ToListAsync(ct),
             Houses = await _db.HouseProperties.Where(h => h.TaxReturnId == returnId).ToListAsync(ct),
             Gains = await _db.CapitalGains.Where(g => g.TaxReturnId == returnId).ToListAsync(ct),

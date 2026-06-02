@@ -8,11 +8,13 @@ namespace TallyG.Tax.Api.Modules.EReturn;
 /// <summary>
 /// Maps the common return model + the engine's computation to the ITD-format ITR JSON.
 ///
-/// IMPORTANT (honesty): this models the well-known ITR JSON shape; the exact field names and the
-/// SchemaVer MUST be reconciled with the OFFICIAL downloadable AY-specific schema (incometax.gov.in
-/// → Downloads) before real uploads. Headline totals (GrossTotIncome, TotalIncome, taxes, refund)
-/// are taken verbatim from the engine's <see cref="TaxComputation"/> (single source of truth); the
-/// per-head breakdown is derived and anchored so the heads sum to the engine's GTI.
+/// <b>ITR-1 &amp; ITR-4 (AY2026-27)</b> are validated against the OFFICIAL ITD JSON schema — the
+/// conformance test (ItrSchemaConformanceTests) fails the build if the output drifts from the notified
+/// schema bundled under tests/Schemas/. <b>ITR-2 &amp; ITR-3 remain demo-shape</b> (not yet reconciled —
+/// they are not AY2026-27-notified). Headline totals (GrossTotIncome, TotalIncome, taxes, refund) are
+/// taken verbatim from the engine's <see cref="TaxComputation"/> (single source of truth); the per-head
+/// breakdown is derived and anchored so the heads sum to the engine's GTI. Money is emitted as integer
+/// rupees (s.288A/B rounding) to match the schema's integer types.
 /// No Scrutor surprises: class ends in "Service" so I*Service auto-binds scoped.
 /// </summary>
 public sealed class ItrJsonGenerationService : IItrJsonGenerationService
@@ -55,27 +57,27 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
 
         return new Dictionary<string, object?>
         {
-            ["CreationInfo"] = CreationInfo(),
-            ["Form_ITR1"] = FormHeader("ITR1", "For Indls having Income from Salaries, one/two house property, other sources (Interest etc.) and LTCG u/s 112A upto 1.25 lakh", ctx),
-            ["PersonalInfo"] = PersonalInfo(ctx),
-            ["FilingStatus"] = FilingStatus(ctx),
+            ["CreationInfo"] = CreationInfo(ctx),
+            ["Form_ITR1"] = FormHeader("ITR1", "For Indls having Income from Salaries, one house property, other sources (Interest etc.) and LTCG u/s 112A upto 1.25 lakh", ctx),
+            ["PersonalInfo"] = PersonalInfoNode(ctx, includeStatus: false),
+            ["FilingStatus"] = FilingStatusItr1(ctx),
             ["ITR1_IncomeDeductions"] = new Dictionary<string, object?>
             {
                 ["GrossSalary"] = R(grossSalary),
-                ["AllwncExemptUs10"] = R(salExempt),
                 ["NetSalary"] = R(grossSalary - salExempt),
                 ["DeductionUs16"] = R(us16),
                 ["IncomeFromSal"] = R(salaryNet),
-                ["TotalIncomeOfHP"] = R(hp),
+                ["TotalIncomeChargeableUnHP"] = R(hp),
                 ["IncomeOthSrc"] = R(other),
                 ["GrossTotIncome"] = R(gti),
-                ["UsrDeductUndChapVIA"] = ChapterViaClaimed(ctx.Deductions),
-                ["TotalChapVIADeductions"] = R(ctx.Deductions.Sum(d => d.Amount)),
+                ["GrossTotIncomeIncLTCG112A"] = R(gti),
+                ["UsrDeductUndChapVIA"] = ViaObject(ctx.Deductions, Itr1UsrViaKeys),
+                ["DeductUndChapVIA"] = ViaObject(ctx.Deductions, Itr1DeductViaKeys),
                 ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
             },
-            ["ITR1_TaxComputation"] = TaxComputationNode(c),
+            ["ITR1_TaxComputation"] = TaxComputationItr1(c),
             ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundNode(ctx, c),
+            ["Refund"] = RefundConformant(c),
             ["Verification"] = Verification(ctx)
         };
     }
@@ -90,38 +92,33 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = gti - hp - other - business;            // anchored to the engine's GTI
         var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
+        var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
+        var us16 = Math.Max(0m, grossSalary - salExempt - salaryNet);
 
         return new Dictionary<string, object?>
         {
-            ["CreationInfo"] = CreationInfo(),
+            ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR4"] = FormHeader("ITR4", "For presumptive income from Business & Profession (44AD/44ADA/44AE)", ctx),
-            ["PersonalInfo"] = PersonalInfo(ctx),
-            ["FilingStatus"] = FilingStatus(ctx),
+            ["PersonalInfo"] = PersonalInfoNode(ctx, includeStatus: true),
+            ["FilingStatus"] = FilingStatusItr4(ctx),
             ["IncomeDeductions"] = new Dictionary<string, object?>
             {
+                ["IncomeFromBusinessProf"] = R(business),
+                ["GrossSalary"] = R(grossSalary),
+                ["NetSalary"] = R(grossSalary - salExempt),
+                ["DeductionUs16"] = R(us16),
                 ["IncomeFromSal"] = R(salaryNet),
-                ["TotalIncomeOfHP"] = R(hp),
+                ["TotalIncomeChargeableUnHP"] = R(hp),
                 ["IncomeOthSrc"] = R(other),
                 ["GrossTotIncome"] = R(gti),
-                ["TotalChapVIADeductions"] = R(ctx.Deductions.Sum(d => d.Amount)),
-                ["UsrDeductUndChapVIA"] = ChapterViaClaimed(ctx.Deductions),
+                ["GrossTotIncomeIncLTCG112A"] = R(gti),
+                ["UsrDeductUndChapVIA"] = ViaObject(ctx.Deductions, Itr4ViaKeys),
+                ["DeductUndChapVIA"] = ViaObject(ctx.Deductions, Itr4ViaKeys),
                 ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
             },
-            ["IncomeFromBusinessProf"] = new Dictionary<string, object?>
-            {
-                ["IncFromBusProfFor44AD_44ADA_44AE"] = R(business),
-                ["Items"] = ctx.Businesses.Select(b => new Dictionary<string, object?>
-                {
-                    ["Section"] = b.IsPresumptive ? (b.PresumptiveSection ?? "44AD") : "Regular",
-                    ["Turnover"] = R(b.Turnover),
-                    ["GrossReceiptsDigital"] = R(b.GrossReceiptsDigital),
-                    ["GrossReceiptsCash"] = R(b.GrossReceiptsCash),
-                    ["PresumptiveIncome"] = R(PresumptiveIncome(b))
-                }).ToList()
-            },
-            ["ITR4_TaxComputation"] = TaxComputationNode(c),
+            ["TaxComputation"] = TaxComputationItr4(c),
             ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundNode(ctx, c),
+            ["Refund"] = RefundConformant(c),
             ["Verification"] = Verification(ctx)
         };
     }
@@ -140,7 +137,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
 
         return new Dictionary<string, object?>
         {
-            ["CreationInfo"] = CreationInfo(),
+            ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR2"] = FormHeader("ITR2", "For Individuals and HUFs not having income from profits and gains of business or profession", ctx),
             ["PersonalInfo"] = PersonalInfo(ctx),
             ["FilingStatus"] = FilingStatus(ctx),
@@ -187,7 +184,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
 
         return new Dictionary<string, object?>
         {
-            ["CreationInfo"] = CreationInfo(),
+            ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR3"] = FormHeader("ITR3", "For individuals and HUFs having income from profits and gains of business or profession", ctx),
             ["PersonalInfo"] = PersonalInfo(ctx),
             ["FilingStatus"] = FilingStatus(ctx),
@@ -233,11 +230,12 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
     }
 
     // ----------------------------------------------------------------- shared nodes
-    private static Dictionary<string, object?> CreationInfo() => new()
+    private static Dictionary<string, object?> CreationInfo(ItrFilingContext ctx) => new()
     {
         ["SWVersionNo"] = "1.0",
         ["SWCreatedBy"] = "TallyG-Tax",
         ["JSONCreatedBy"] = "TallyG-Tax",
+        ["JSONCreationDate"] = ctx.GeneratedOn.ToString("yyyy-MM-dd"),
         ["IntermediaryCity"] = "Noida",
         ["Digest"] = "-"
     };
@@ -393,6 +391,246 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
             ["Capacity"] = "S",
             ["Place"] = ctx.Profile?.City ?? string.Empty
         };
+    }
+
+    // ===================== schema-conformant nodes (ITR-1 / ITR-4, AY2026-27) =====================
+
+    private static Dictionary<string, object?> PersonalInfoNode(ItrFilingContext ctx, bool includeStatus)
+    {
+        var (first, last) = SplitName(ctx.User.FullName, ctx.Profile);
+        var pi = new Dictionary<string, object?>
+        {
+            ["AssesseeName"] = new Dictionary<string, object?>
+            {
+                ["FirstName"] = NonEmpty(first, "NA"),
+                ["SurNameOrOrgName"] = NonEmpty(string.IsNullOrWhiteSpace(last) ? first : last, "NA"),
+            },
+            ["PAN"] = ctx.User.PanMasked ?? string.Empty,   // full PAN requires vault decryption before real upload
+            ["Address"] = AddressNode(ctx),
+            ["SecondaryAdd"] = "N",
+            ["DOB"] = ctx.Profile?.Dob?.ToString("yyyy-MM-dd") ?? "1980-01-01",
+            ["EmployerCategory"] = ctx.Profile?.IsGovtEmployee == true ? "CGOV" : "OTH",
+        };
+        if (includeStatus)
+        {
+            pi["Status"] = "I"; // Individual
+        }
+
+        return pi;
+    }
+
+    private static Dictionary<string, object?> AddressNode(ItrFilingContext ctx)
+    {
+        var p = ctx.Profile;
+        var addr = new Dictionary<string, object?>
+        {
+            ["ResidenceNo"] = NonEmpty(p?.AddressLine1, "NA"),
+            ["LocalityOrArea"] = NonEmpty(p?.AddressLine2, "NA"),
+            ["CityOrTownOrDistrict"] = NonEmpty(p?.City, "NA"),
+            ["StateCode"] = ValidStateCode(p?.StateCode),
+            ["CountryCode"] = "91",
+            ["CountryCodeMobile"] = 91,
+            ["MobileNo"] = MobileDigits(ctx.User.MobileE164),
+            ["EmailAddress"] = NonEmpty(ctx.User.Email, "na@example.com"),
+        };
+        if (PinDigits(p?.Pincode) is { } pin)
+        {
+            addr["PinCode"] = pin; // optional, integer
+        }
+
+        return addr;
+    }
+
+    private static Dictionary<string, object?> FilingStatusItr1(ItrFilingContext ctx) => new()
+    {
+        ["ReturnFileSec"] = 11,                                            // 139(1), on/before due date
+        ["OptOutNewTaxRegime"] = ctx.Computation?.Regime == Regime.Old ? "Y" : "N",
+        ["AsseseeRepFlg"] = "N",
+        ["ItrFilingDueDate"] = DueDate(ctx),
+    };
+
+    private static Dictionary<string, object?> FilingStatusItr4(ItrFilingContext ctx) => new()
+    {
+        ["ReturnFileSec"] = 11,
+        ["Form10IEAEarlierAYOldRegime"] = "NA",
+        ["AsseseeRepFlg"] = "N",
+        ["ItrFilingDueDate"] = DueDate(ctx),
+    };
+
+    private static Dictionary<string, object?> TaxComputationItr1(TaxComputation? c)
+    {
+        var rebate = c?.Rebate87A ?? 0m;
+        var surcharge = c?.Surcharge ?? 0m;
+        var taxBeforeCess = c?.TaxBeforeCess ?? 0m;          // after rebate + surcharge, before cess
+        var slabTax = taxBeforeCess + rebate - surcharge;     // tax on total income BEFORE rebate
+        var cess = c?.Cess ?? 0m;
+        var grossTaxLiab = taxBeforeCess + cess;              // after rebate (+surcharge) + cess, before reliefs
+        var net = c?.TotalTax ?? 0m;                          // engine total is already net of reliefs/AMT
+        var interest = c?.InterestPenalty ?? 0m;
+        return new Dictionary<string, object?>
+        {
+            ["TotalTaxPayable"] = R(slabTax),
+            ["Rebate87A"] = R(rebate),
+            ["TaxPayableOnRebate"] = R(Math.Max(0m, slabTax - rebate)),
+            ["EducationCess"] = R(cess),
+            ["GrossTaxLiability"] = R(grossTaxLiab),
+            ["Section89"] = R(c?.Relief89 ?? 0m),
+            ["NetTaxLiability"] = R(net),
+            ["TotalIntrstPay"] = R(interest),
+            ["IntrstPay"] = IntrstPayNode(c),
+            ["TotTaxPlusIntrstPay"] = R(net + interest),
+        };
+    }
+
+    private static Dictionary<string, object?> TaxComputationItr4(TaxComputation? c)
+    {
+        var rebate = c?.Rebate87A ?? 0m;
+        var surcharge = c?.Surcharge ?? 0m;
+        var taxBeforeCess = c?.TaxBeforeCess ?? 0m;
+        var slabTax = taxBeforeCess + rebate - surcharge;
+        var cess = c?.Cess ?? 0m;
+        var net = c?.TotalTax ?? 0m;
+        var interest = c?.InterestPenalty ?? 0m;
+        return new Dictionary<string, object?>
+        {
+            ["TotalTaxPayable"] = R(slabTax),
+            ["Rebate87A"] = R(rebate),
+            ["TaxPayableOnRebate"] = R(Math.Max(0m, slabTax - rebate)),
+            ["EducationCess"] = R(cess),
+            ["GrossTaxLiability"] = R(taxBeforeCess + cess),
+            ["NetTaxLiability"] = R(net),
+            ["IntrstPay"] = IntrstPayNode(c),
+            ["TotTaxPlusIntrstPay"] = R(net + interest),
+        };
+    }
+
+    // s.234A/B/C split is in the engine trace, not the snapshot — bucket the total into 234B so the
+    // sub-fields reconcile with TotalIntrstPay (a documented MVP simplification; per-section split TODO).
+    private static Dictionary<string, object?> IntrstPayNode(TaxComputation? c) => new()
+    {
+        ["IntrstPayUs234A"] = R(0m),
+        ["IntrstPayUs234B"] = R(c?.InterestPenalty ?? 0m),
+        ["IntrstPayUs234C"] = R(0m),
+        ["LateFilingFee234F"] = R(0m),
+    };
+
+    private static Dictionary<string, object?> RefundConformant(TaxComputation? c) => new()
+    {
+        ["RefundDue"] = R(Math.Max(0m, c?.RefundOrPayable ?? 0m)),
+        // AddtnlBankDetails is optional; an empty object is schema-valid. Bank detail (with decrypted
+        // account no.) is populated before the real upload — see the rules-validator's refund check.
+        ["BankAccountDtls"] = new Dictionary<string, object?>(),
+    };
+
+    // Chapter VI-A objects: exactly the section keys the form allows, each an integer (0 when unclaimed),
+    // with anything outside the form's set folded into AnyOthSec80CCH so the per-section sum reconciles.
+    private static readonly string[] Itr1UsrViaKeys =
+    {
+        "Section80C", "Section80CCC", "Section80CCDEmployeeOrSE", "Section80CCD1B", "Section80CCDEmployer",
+        "Section80D", "Section80DD", "Section80DDB", "Section80E", "Section80EE", "Section80G", "Section80GG",
+        "Section80GGA", "Section80GGC", "Section80U", "Section80TTA", "Section80TTB", "AnyOthSec80CCH",
+    };
+
+    private static readonly string[] Itr1DeductViaKeys =
+    {
+        "Section80C", "Section80CCC", "Section80CCDEmployeeOrSE", "Section80CCD1B", "Section80CCDEmployer",
+        "Section80D", "Section80DD", "Section80DDB", "Section80E", "Section80EE", "Section80EEA", "Section80EEB",
+        "Section80G", "Section80GG", "Section80GGA", "Section80GGC", "Section80U", "Section80TTA", "Section80TTB", "AnyOthSec80CCH",
+    };
+
+    private static readonly string[] Itr4ViaKeys =
+    {
+        "Section80C", "Section80CCC", "Section80CCDEmployeeOrSE", "Section80CCD1B", "Section80CCDEmployer",
+        "Section80D", "Section80DD", "Section80DDB", "Section80E", "Section80G", "Section80GG", "Section80GGC",
+        "Section80U", "Section80TTA", "Section80TTB", "AnyOthSec80CCH",
+    };
+
+    private static Dictionary<string, object?> ViaObject(IReadOnlyList<Deduction> deductions, string[] keys)
+    {
+        var byKey = new Dictionary<string, decimal>();
+        foreach (var d in deductions)
+        {
+            var k = ViaKey(d.Section);
+            byKey[k] = (byKey.TryGetValue(k, out var v) ? v : 0m) + Math.Max(0m, d.Amount);
+        }
+
+        var total = deductions.Sum(d => Math.Max(0m, d.Amount));
+        var obj = new Dictionary<string, object?>();
+        decimal listed = 0m;
+        foreach (var key in keys)
+        {
+            if (key == "AnyOthSec80CCH")
+            {
+                continue; // computed last as the reconciling remainder
+            }
+
+            var amt = byKey.TryGetValue(key, out var v) ? v : 0m;
+            obj[key] = R(amt);
+            listed += amt;
+        }
+
+        obj["AnyOthSec80CCH"] = R(Math.Max(0m, total - listed));
+        obj["TotalChapVIADeductions"] = R(total);
+        return obj;
+    }
+
+    private static string ViaKey(string? section)
+    {
+        var s = new string((section ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        return s switch
+        {
+            "80C" => "Section80C",
+            "80CCC" => "Section80CCC",
+            "80CCD1B" => "Section80CCD1B",
+            "80CCD2" => "Section80CCDEmployer",
+            "80CCD" or "80CCD1" => "Section80CCDEmployeeOrSE",
+            "80D" or "80DSELF" or "80DPARENTS" or "80DPREVENTIVE" => "Section80D",
+            "80DD" => "Section80DD",
+            "80DDB" => "Section80DDB",
+            "80E" => "Section80E",
+            "80EE" => "Section80EE",
+            "80EEA" => "Section80EEA",
+            "80EEB" => "Section80EEB",
+            "80G" => "Section80G",
+            "80GG" => "Section80GG",
+            "80GGA" => "Section80GGA",
+            "80GGC" => "Section80GGC",
+            "80U" => "Section80U",
+            "80TTA" => "Section80TTA",
+            "80TTB" => "Section80TTB",
+            _ => "AnyOthSec80CCH",
+        };
+    }
+
+    private static string ValidStateCode(string? code)
+    {
+        var digits = new string((code ?? string.Empty).Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var n) && n is >= 1 and <= 37 ? n.ToString("D2") : "99";
+    }
+
+    private static long MobileDigits(string? mobile)
+    {
+        var digits = new string((mobile ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (digits.Length > 10)
+        {
+            digits = digits[^10..];
+        }
+
+        return long.TryParse(digits, out var v) ? v : 0L;
+    }
+
+    private static long? PinDigits(string? pin)
+    {
+        var digits = new string((pin ?? string.Empty).Where(char.IsDigit).ToArray());
+        return digits.Length is 5 or 6 && long.TryParse(digits, out var v) ? v : null;
+    }
+
+    private static string NonEmpty(string? s, string fallback) => string.IsNullOrWhiteSpace(s) ? fallback : s.Trim();
+
+    private static string DueDate(ItrFilingContext ctx)
+    {
+        var d = ctx.Ay?.DueDateNonAudit ?? default;
+        return d.Year >= 2000 ? d.ToString("dd/MM/yyyy") : "31/07/2026";
     }
 
     private static Dictionary<string, object?> ChapterViaClaimed(IReadOnlyList<Deduction> deductions)

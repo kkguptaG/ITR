@@ -55,6 +55,9 @@ public sealed class ItrFilingContext
     public UserProfile? Profile { get; init; }
     public AssessmentYear? Ay { get; init; }
     public TaxComputation? Computation { get; init; }
+
+    /// <summary>JSON creation date stamped into CreationInfo.JSONCreationDate (set by the caller's clock).</summary>
+    public DateOnly GeneratedOn { get; init; } = new(2026, 6, 1);
     public IReadOnlyList<SalaryDetail> Salaries { get; init; } = Array.Empty<SalaryDetail>();
     public IReadOnlyList<HouseProperty> Houses { get; init; } = Array.Empty<HouseProperty>();
     public IReadOnlyList<CapitalGain> Gains { get; init; } = Array.Empty<CapitalGain>();
