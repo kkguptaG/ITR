@@ -24,6 +24,7 @@ import { isReturnLocked } from './useReturn';
 import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
+import { ReconciliationCard } from '@/features/reconciliation';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -130,6 +131,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
 
       {/* Prepaid taxes: deductor-wise TDS + advance/self-assessment challans */}
       <TaxesPaidCard returnId={returnId} editable={!locked} />
+
+      {/* Pre-filing reconciliation against the department's AIS / 26AS */}
+      <ReconciliationCard returnId={returnId} />
     </div>
   );
 }
