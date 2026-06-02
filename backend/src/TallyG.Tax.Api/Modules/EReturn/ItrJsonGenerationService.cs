@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
@@ -903,6 +904,75 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         {
             SetIfInt(bp, "BusinessIncOthThanSpec", R(businessRaw));
         }
+
+        OverlayItr3FinancialStatements(skel, ctx.FinancialStatements);
+    }
+
+    // Overlay the books-derived Balance Sheet + P&L (FinancialStatementsService) onto the ITR-3
+    // PARTA_BS / PARTA_PL summary leaves, so a regular-books filer's financials reflect their accounts.
+    private static void OverlayItr3FinancialStatements(Dictionary<string, object?> skel, FinancialStatementsDto? fs)
+    {
+        if (fs is null)
+        {
+            return;
+        }
+
+        decimal Grp(IReadOnlyList<GroupBalanceDto> rows, string g) => rows.Where(r => r.Group == g).Sum(r => r.Amount);
+        var a = fs.BalanceSheet.Assets;
+        var l = fs.BalanceSheet.LiabilitiesAndCapital;
+        decimal fixedAssets = Grp(a, "FixedAssets"), investments = Grp(a, "Investments"),
+            debtors = Grp(a, "SundryDebtors"), bank = Grp(a, "BankAccounts"), cash = Grp(a, "CashInHand");
+        decimal capital = Grp(l, "CapitalAccount") + Grp(l, "NetProfitToCapital"),
+            loans = Grp(l, "LoansAndLiabilities"), creditors = Grp(l, "SundryCreditors"), taxes = Grp(l, "DutiesAndTaxes");
+        decimal curAssets = debtors + bank + cash, curLiab = creditors + taxes, netCur = curAssets - curLiab;
+
+        if (skel["PARTA_BS"] is Dictionary<string, object?> bs)
+        {
+            if (Nav(bs, "FundApply", "FixedAsset") is { } fa) { SetIfInt(fa, "NetBlock", R(fixedAssets)); SetIfInt(fa, "TotFixedAsset", R(fixedAssets)); }
+            if (Nav(bs, "FundApply", "Investments") is { } inv) { SetIfInt(inv, "TotInvestments", R(investments)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv", "CurrAsset") is { } ca) { SetIfInt(ca, "SndryDebtors", R(debtors)); SetIfInt(ca, "TotCurrAsset", R(curAssets)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv", "CurrAsset", "CashOrBankBal") is { } cb) { SetIfInt(cb, "CashinHand", R(cash)); SetIfInt(cb, "BankBal", R(bank)); SetIfInt(cb, "TotCashOrBankBal", R(bank + cash)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv", "CurrLiabilitiesProv", "CurrLiabilities") is { } cl) { SetIfInt(cl, "SundryCred", R(creditors)); SetIfInt(cl, "TotCurrLiabilities", R(creditors)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv", "CurrLiabilitiesProv", "Provisions") is { } pv) { SetIfInt(pv, "OthProvision", R(taxes)); SetIfInt(pv, "TotProvisions", R(taxes)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv", "CurrLiabilitiesProv") is { } clp) { SetIfInt(clp, "TotCurrLiabilitiesProvision", R(curLiab)); }
+            if (Nav(bs, "FundApply", "CurrAssetLoanAdv") is { } cala) { SetIfInt(cala, "TotCurrAssetLoanAdv", R(curAssets)); SetIfInt(cala, "NetCurrAsset", R(netCur)); }
+            if (Nav(bs, "FundApply") is { } fap) { SetIfInt(fap, "TotFundApply", R(fixedAssets + investments + netCur)); }
+            if (Nav(bs, "FundSrc", "PropFund") is { } pf) { SetIfInt(pf, "PropCap", R(capital)); SetIfInt(pf, "TotPropFund", R(capital)); }
+            if (Nav(bs, "FundSrc", "LoanFunds", "UnsecrLoan") is { } ul) { SetIfInt(ul, "FrmOthrs", R(loans)); SetIfInt(ul, "TotUnSecrLoan", R(loans)); }
+            if (Nav(bs, "FundSrc", "LoanFunds") is { } lfn) { SetIfInt(lfn, "TotLoanFund", R(loans)); }
+            if (Nav(bs, "FundSrc") is { } fsrc) { SetIfInt(fsrc, "TotFundSrc", R(capital + loans)); }
+        }
+
+        if (skel["PARTA_PL"] is Dictionary<string, object?> pl)
+        {
+            var income = fs.ProfitAndLoss.TotalIncome;
+            var expenses = fs.ProfitAndLoss.TotalExpenses;
+            var profit = fs.ProfitAndLoss.NetProfit;
+            if (Nav(pl, "CreditsToPL", "OthIncome") is { } oi) { SetIfInt(oi, "TotOthIncome", R(income)); }
+            if (Nav(pl, "CreditsToPL") is { } cr) { SetIfInt(cr, "TotCreditsToPL", R(income)); }
+            if (Nav(pl, "DebitsToPL") is { } db) { SetIfInt(db, "OtherExpenses", R(expenses)); SetIfInt(db, "PBIDTA", R(profit)); SetIfInt(db, "PBT", R(profit)); }
+            if (Nav(pl, "TaxProvAppr") is { } tpa) { SetIfInt(tpa, "ProfitAfterTax", R(profit)); }
+            if (Nav(pl, "NoBooksOfAccPL") is { } nb) { SetIfInt(nb, "NetProfit", R(profit)); SetIfInt(nb, "TotBusinessProfession", R(profit)); }
+        }
+    }
+
+    /// <summary>Walk a nested dictionary path; returns null if any segment is missing or not an object.</summary>
+    private static Dictionary<string, object?>? Nav(Dictionary<string, object?> node, params string[] path)
+    {
+        Dictionary<string, object?>? cur = node;
+        foreach (var key in path)
+        {
+            if (cur is not null && cur.TryGetValue(key, out var v) && v is Dictionary<string, object?> next)
+            {
+                cur = next;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        return cur;
     }
 
     private static void SetIfInt(Dictionary<string, object?> node, string key, long value)

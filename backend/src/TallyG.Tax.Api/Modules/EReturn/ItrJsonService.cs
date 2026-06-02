@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Api.Modules.Admin.Audit;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Common;
@@ -26,6 +27,7 @@ public sealed class ItrJsonService : IItrJsonService
     private readonly IDateTime _clock;
     private readonly IItrJsonGenerationService _generator;
     private readonly IItrJsonValidationService _validator;
+    private readonly IFinancialStatementsService _financials;
     private readonly IAuditWriterService _audit;
     private readonly ILogger<ItrJsonService> _logger;
 
@@ -35,6 +37,7 @@ public sealed class ItrJsonService : IItrJsonService
         IDateTime clock,
         IItrJsonGenerationService generator,
         IItrJsonValidationService validator,
+        IFinancialStatementsService financials,
         IAuditWriterService audit,
         ILogger<ItrJsonService> logger)
     {
@@ -43,6 +46,7 @@ public sealed class ItrJsonService : IItrJsonService
         _clock = clock;
         _generator = generator;
         _validator = validator;
+        _financials = financials;
         _audit = audit;
         _logger = logger;
     }
@@ -186,6 +190,8 @@ public sealed class ItrJsonService : IItrJsonService
             Ay = ret.AssessmentYear,
             Computation = comp,
             GeneratedOn = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
+            // ITR-3's Balance Sheet + P&L are derived from the user's books (the accounting ledgers).
+            FinancialStatements = ret.ItrType == ItrType.ITR3 ? await _financials.GetAsync(ct) : null,
             Salaries = await _db.SalaryDetails.Where(s => s.TaxReturnId == returnId).ToListAsync(ct),
             Houses = await _db.HouseProperties.Where(h => h.TaxReturnId == returnId).ToListAsync(ct),
             Gains = await _db.CapitalGains.Where(g => g.TaxReturnId == returnId).ToListAsync(ct),

@@ -1,6 +1,7 @@
 // EReturn module — offline-filing ITR JSON: generate → validate → save to a list → download,
 // for manual upload on the Income Tax e-filing portal (pre-ERI model). camelCase on the wire.
 
+using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
 
@@ -58,6 +59,9 @@ public sealed class ItrFilingContext
 
     /// <summary>JSON creation date stamped into CreationInfo.JSONCreationDate (set by the caller's clock).</summary>
     public DateOnly GeneratedOn { get; init; } = new(2026, 6, 1);
+
+    /// <summary>Balance Sheet + P&amp;L derived from the user's books (ITR-3 PARTA_BS/PARTA_PL source); null when N/A.</summary>
+    public FinancialStatementsDto? FinancialStatements { get; init; }
     public IReadOnlyList<SalaryDetail> Salaries { get; init; } = Array.Empty<SalaryDetail>();
     public IReadOnlyList<HouseProperty> Houses { get; init; } = Array.Empty<HouseProperty>();
     public IReadOnlyList<CapitalGain> Gains { get; init; } = Array.Empty<CapitalGain>();

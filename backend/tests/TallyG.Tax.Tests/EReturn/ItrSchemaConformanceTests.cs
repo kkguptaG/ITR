@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using FluentAssertions;
+using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Api.Modules.EReturn;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
@@ -69,6 +71,24 @@ public class ItrSchemaConformanceTests
         result.Errors.Should().BeEmpty("the ITR-3 JSON must match the official AY2025-26 schema. Violations:\n" + Format(result));
     }
 
+    [Fact]
+    public void Itr3_overlays_books_financials_into_partA_bs_and_pl()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+
+        // P&L from the books: total credits = income (₹20L); profit after tax = net profit (₹6L).
+        itr3.GetProperty("PARTA_PL").GetProperty("CreditsToPL").GetProperty("TotCreditsToPL").GetInt64().Should().Be(2_000_000);
+        itr3.GetProperty("PARTA_PL").GetProperty("TaxProvAppr").GetProperty("ProfitAfterTax").GetInt64().Should().Be(600_000);
+        // Balance Sheet from the books: sources = capital ₹6L + loans ₹0; bank balance ₹6L.
+        itr3.GetProperty("PARTA_BS").GetProperty("FundSrc").GetProperty("TotFundSrc").GetInt64().Should().Be(600_000);
+        itr3.GetProperty("PARTA_BS").GetProperty("FundApply").GetProperty("CurrAssetLoanAdv")
+            .GetProperty("CurrAsset").GetProperty("CashOrBankBal").GetProperty("BankBal").GetInt64().Should().Be(600_000);
+    }
+
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
     private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27")
     {
@@ -132,6 +152,18 @@ public class ItrSchemaConformanceTests
             Computation = comp,
             Salaries = new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 1_000_000m } },
             Businesses = businesses,
+            // ITR-3 carries books-derived financials so the gate exercises the PARTA_BS/PARTA_PL overlay.
+            FinancialStatements = itrType == ItrType.ITR3 ? SampleFinancials() : null,
         };
     }
+
+    private static FinancialStatementsDto SampleFinancials() => new(
+        new ProfitAndLossDto(
+            new[] { new GroupBalanceDto("SalesIncome", 2_000_000m) }, 2_000_000m,
+            new[] { new GroupBalanceDto("IndirectExpenses", 1_400_000m) }, 1_400_000m,
+            600_000m),
+        new BalanceSheetDto(
+            new[] { new GroupBalanceDto("BankAccounts", 600_000m) }, 600_000m,
+            new[] { new GroupBalanceDto("CapitalAccount", 0m), new GroupBalanceDto("NetProfitToCapital", 600_000m) }, 600_000m,
+            IsBalanced: true));
 }
