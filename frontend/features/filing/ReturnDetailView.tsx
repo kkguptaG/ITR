@@ -26,7 +26,7 @@ import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
 import { AssetsLiabilitiesCard, ImmovableAssetsCard } from '@/features/assets-liabilities';
-import { ForeignAssetsCard } from '@/features/foreign-assets';
+import { ForeignAssetsCard, ForeignCustodialCard, ForeignEquityDebtCard } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
@@ -145,6 +145,8 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
           <ImmovableAssetsCard returnId={returnId} editable={!locked} />
           <ForeignAssetsCard returnId={returnId} editable={!locked} />
+          <ForeignCustodialCard returnId={returnId} editable={!locked} />
+          <ForeignEquityDebtCard returnId={returnId} editable={!locked} />
         </>
       )}
     </div>

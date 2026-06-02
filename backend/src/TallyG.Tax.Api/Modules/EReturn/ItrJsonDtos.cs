@@ -83,6 +83,12 @@ public sealed class ItrFilingContext
     /// <summary>Foreign bank accounts disclosed in Schedule FA (resident only).</summary>
     public IReadOnlyList<ForeignBankAccount> ForeignBankAccounts { get; init; } = Array.Empty<ForeignBankAccount>();
 
+    /// <summary>Foreign custodial / brokerage accounts (Schedule FA DtlsForeignCustodialAcc).</summary>
+    public IReadOnlyList<ForeignCustodialAccount> ForeignCustodialAccounts { get; init; } = Array.Empty<ForeignCustodialAccount>();
+
+    /// <summary>Foreign equity / debt interests (Schedule FA DtlsForeignEquityDebtInterest).</summary>
+    public IReadOnlyList<ForeignEquityDebtInterest> ForeignEquityDebtInterests { get; init; } = Array.Empty<ForeignEquityDebtInterest>();
+
     /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
     public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
 

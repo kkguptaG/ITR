@@ -143,6 +143,47 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_discloses_foreign_investments_in_scheduleFA()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withForeignInvestments: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with foreign custodial + equity/debt FA tables must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var fa = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleFA");
+
+        var cust = fa.GetProperty("DtlsForeignCustodialAcc")[0];
+        cust.GetProperty("FinancialInstName").GetString().Should().Be("Charles Schwab");
+        cust.GetProperty("CountryCodeExcludingIndia").GetString().Should().Be("2");
+        cust.GetProperty("ClosingBalance").GetInt64().Should().Be(2_100_000);
+        cust.GetProperty("Status").GetString().Should().Be("OWNER");
+        cust.GetProperty("NatureOfAmount").GetString().Should().Be("D"); // D = Dividend (coded enum)
+
+        var eq = fa.GetProperty("DtlsForeignEquityDebtInterest")[0];
+        eq.GetProperty("NameOfEntity").GetString().Should().Be("Globex Corporation Inc");
+        eq.GetProperty("NatureOfEntity").GetString().Should().Be("Equity");
+        eq.GetProperty("InitialValOfInvstmnt").GetInt64().Should().Be(1_000_000);
+        eq.GetProperty("ClosingBalance").GetInt64().Should().Be(1_600_000);
+    }
+
+    [Fact]
+    public void Itr3_discloses_foreign_investments_in_scheduleFA()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withForeignInvestments: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with foreign custodial + equity/debt FA tables must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var fa = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleFA");
+        fa.GetProperty("DtlsForeignCustodialAcc")[0].GetProperty("FinancialInstName").GetString().Should().Be("Charles Schwab");
+        fa.GetProperty("DtlsForeignEquityDebtInterest")[0].GetProperty("InitialValOfInvstmnt").GetInt64().Should().Be(1_000_000);
+    }
+
+    [Fact]
     public void Itr2_declares_assets_and_liabilities_in_scheduleAL()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withAssets: true);
@@ -434,7 +475,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false)
     {
         var user = new User
         {
@@ -542,6 +583,13 @@ public class ItrSchemaConformanceTests
             ForeignBankAccounts = withForeignBank
                 ? new[] { new ForeignBankAccount { CountryCode = "2", CountryName = "United States", BankName = "Chase Bank", Address = "270 Park Ave, New York", ZipCode = "10017", AccountNumber = "9876543210", OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1), PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m } }
                 : Array.Empty<ForeignBankAccount>(),
+            // Foreign custodial + equity/debt holdings so the ITR-2/3 gate exercises the extra Schedule FA tables.
+            ForeignCustodialAccounts = withForeignInvestments
+                ? new[] { new ForeignCustodialAccount { CountryCode = "2", CountryName = "United States", InstitutionName = "Charles Schwab", InstitutionAddress = "211 Main St, San Francisco", ZipCode = "94105", AccountNumber = "CS1234567", Status = "OWNER", AccountOpenDate = new DateOnly(2021, 4, 10), PeakBalance = 2_500_000m, ClosingBalance = 2_100_000m, GrossAmountCredited = 60_000m, NatureOfAmount = "D" } }
+                : Array.Empty<ForeignCustodialAccount>(),
+            ForeignEquityDebtInterests = withForeignInvestments
+                ? new[] { new ForeignEquityDebtInterest { CountryCode = "2", CountryName = "United States", EntityName = "Globex Corporation Inc", EntityAddress = "1 Globex Plaza, Seattle", ZipCode = "98101", NatureOfEntity = "Equity", AcquisitionDate = new DateOnly(2022, 7, 1), InitialValue = 1_000_000m, PeakBalance = 1_800_000m, ClosingBalance = 1_600_000m, GrossAmountCredited = 20_000m, GrossProceeds = 0m } }
+                : Array.Empty<ForeignEquityDebtInterest>(),
             // Donee-wise 80G donations so the ITR-2/3 gate exercises the itemised Schedule 80G tables:
             // a 100%-no-limit donee (full eligible) + a 50%-with-limit donee (half eligible).
             Donations80G = withDonees

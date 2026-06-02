@@ -295,6 +295,23 @@ public static class DbInitializer
             PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m,
         });
 
+        db.ForeignCustodialAccounts.Add(new ForeignCustodialAccount
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", InstitutionName = "Charles Schwab",
+            InstitutionAddress = "211 Main Street, San Francisco", ZipCode = "94105", AccountNumber = "CS1234567",
+            Status = "OWNER", AccountOpenDate = new DateOnly(2021, 4, 10),
+            PeakBalance = 2_500_000m, ClosingBalance = 2_100_000m, GrossAmountCredited = 60_000m, NatureOfAmount = "D",
+        });
+        db.ForeignEquityDebtInterests.Add(new ForeignEquityDebtInterest
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", EntityName = "Globex Corporation Inc",
+            EntityAddress = "1 Globex Plaza, Seattle", ZipCode = "98101", NatureOfEntity = "Equity",
+            AcquisitionDate = new DateOnly(2022, 7, 1), InitialValue = 1_000_000m,
+            PeakBalance = 1_800_000m, ClosingBalance = 1_600_000m, GrossAmountCredited = 20_000m, GrossProceeds = 0m,
+        });
+
         // Donee-wise 80G donations (Schedule 80G). Total ₹11,000 (matches the 80G deduction above); eligible
         // ₹8,000 = ₹5,000 (PM CARES, 100%) + 50% × ₹6,000 (a charitable trust, the limited bucket).
         db.Donations80G.Add(new Donation80G

@@ -1004,21 +1004,84 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     }
 
     // ----------------------------------------------------------------- Schedule FA (foreign assets)
-    // Foreign depository / bank accounts disclosed by a resident (DetailsForiegnBank). The other nine FA
-    // tables (custodial, equity/debt, immovable, trusts, signing authority, …) are a later addition. The
-    // whole schedule is optional; emitted only when a foreign account is declared.
+    // Foreign bank (DetailsForiegnBank), custodial/brokerage (DtlsForeignCustodialAcc) and equity/debt
+    // (DtlsForeignEquityDebtInterest) holdings disclosed by a resident. The remaining FA tables (cash-value
+    // insurance, financial interest, immovable, trusts, signing authority, …) are a later addition. The
+    // whole schedule is optional; each table is emitted only when that asset class is declared.
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
-        if (ctx.ForeignBankAccounts.Count == 0)
+        if (ctx.ForeignBankAccounts.Count == 0
+            && ctx.ForeignCustodialAccounts.Count == 0
+            && ctx.ForeignEquityDebtInterests.Count == 0)
         {
             return;
         }
 
-        form["ScheduleFA"] = new Dictionary<string, object?>
+        var fa = new Dictionary<string, object?>();
+        if (ctx.ForeignBankAccounts.Count > 0)
         {
-            ["DetailsForiegnBank"] = ctx.ForeignBankAccounts.Select(ForeignBankItem).ToList(),
+            fa["DetailsForiegnBank"] = ctx.ForeignBankAccounts.Select(ForeignBankItem).ToList();
+        }
+
+        if (ctx.ForeignCustodialAccounts.Count > 0)
+        {
+            fa["DtlsForeignCustodialAcc"] = ctx.ForeignCustodialAccounts.Select(CustodialItem).ToList();
+        }
+
+        if (ctx.ForeignEquityDebtInterests.Count > 0)
+        {
+            fa["DtlsForeignEquityDebtInterest"] = ctx.ForeignEquityDebtInterests.Select(EquityDebtItem).ToList();
+        }
+
+        form["ScheduleFA"] = fa;
+    }
+
+    private static Dictionary<string, object?> CustodialItem(ForeignCustodialAccount c) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(c.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(c.CountryCode) ? "2" : c.CountryCode.Trim(),
+        ["FinancialInstName"] = Trunc(NonEmpty(c.InstitutionName, "NA"), 125),
+        ["FinancialInstAddress"] = Trunc(NonEmpty(c.InstitutionAddress, "NA"), 200),
+        ["ZipCode"] = Trunc(NonEmpty(c.ZipCode, "NA"), 8),
+        ["AccountNumber"] = Trunc(NonEmpty(c.AccountNumber, "NA"), 34),
+        ["Status"] = ForeignOwnerStatus(c.Status),
+        ["AccOpenDate"] = (c.AccountOpenDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["PeakBalanceDuringPeriod"] = R(c.PeakBalance),
+        ["ClosingBalance"] = R(c.ClosingBalance),
+        ["GrossAmtPaidCredited"] = R(c.GrossAmountCredited),
+        ["NatureOfAmount"] = NatureOfAmountCode(c.NatureOfAmount),
+    };
+
+    // Schedule FA custodial "NatureOfAmount" is a coded enum: I=Interest, D=Dividend, S=Sale/redemption
+    // proceeds, O=Other income, N=No amount. Map common inputs (code or word); default to Other.
+    private static string NatureOfAmountCode(string? s)
+    {
+        var v = (s ?? string.Empty).Trim().ToUpperInvariant();
+        return v switch
+        {
+            "I" or "INTEREST" => "I",
+            "D" or "DIVIDEND" => "D",
+            "S" or "SALE" or "PROCEEDS" or "SALE PROCEEDS" => "S",
+            "N" or "NONE" or "NO AMOUNT" => "N",
+            _ => "O",
         };
     }
+
+    private static Dictionary<string, object?> EquityDebtItem(ForeignEquityDebtInterest e) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(e.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(e.CountryCode) ? "2" : e.CountryCode.Trim(),
+        ["NameOfEntity"] = Trunc(NonEmpty(e.EntityName, "NA"), 125),
+        ["AddressOfEntity"] = Trunc(NonEmpty(e.EntityAddress, "NA"), 200),
+        ["ZipCode"] = Trunc(NonEmpty(e.ZipCode, "NA"), 8),
+        ["NatureOfEntity"] = Trunc(NonEmpty(e.NatureOfEntity, "Equity"), 34),
+        ["InterestAcquiringDate"] = (e.AcquisitionDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["InitialValOfInvstmnt"] = R(e.InitialValue),
+        ["PeakBalanceDuringPeriod"] = R(e.PeakBalance),
+        ["ClosingBalance"] = R(e.ClosingBalance),
+        ["TotGrossAmtPaidCredited"] = R(e.GrossAmountCredited),
+        ["TotGrossProceeds"] = R(e.GrossProceeds),
+    };
 
     private static Dictionary<string, object?> ForeignBankItem(ForeignBankAccount f) => new()
     {

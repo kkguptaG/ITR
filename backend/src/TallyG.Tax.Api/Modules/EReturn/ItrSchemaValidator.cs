@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using NJsonSchema;
+using NJsonSchema.Validation;
 using TallyG.Tax.Domain.Enums;
 
 namespace TallyG.Tax.Api.Modules.EReturn;
@@ -45,13 +46,33 @@ public static class ItrSchemaValidator
             return SchemaValidationResult.NotAvailable;
         }
 
-        var errors = schema.Validate(json)
-            .Select(e => new SchemaIssue(
+        var errors = new List<SchemaIssue>();
+        Collect(schema.Validate(json), errors);
+        return new SchemaValidationResult(true, errors);
+    }
+
+    /// <summary>
+    /// Flatten NJsonSchema's validation errors, including the leaf causes nested under a container error
+    /// (e.g. ArrayItemNotValid / PropertyRequired on a sub-object) so a violation names the exact field —
+    /// not just the array/object that contains it.
+    /// </summary>
+    private static void Collect(IEnumerable<ValidationError> errors, List<SchemaIssue> sink)
+    {
+        foreach (var e in errors)
+        {
+            sink.Add(new SchemaIssue(
                 string.IsNullOrEmpty(e.Path) ? "$" : e.Path,
                 e.Kind.ToString(),
-                e.Property ?? string.Empty))
-            .ToList();
-        return new SchemaValidationResult(true, errors);
+                e.Property ?? string.Empty));
+
+            if (e is ChildSchemaValidationError child)
+            {
+                foreach (var group in child.Errors.Values)
+                {
+                    Collect(group, sink);
+                }
+            }
+        }
     }
 
     private static bool TryResourceName(string assessmentYearCode, ItrType form, out string resource)

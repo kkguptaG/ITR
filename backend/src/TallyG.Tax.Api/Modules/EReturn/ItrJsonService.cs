@@ -211,6 +211,10 @@ public sealed class ItrJsonService : IItrJsonService
                 .Where(d => d.TaxReturnId == returnId && d.TenantId == ret.TenantId).ToListAsync(ct),
             ImmovablePropertiesAL = await _db.ImmovablePropertiesAL
                 .Where(p => p.TaxReturnId == returnId && p.TenantId == ret.TenantId).ToListAsync(ct),
+            ForeignCustodialAccounts = await _db.ForeignCustodialAccounts
+                .Where(c => c.TaxReturnId == returnId && c.TenantId == ret.TenantId).ToListAsync(ct),
+            ForeignEquityDebtInterests = await _db.ForeignEquityDebtInterests
+                .Where(e => e.TaxReturnId == returnId && e.TenantId == ret.TenantId).ToListAsync(ct),
         };
     }
 
