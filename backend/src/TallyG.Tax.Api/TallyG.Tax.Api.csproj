@@ -27,6 +27,8 @@
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-4_2026.json" LogicalName="ITR-4_2026.json" />
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-2_2025.json" LogicalName="ITR-2_2025.json" />
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-3_2025.json" LogicalName="ITR-3_2025.json" />
+    <!-- RBI IFSC master (gzipped, IFSC-sorted TSV) for IFSC -> bank/branch lookup + auto-fill. -->
+    <EmbeddedResource Include="Modules\BankAccounts\Data\ifsc.tsv.gz" LogicalName="ifsc.tsv.gz" />
   </ItemGroup>
 
   <ItemGroup>
