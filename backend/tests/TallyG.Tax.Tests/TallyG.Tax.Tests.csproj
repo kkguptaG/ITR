@@ -16,13 +16,6 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
-    <!-- Official ITD ITR JSON schemas are draft-04; NJsonSchema validates that draft. -->
-    <PackageReference Include="NJsonSchema" Version="11.1.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Bundled official ITD schemas (incometax.gov.in) for conformance tests. -->
-    <None Include="Schemas\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

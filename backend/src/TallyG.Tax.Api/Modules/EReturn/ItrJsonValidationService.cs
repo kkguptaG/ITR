@@ -114,16 +114,36 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Only regenerate if you intend to file a REVISED return; otherwise no action is needed.");
         }
 
-        // --- always-on reminders for a public tax product ---
-        Warn("SCHEMA.RECONCILE", "$",
-            "Field mapping is modeled on the ITD schema and not yet verified against the official one.",
-            "Download the official AY 2026-27 ITR schema from incometax.gov.in (Downloads) and validate this JSON in the offline utility before uploading.");
+        // --- official ITD schema conformance (JSON Schema draft-04), when a schema is bundled for this AY + form ---
+        var schemaResult = ItrSchemaValidator.Validate(ctx.AyCode, ctx.ItrType, json);
+        if (schemaResult.SchemaAvailable)
+        {
+            foreach (var e in schemaResult.Errors)
+            {
+                var at = string.IsNullOrEmpty(e.Property) ? string.Empty : $" at '{e.Property}'";
+                Err("SCHEMA.NONCONFORMANT", "$.." + e.Path,
+                    $"Does not match the official ITD schema ({e.Kind}{at}).",
+                    "Regenerate the JSON; if it recurs the form mapper has drifted from the notified schema — report it.");
+            }
+        }
+        else
+        {
+            Warn("SCHEMA.RECONCILE", "$",
+                "This form's mapping is not yet verified against an official ITD schema.",
+                "Download the official AY schema from incometax.gov.in (Downloads) and validate this JSON in the offline utility before uploading.");
+        }
+
+        // --- always-on reminder for a public tax product ---
         Warn("TAX.PROVISIONAL", "$",
             "Tax figures are provisional and pending Chartered Accountant validation.",
             "Have a qualified CA validate the computation and rule-set, then mark the rule-set CA-approved.");
 
         var errors = issues.Count(i => i.Severity == "error");
         var warnings = issues.Count(i => i.Severity == "warning");
-        return new ValidationReportDto(errors == 0, errors, warnings, issues, NoticeText);
+        var notice = schemaResult.IsConformant
+            ? $"Structure validated against the official ITD {ctx.ItrType} schema (draft-04) — conformant. " +
+              "Validate the figures with a CA and re-check in the offline utility before the actual upload."
+            : NoticeText;
+        return new ValidationReportDto(errors == 0, errors, warnings, issues, notice);
     }
 }

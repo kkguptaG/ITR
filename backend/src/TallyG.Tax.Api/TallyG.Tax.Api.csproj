@@ -13,10 +13,18 @@
     <PackageReference Include="Scrutor" Version="5.0.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
+    <!-- Official ITD ITR JSON schemas are draft-04; NJsonSchema validates that draft at runtime. -->
+    <PackageReference Include="NJsonSchema" Version="11.1.0" />
     <!-- Required by the EF Core CLI tooling (migrations) on the startup project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.6">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Official ITD AY2026-27 schemas embedded for runtime conformance validation (stable logical names). -->
+    <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-1_2026.json" LogicalName="ITR-1_2026.json" />
+    <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-4_2026.json" LogicalName="ITR-4_2026.json" />
   </ItemGroup>
 
   <ItemGroup>
