@@ -54,6 +54,19 @@ public sealed partial class ItrJsonGenerationService
             if (ltcg112A)
             {
                 D(lt["SaleOfEquityShareUs112A"])["CapgainonAssets"] = R(cgLong);
+
+                // Per-scrip Schedule 112A (LTCG on STT-paid listed equity / equity MF) — ITR-2 only for now.
+                // ITR-3's Schedule112A item diverges (LTCGBeforelower6and11 + ShareTransferredOnOrBefore) and
+                // its ScheduleCGFor23 skeleton needs extra required leaves when gains are present, so the full
+                // ITR-3 capital-gains path is a separate refinement.
+                if (ctx.ItrType == ItrType.ITR2)
+                {
+                    var sch112A = BuildSchedule112A(ctx);
+                    if (sch112A is not null)
+                    {
+                        form["Schedule112A"] = sch112A;
+                    }
+                }
             }
 
             var b = D(D(skel["CurrYrLosses"])["InLtcg12_5Per"]);
@@ -66,6 +79,79 @@ public sealed partial class ItrJsonGenerationService
         skel["TotScheduleCGFor23"] = R(cgShort + cgLong);
 
         form["ScheduleCGFor23"] = skel;
+    }
+
+    // Schedule 112A — the scrip-wise breakup of LTCG on STT-paid listed equity / equity MF (s.112A). Each
+    // captured 112A gain becomes a row (ISIN + sale value + cost + the LTCG), and the aggregate Balance ties
+    // to the engine's 112A LTCG. Grandfathering under s.55(2)(ac) (shares acquired on/before 31-Jan-2018)
+    // needs the 31-Jan-2018 FMV and matching engine support, so every row is reported as acquired after that
+    // date ("AE") with cost = actual cost — that remains a future refinement. Returns null when there are no
+    // positive 112A gains (the minItems:1 Schedule112ADtls array must not be empty).
+    private static Dictionary<string, object?>? BuildSchedule112A(ItrFilingContext ctx)
+    {
+        var rows = new List<Dictionary<string, object?>>();
+        long saleTot = 0, costTot = 0, expTot = 0, balTot = 0;
+
+        foreach (var g in ctx.Gains.Where(x => x.Term == CapitalGainTerm.Long && (x.TaxSection ?? string.Empty).Contains("112A")))
+        {
+            var sale = R(Math.Max(0m, g.SalePrice));
+            var cost = R(Math.Max(0m, g.CostOfAcquisition + g.CostOfImprovement));
+            var exp = R(Math.Max(0m, g.ExpensesOnTransfer));
+            var deductions = cost + exp;
+            var balance = Math.Max(0L, sale - deductions);
+            if (sale <= 0L)
+            {
+                continue;
+            }
+
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["ShareOnOrBefore"] = "AE",
+                ["ISINCode"] = ValidIsin(g.Isin),
+                ["ShareUnitName"] = "Listed equity / equity MF (STT paid)",
+                ["TotSaleValue"] = sale,
+                ["CostAcqWithoutIndx"] = cost,
+                ["AcquisitionCost"] = cost,
+                ["LTCGBeforelowerB1B2"] = balance,
+                ["FairMktValuePerShareunit"] = 0,
+                ["TotFairMktValueCapAst"] = 0L,
+                ["ExpExclCnctTransfer"] = exp,
+                ["TotalDeductions"] = deductions,
+                ["Balance"] = balance,
+            });
+
+            saleTot += sale;
+            costTot += cost;
+            expTot += exp;
+            balTot += balance;
+        }
+
+        if (rows.Count == 0)
+        {
+            return null;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["Schedule112ADtls"] = rows,
+            ["SaleValue112A"] = saleTot,
+            ["CostAcqWithoutIndx112A"] = costTot,
+            ["AcquisitionCost112A"] = costTot,
+            ["LTCGBeforelowerB1B2112A"] = balTot,
+            ["FairMktValueCapAst112A"] = 0L,
+            ["ExpExclCnctTransfer112A"] = expTot,
+            ["Deductions112A"] = costTot + expTot,
+            ["Balance112A"] = balTot,
+            ["Balance112ABE"] = 0L,        // none reported as acquired before 01-Feb-2018 (grandfathering deferred)
+            ["Balance112AAE"] = balTot,
+            ["TotalBalance112A"] = balTot,
+        };
+    }
+
+    private static string ValidIsin(string? isin)
+    {
+        var s = (isin ?? string.Empty).Trim().ToUpperInvariant();
+        return System.Text.RegularExpressions.Regex.IsMatch(s, "^IN[0-9A-Z]{10}$") ? s : "INNOTREQUIRD";
     }
 
     // Schema-derived, required-only all-zero skeleton for ScheduleCGFor23 (regenerate from the official

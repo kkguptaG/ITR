@@ -442,6 +442,29 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_emits_per_scrip_schedule112A()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGains: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule 112A must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var s112a = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("Schedule112A");
+
+        // The 112A equity LTCG (sale 5L − cost 3L = 2L) is reported scrip-wise and ties to the aggregate.
+        var row = s112a.GetProperty("Schedule112ADtls")[0];
+        row.GetProperty("ISINCode").GetString().Should().Be("INE002A01018");
+        row.GetProperty("ShareOnOrBefore").GetString().Should().Be("AE");
+        row.GetProperty("TotSaleValue").GetInt64().Should().Be(500_000);
+        row.GetProperty("Balance").GetInt64().Should().Be(200_000);
+        s112a.GetProperty("SaleValue112A").GetInt64().Should().Be(500_000);
+        s112a.GetProperty("Balance112A").GetInt64().Should().Be(200_000);
+        s112a.GetProperty("TotalBalance112A").GetInt64().Should().Be(200_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_house_property_into_scheduleHP()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true);
@@ -600,7 +623,7 @@ public class ItrSchemaConformanceTests
                 ? new[]
                 {
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
-                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m, Isin = "INE002A01018" },
                 }
                 : Array.Empty<CapitalGain>(),
             // Chapter VI-A deductions so the ITR-2/3 gate exercises the itemised Schedule VIA.

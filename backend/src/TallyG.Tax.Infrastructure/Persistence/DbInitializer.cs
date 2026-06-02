@@ -260,6 +260,7 @@ public static class DbInitializer
         {
             TenantId = RetailTenantId, TaxReturnId = returnId, AssetType = CapitalGainAssetType.ListedEquity,
             Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m,
+            Isin = "INE002A01018", AcquisitionDate = new DateOnly(2022, 6, 10), TransferDate = new DateOnly(2025, 2, 14),
         });
 
         db.IncomeSources.Add(new IncomeSource { TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources, Label = "SBI savings interest", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" });
