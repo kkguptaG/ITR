@@ -503,6 +503,30 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_sets_off_net_short_term_loss_against_long_term_gain()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withCgCrossLoss: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with a cross-term STCL→LTCG set-off must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var cg = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleCGFor23");
+
+        // 111A STCG +₹50k and STCL −₹120k net to a ₹70k short-term loss (so STCG is nil), which sets off
+        // (s.70(2)) against the ₹2L 112A LTCG: gross LTCG stays ₹2L, ₹70k shows as StclSetoff20Per, and the
+        // surviving ₹1.3L is the current-year capital gain.
+        cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(0);
+        var ltLosses = cg.GetProperty("CurrYrLosses").GetProperty("InLtcg12_5Per");
+        ltLosses.GetProperty("CurrYearIncome").GetInt64().Should().Be(200_000);
+        ltLosses.GetProperty("StclSetoff20Per").GetInt64().Should().Be(70_000);
+        ltLosses.GetProperty("CurrYrCapGain").GetInt64().Should().Be(130_000);
+        cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(200_000);
+        cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(130_000);
+    }
+
+    [Fact]
     public void Itr2_grandfathers_pre2018_equity_in_schedule112A()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGrandfathering: true);
@@ -627,7 +651,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false)
     {
         var user = new User
         {
@@ -720,6 +744,15 @@ public class ItrSchemaConformanceTests
                     // plus a ₹2L 112A LTCG. Exercises intra-term current-year loss set-off.
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 100_000m, CostOfAcquisition = 130_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
+                }
+                : withCgCrossLoss
+                ? new[]
+                {
+                    // 111A STCG +₹50k and STCL −₹120k → a net ₹70k short-term loss that spills (s.70(2)) onto
+                    // the ₹2L 112A LTCG: STCG nil, LTCG 2L − 70k = ₹1.3L. Exercises the cross-term set-off.
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 100_000m, CostOfAcquisition = 220_000m },
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
                 }
                 : withGains

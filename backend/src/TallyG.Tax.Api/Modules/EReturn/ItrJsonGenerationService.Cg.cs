@@ -22,10 +22,12 @@ public sealed partial class ItrJsonGenerationService
             return;
         }
 
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
-        if (cgShort <= 0m && cgLong <= 0m)
+        var cg = ComputeCgSetOff(ctx.Gains);
+        var cgShort = cg.ShortGain;            // net current-year STCG (after intra-short set-off)
+        var cgLong = cg.LongGainAfterSetoff;   // net LTCG after the cross-term STCL set-off (s.70(2))
+        if (cgShort <= 0m && cg.LongGrossGain <= 0m)
         {
-            return;   // only losses / nil — the loss-set-off matrix is a future refinement
+            return;   // no positive current-year gain to report (a net loss carries via Schedule CFL)
         }
 
         var skel = ScheduleCgFor23Skeleton();
@@ -36,6 +38,7 @@ public sealed partial class ItrJsonGenerationService
         var stcg111A = ctx.Gains.Any(g => g.Term == CapitalGainTerm.Short && (g.TaxSection ?? string.Empty).Contains("111A"));
         var stcgBucket = stcg111A ? "InStcg20Per" : "InStcgAppRate";
         var stcgAccrual = stcg111A ? "ShortTermUnder20Per" : "ShortTermUnderAppRate";
+        var stclSetoffColumn = stcg111A ? "StclSetoff20Per" : "StclSetoffAppRate";   // which STCG-rate the spilled STCL came from
         var ltcg112A = ctx.Gains.Any(g => g.Term == CapitalGainTerm.Long && (g.TaxSection ?? string.Empty).Contains("112A"));
 
         if (cgShort > 0m)
@@ -47,17 +50,17 @@ public sealed partial class ItrJsonGenerationService
             D(D(D(skel["AccruOrRecOfCG"])[stcgAccrual])["DateRange"])["Up16Of3To31Of3"] = R(cgShort);
         }
 
-        if (cgLong > 0m)
+        if (cg.LongGrossGain > 0m)
         {
             var lt = D(skel["LongTermCapGain23"]);
-            lt["TotalLTCG"] = R(cgLong);
+            lt["TotalLTCG"] = R(cg.LongGrossGain);   // gross LTCG; the loss set-off is shown in CurrYrLosses
             if (ltcg112A)
             {
-                D(lt["SaleOfEquityShareUs112A"])["CapgainonAssets"] = R(cgLong);
+                D(lt["SaleOfEquityShareUs112A"])["CapgainonAssets"] = R(cg.LongGrossGain);
 
                 // Per-scrip Schedule 112A (LTCG on STT-paid listed equity / equity MF). Form-aware: the ITR-3
                 // per-scrip item uses LTCGBeforelower6and11 + ShareTransferredOnOrBefore (ITR-2 uses
-                // LTCGBeforelowerB1B2). Grandfathering (pre-01-Feb-2018 shares) remains a future refinement.
+                // LTCGBeforelowerB1B2). Grandfathering (pre-01-Feb-2018 shares) is in the per-scrip cost.
                 var sch112A = BuildSchedule112A(ctx);
                 if (sch112A is not null)
                 {
@@ -66,8 +69,15 @@ public sealed partial class ItrJsonGenerationService
             }
 
             var b = D(D(skel["CurrYrLosses"])["InLtcg12_5Per"]);
-            b["CurrYearIncome"] = R(cgLong);
+            b["CurrYearIncome"] = R(cg.LongGrossGain);
+            if (cg.StclSetOffLtcg > 0m)
+            {
+                // A net short-term capital loss set off against this LTCG (s.70(2)).
+                b[stclSetoffColumn] = R(cg.StclSetOffLtcg);
+            }
+
             b["CurrYrCapGain"] = R(cgLong);
+            // Only the LTCG that survives set-off accrues (drives the s.234C accrual buckets).
             D(D(D(skel["AccruOrRecOfCG"])["LongTermUnder12_5Per"])["DateRange"])["Up16Of3To31Of3"] = R(cgLong);
         }
 
