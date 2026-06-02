@@ -26,11 +26,7 @@ import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
 import { AssetsLiabilitiesCard, ImmovableAssetsCard } from '@/features/assets-liabilities';
-import {
-  ForeignAssetsCard, ForeignCustodialCard, ForeignEquityDebtCard,
-  ForeignImmovableCard, ForeignFinancialInterestCard,
-  ForeignSigningAuthorityCard, ForeignOtherIncomeCard,
-} from '@/features/foreign-assets';
+import { ForeignAssetsSection } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
@@ -142,19 +138,14 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}
       <ReconciliationCard returnId={returnId} />
 
-      {/* Schedules 80G + AL + FA — donations + assets/liabilities + foreign assets (ITR-2/3) */}
+      {/* Schedules 80G + AL + FA — donations + assets/liabilities + foreign assets (ITR-2/3).
+          The many Schedule FA tables are grouped under one collapsible section. */}
       {(detail.itrType === 'ITR2' || detail.itrType === 'ITR3') && (
         <>
           <Donations80GCard returnId={returnId} editable={!locked} />
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
           <ImmovableAssetsCard returnId={returnId} editable={!locked} />
-          <ForeignAssetsCard returnId={returnId} editable={!locked} />
-          <ForeignCustodialCard returnId={returnId} editable={!locked} />
-          <ForeignEquityDebtCard returnId={returnId} editable={!locked} />
-          <ForeignImmovableCard returnId={returnId} editable={!locked} />
-          <ForeignFinancialInterestCard returnId={returnId} editable={!locked} />
-          <ForeignSigningAuthorityCard returnId={returnId} editable={!locked} />
-          <ForeignOtherIncomeCard returnId={returnId} editable={!locked} />
+          <ForeignAssetsSection returnId={returnId} editable={!locked} />
         </>
       )}
     </div>

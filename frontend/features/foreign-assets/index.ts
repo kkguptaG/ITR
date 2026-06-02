@@ -5,6 +5,7 @@ export { ForeignImmovableCard } from './components/ForeignImmovableCard';
 export { ForeignFinancialInterestCard } from './components/ForeignFinancialInterestCard';
 export { ForeignSigningAuthorityCard } from './components/ForeignSigningAuthorityCard';
 export { ForeignOtherIncomeCard } from './components/ForeignOtherIncomeCard';
+export { ForeignAssetsSection } from './components/ForeignAssetsSection';
 export {
   listForeignBankAccounts, addForeignBankAccount, deleteForeignBankAccount, foreignAssetsKeys,
   listForeignCustodialAccounts, addForeignCustodialAccount, deleteForeignCustodialAccount, foreignCustodialKeys,
