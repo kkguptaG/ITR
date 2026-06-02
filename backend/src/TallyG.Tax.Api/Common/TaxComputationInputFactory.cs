@@ -26,7 +26,8 @@ internal static class TaxComputationInputFactory
         IReadOnlyList<BusinessIncome> businesses,
         IReadOnlyList<IncomeSource> incomeSources,
         IReadOnlyList<Deduction> deductions,
-        IReadOnlyList<Donation80G>? donations80G = null)
+        IReadOnlyList<Donation80G>? donations80G = null,
+        IReadOnlyList<ExemptIncome>? exemptIncomes = null)
     {
         var ay = ret.AssessmentYear;
         return new TaxComputationInput
@@ -50,9 +51,17 @@ internal static class TaxComputationInputFactory
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
                 b.NetProfit, b.SpeculativeFlag)).ToList(),
+            // Other-sources income (carrying its {"nature"} tag) PLUS any net agricultural income captured in
+            // Schedule EI — fed as nature "agricultural" so the engine's partial-integration raises the rate
+            // (s.2(2)/Finance Act) without taxing the exempt agri income itself.
             OtherIncomes = incomeSources
                 .Where(s => s.Type == IncomeType.OtherSources)
-                .Select(s => new OtherIncomeInput(s.Label ?? "Other", s.Amount, ExtractNature(s.SourceMetaJson))).ToList(),
+                .Select(s => new OtherIncomeInput(s.Label ?? "Other", s.Amount, ExtractNature(s.SourceMetaJson)))
+                .Concat((exemptIncomes ?? Array.Empty<ExemptIncome>())
+                    .Where(e => e.Category == ExemptIncomeCategory.Agricultural && e.Amount > 0m)
+                    .Select(e => new OtherIncomeInput(
+                        string.IsNullOrWhiteSpace(e.Description) ? "Agricultural income" : e.Description, e.Amount, "agricultural")))
+                .ToList(),
             Deductions = BuildDeductionInputs(deductions, donations80G ?? Array.Empty<Donation80G>()),
             // Prepaid taxes + brought-forward losses captured on the return.
             TdsPaid = ret.TdsPaid,
