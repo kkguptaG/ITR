@@ -178,6 +178,48 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_itemizes_donations_donee_wise_in_schedule80G()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDonees: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with donee-wise Schedule 80G must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var g = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("Schedule80G");
+
+        // 100%-no-limit donee → Don100Percent (full eligible); 50%-with-limit donee → Don50PercentApprReqd (half).
+        var doneeA = g.GetProperty("Don100Percent").GetProperty("DoneeWithPan")[0];
+        doneeA.GetProperty("DoneePAN").GetString().Should().Be("AAETP3993P");
+        doneeA.GetProperty("DonationAmt").GetInt64().Should().Be(10_000);
+        doneeA.GetProperty("EligibleDonationAmt").GetInt64().Should().Be(10_000);
+        doneeA.GetProperty("AddressDetail").GetProperty("PinCode").GetInt64().Should().Be(110011);
+        g.GetProperty("Don100Percent").GetProperty("TotEligibleDon100Percent").GetInt64().Should().Be(10_000);
+        g.GetProperty("Don50PercentApprReqd").GetProperty("TotEligibleDon50PercentApprReqd").GetInt64().Should().Be(2_000);
+
+        // Grand totals reconcile across the buckets: ₹14k donated, ₹12k eligible, nil in cash.
+        g.GetProperty("TotalDonationsUs80GCash").GetInt64().Should().Be(0);
+        g.GetProperty("TotalDonationsUs80G").GetInt64().Should().Be(14_000);
+        g.GetProperty("TotalEligibleDonationsUs80G").GetInt64().Should().Be(12_000);
+    }
+
+    [Fact]
+    public void Itr3_itemizes_donations_donee_wise_in_schedule80G()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withDonees: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with donee-wise Schedule 80G must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var g = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("Schedule80G");
+        g.GetProperty("Don100Percent").GetProperty("DoneeWithPan")[0].GetProperty("DonationAmt").GetInt64().Should().Be(10_000);
+        g.GetProperty("TotalEligibleDonationsUs80G").GetInt64().Should().Be(12_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
@@ -357,7 +399,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false)
     {
         var user = new User
         {
@@ -461,6 +503,15 @@ public class ItrSchemaConformanceTests
             ForeignBankAccounts = withForeignBank
                 ? new[] { new ForeignBankAccount { CountryCode = "2", CountryName = "United States", BankName = "Chase Bank", Address = "270 Park Ave, New York", ZipCode = "10017", AccountNumber = "9876543210", OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1), PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m } }
                 : Array.Empty<ForeignBankAccount>(),
+            // Donee-wise 80G donations so the ITR-2/3 gate exercises the itemised Schedule 80G tables:
+            // a 100%-no-limit donee (full eligible) + a 50%-with-limit donee (half eligible).
+            Donations80G = withDonees
+                ? new[]
+                {
+                    new Donation80G { Category = Donation80GCategory.HundredPercentNoLimit, DoneeName = "PM CARES Fund", DoneePan = "AAETP3993P", AddressLine = "PMO, South Block", City = "New Delhi", StateCode = "07", Pincode = "110011", CashAmount = 0m, OtherModeAmount = 10_000m },
+                    new Donation80G { Category = Donation80GCategory.FiftyPercentWithLimit, DoneeName = "Helping Hands Trust", DoneePan = "AABTH1234Q", AddressLine = "44 Sector 18", City = "Noida", StateCode = "09", Pincode = "201301", CashAmount = 0m, OtherModeAmount = 4_000m },
+                }
+                : Array.Empty<Donation80G>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

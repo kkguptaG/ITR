@@ -27,6 +27,7 @@ import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
 import { AssetsLiabilitiesCard } from '@/features/assets-liabilities';
 import { ForeignAssetsCard } from '@/features/foreign-assets';
+import { Donations80GCard } from '@/features/donations-80g';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -137,9 +138,10 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}
       <ReconciliationCard returnId={returnId} />
 
-      {/* Schedules AL + FA — assets/liabilities + foreign assets (ITR-2/3) */}
+      {/* Schedules 80G + AL + FA — donations + assets/liabilities + foreign assets (ITR-2/3) */}
       {(detail.itrType === 'ITR2' || detail.itrType === 'ITR3') && (
         <>
+          <Donations80GCard returnId={returnId} editable={!locked} />
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
           <ForeignAssetsCard returnId={returnId} editable={!locked} />
         </>

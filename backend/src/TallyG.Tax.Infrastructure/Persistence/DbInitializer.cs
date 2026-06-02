@@ -268,7 +268,7 @@ public static class DbInitializer
 
         db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80C", Amount = 150_000m });
         db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80D", Amount = 25_000m });
-        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80G", Amount = 11_000m });
+        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80G", Amount = 11_000m, EligibleAmount = 8_000m });
         db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80TTA", Amount = 10_000m });
 
         db.AssetsLiabilities.Add(new AssetsLiabilities
@@ -285,6 +285,23 @@ public static class DbInitializer
             Address = "270 Park Avenue, New York", ZipCode = "10017", AccountNumber = "9876543210",
             OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1),
             PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m,
+        });
+
+        // Donee-wise 80G donations (Schedule 80G). Total ₹11,000 (matches the 80G deduction above); eligible
+        // ₹8,000 = ₹5,000 (PM CARES, 100%) + 50% × ₹6,000 (a charitable trust, the limited bucket).
+        db.Donations80G.Add(new Donation80G
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            DoneeName = "PM CARES Fund", DoneePan = "AAETP3993P", ArnNumber = "AAETP3993PF20210",
+            AddressLine = "Prime Minister's Office, South Block", City = "New Delhi", StateCode = "07", Pincode = "110011",
+            Category = Donation80GCategory.HundredPercentNoLimit, CashAmount = 0m, OtherModeAmount = 5_000m,
+        });
+        db.Donations80G.Add(new Donation80G
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            DoneeName = "Helping Hands Charitable Trust", DoneePan = "AABTH1234Q", ArnNumber = "AABTH1234QF20230",
+            AddressLine = "44 Sector 18", City = "Noida", StateCode = "09", Pincode = "201301",
+            Category = Donation80GCategory.FiftyPercentWithLimit, CashAmount = 0m, OtherModeAmount = 6_000m,
         });
 
         db.TdsEntries.Add(new TdsEntry

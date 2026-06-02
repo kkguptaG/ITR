@@ -80,6 +80,9 @@ public sealed class ItrFilingContext
     /// <summary>Foreign bank accounts disclosed in Schedule FA (resident only).</summary>
     public IReadOnlyList<ForeignBankAccount> ForeignBankAccounts { get; init; } = Array.Empty<ForeignBankAccount>();
 
+    /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
+    public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

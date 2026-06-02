@@ -207,6 +207,8 @@ public sealed class ItrJsonService : IItrJsonService
                 .FirstOrDefaultAsync(a => a.TaxReturnId == returnId && a.TenantId == ret.TenantId, ct),
             ForeignBankAccounts = await _db.ForeignBankAccounts
                 .Where(f => f.TaxReturnId == returnId && f.TenantId == ret.TenantId).ToListAsync(ct),
+            Donations80G = await _db.Donations80G
+                .Where(d => d.TaxReturnId == returnId && d.TenantId == ret.TenantId).ToListAsync(ct),
         };
     }
 
