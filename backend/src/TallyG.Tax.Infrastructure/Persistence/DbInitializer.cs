@@ -45,6 +45,9 @@ public static class DbInitializer
         await SeedBankAccountsAsync(db, ct);
         await SeedAssessmentYearAndRulesAsync(db, ct);
         await SeedPlansAndCouponAsync(db, ct);
+        await db.SaveChangesAsync(ct);          // persist the AY/ruleset before the return references them
+
+        await SeedDemoItr2ReturnAsync(db, ct);
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Database seed complete (idempotent).");
@@ -185,6 +188,114 @@ public static class DbInitializer
                 db.BankAccountDetails.Add(account);
             }
         }
+    }
+
+    /// <summary>
+    /// A fully-populated demo ITR-2 return (AY2025-26) for the demo taxpayer, so the live app exercises
+    /// the ITR-2/3 schedules (S / HP / CG / OS / VIA / AL / SI / 80G / TDS). The portal's "filing closed"
+    /// rule only blocks the CREATE endpoint — seeding inserts directly. Keyed by a stable Guid → idempotent.
+    /// Old regime so the Chapter VI-A deductions apply and Schedule VIA is meaningful.
+    /// </summary>
+    private static async Task SeedDemoItr2ReturnAsync(AppDbContext db, CancellationToken ct)
+    {
+        // The demo taxpayer needs an identity (PAN + profile) for the return to validate cleanly.
+        var demoUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == DemoUserId, ct);
+        if (demoUser is not null && string.IsNullOrWhiteSpace(demoUser.PanMasked))
+        {
+            demoUser.PanMasked = "ABCDE1234F";
+        }
+
+        if (!await db.UserProfiles.AnyAsync(p => p.UserId == DemoUserId, ct))
+        {
+            db.UserProfiles.Add(new UserProfile
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId,
+                FirstName = "Demo", LastName = "Taxpayer", FatherName = "Parent Taxpayer",
+                Dob = new DateOnly(1985, 6, 15), Gender = "M", ResidentialStatus = "resident",
+                AddressLine1 = "B-12 Greenwood Residency", AddressLine2 = "Baner",
+                City = "Pune", StateCode = "27", Pincode = "411045", BankIfsc = "HDFC0001234",
+            });
+        }
+
+        var returnId = StableId("return:demo:itr2:AY2025-26");
+        if (await db.TaxReturns.AnyAsync(r => r.Id == returnId, ct))
+        {
+            return;
+        }
+
+        db.TaxReturns.Add(new TaxReturn
+        {
+            Id = returnId,
+            TenantId = RetailTenantId,
+            UserId = DemoUserId,
+            AssessmentYearId = Ay2025Id,
+            ItrType = ItrType.ITR2,
+            Regime = Regime.Old,
+            Status = ReturnStatus.ComputedReady,
+            RuleSetVersion = SeedRuleSet.Version,
+            QuestionnaireSchemaVersion = "1.0.0",
+            TdsPaid = 1_500_000m,
+            AdvanceTaxPaid = 200_000m,
+        });
+
+        db.SalaryDetails.Add(new SalaryDetail
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Employer = "Globex Corporation Pvt Ltd",
+            Tan = "DELG12345C", Gross = 6_000_000m, StdDeduction = 75_000m, ProfessionalTax = 2_400m,
+        });
+
+        db.HouseProperties.Add(new HouseProperty
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Type = HousePropertyType.LetOut,
+            Address = "B-12 Greenwood Residency, Pune", AnnualValue = 300_000m, AnnualRent = 300_000m,
+            MunicipalTaxPaid = 20_000m, InterestOnLoan = 50_000m, CoOwnerSharePct = 100m,
+        });
+
+        db.CapitalGains.Add(new CapitalGain
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, AssetType = CapitalGainAssetType.ListedEquity,
+            Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m,
+        });
+        db.CapitalGains.Add(new CapitalGain
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, AssetType = CapitalGainAssetType.ListedEquity,
+            Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m,
+        });
+
+        db.IncomeSources.Add(new IncomeSource { TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources, Label = "SBI savings interest", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" });
+        db.IncomeSources.Add(new IncomeSource { TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources, Label = "HDFC fixed deposit interest", Amount = 30_000m, SourceMetaJson = "{\"nature\":\"fd_interest\"}" });
+        db.IncomeSources.Add(new IncomeSource { TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources, Label = "Equity dividend", Amount = 8_000m, SourceMetaJson = "{\"nature\":\"dividend\"}" });
+
+        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80C", Amount = 150_000m });
+        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80D", Amount = 25_000m });
+        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80G", Amount = 11_000m });
+        db.Deductions.Add(new Deduction { TenantId = RetailTenantId, TaxReturnId = returnId, Section = "80TTA", Amount = 10_000m });
+
+        db.AssetsLiabilities.Add(new AssetsLiabilities
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            BankDeposits = 5_000_000m, SharesAndSecurities = 3_000_000m, JewelleryBullion = 2_000_000m,
+            Vehicles = 1_200_000m, CashInHand = 50_000m, Liabilities = 2_500_000m,
+        });
+
+        db.TdsEntries.Add(new TdsEntry
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,
+            DeductorTan = "DELG12345C", DeductorName = "Globex Corporation Pvt Ltd", IncomeOffered = 6_000_000m, TaxDeducted = 1_500_000m,
+        });
+        db.TaxPaymentChallans.Add(new TaxPaymentChallan
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Kind = ChallanKind.Advance,
+            BsrCode = "0510308", DepositDate = new DateOnly(2025, 3, 15), ChallanSerial = 4567, Amount = 200_000m,
+        });
+
+        db.TaxComputations.Add(new TaxComputation
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Regime = Regime.Old, IsRecommended = true,
+            GrossTotalIncome = 6_371_000m, TotalDeductions = 196_000m, TaxableIncome = 6_175_000m,
+            TaxBeforeCess = 1_620_000m, Surcharge = 0m, Cess = 64_800m, TotalTax = 1_684_800m,
+            TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 15_200m,
+        });
     }
 
     private static async Task SeedAssessmentYearAndRulesAsync(AppDbContext db, CancellationToken ct)
