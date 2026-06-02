@@ -80,6 +80,9 @@ public sealed class ItrFilingContext
     /// <summary>Immovable properties declared in Schedule AL's ImmovableDetails list.</summary>
     public IReadOnlyList<ImmovablePropertyAL> ImmovablePropertiesAL { get; init; } = Array.Empty<ImmovablePropertyAL>();
 
+    /// <summary>Interests in a firm/AOP declared in Schedule AL's InterestHeldInaAsset list (ITR-3).</summary>
+    public IReadOnlyList<FirmInterestAL> FirmInterestsAL { get; init; } = Array.Empty<FirmInterestAL>();
+
     /// <summary>Foreign bank accounts disclosed in Schedule FA (resident only).</summary>
     public IReadOnlyList<ForeignBankAccount> ForeignBankAccounts { get; init; } = Array.Empty<ForeignBankAccount>();
 

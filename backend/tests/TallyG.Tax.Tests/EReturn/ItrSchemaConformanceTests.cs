@@ -265,6 +265,25 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr3_declares_firm_interest_in_scheduleAL()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withFirmInterest: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with a Schedule AL firm/AOP interest must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var al = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleAL");
+        al.GetProperty("InterstAOPFlag").GetString().Should().Be("Y");
+        var fi = al.GetProperty("InterestHeldInaAsset")[0];
+        fi.GetProperty("NameOfFirm").GetString().Should().Be("Acme Partners LLP");
+        fi.GetProperty("PanOfFirm").GetString().Should().Be("AABFA1234R");
+        fi.GetProperty("AssesseInvestment").GetInt64().Should().Be(1_500_000);
+        fi.GetProperty("AddressAL").GetProperty("CountryCode").GetString().Should().Be("91");
+    }
+
+    [Fact]
     public void Itr3_declares_immovable_property_in_scheduleAL()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withImmovable: true);
@@ -589,7 +608,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false)
     {
         var user = new User
         {
@@ -700,6 +719,10 @@ public class ItrSchemaConformanceTests
             ImmovablePropertiesAL = withImmovable
                 ? new[] { new ImmovablePropertyAL { Description = "Residential flat", FlatDoorNo = "Flat 1203, Tower B", Locality = "Sector 137", City = "Noida", StateCode = "09", Pincode = "201305", Cost = 8_000_000m } }
                 : Array.Empty<ImmovablePropertyAL>(),
+            // A firm/AOP interest so the ITR-3 gate exercises Schedule AL's InterestHeldInaAsset list.
+            FirmInterestsAL = withFirmInterest
+                ? new[] { new FirmInterestAL { FirmName = "Acme Partners LLP", FirmPan = "AABFA1234R", FlatDoorNo = "Unit 5", Locality = "BKC", City = "Mumbai", StateCode = "27", Pincode = "400051", Investment = 1_500_000m } }
+                : Array.Empty<FirmInterestAL>(),
             // A foreign bank account so the ITR-2/3 gate exercises Schedule FA (DetailsForiegnBank).
             ForeignBankAccounts = withForeignBank
                 ? new[] { new ForeignBankAccount { CountryCode = "2", CountryName = "United States", BankName = "Chase Bank", Address = "270 Park Ave, New York", ZipCode = "10017", AccountNumber = "9876543210", OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1), PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m } }

@@ -6,6 +6,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import type {
   AssetsLiabilitiesDto, UpsertAssetsLiabilitiesBody,
   ImmovablePropertyAlDto, UpsertImmovablePropertyAlBody,
+  FirmInterestAlDto, UpsertFirmInterestAlBody,
 } from './types';
 
 export const assetsLiabilitiesKeys = {
@@ -18,8 +19,14 @@ export const immovableAssetsKeys = {
   forReturn: (returnId: string) => [...immovableAssetsKeys.all, returnId] as const,
 };
 
+export const firmInterestKeys = {
+  all: ['firm-interests'] as const,
+  forReturn: (returnId: string) => [...firmInterestKeys.all, returnId] as const,
+};
+
 const base = (returnId: string) => `/returns/${returnId}/assets-liabilities`;
 const immBase = (returnId: string) => `/returns/${returnId}/immovable-assets`;
+const firmBase = (returnId: string) => `/returns/${returnId}/firm-interests`;
 
 export function getAssetsLiabilities(returnId: string): Promise<AssetsLiabilitiesDto> {
   return apiGet<AssetsLiabilitiesDto>(base(returnId));
@@ -39,4 +46,16 @@ export function addImmovableAsset(returnId: string, body: UpsertImmovablePropert
 
 export function deleteImmovableAsset(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${immBase(returnId)}/${id}`);
+}
+
+export function listFirmInterests(returnId: string): Promise<FirmInterestAlDto[]> {
+  return apiGet<FirmInterestAlDto[]>(firmBase(returnId));
+}
+
+export function addFirmInterest(returnId: string, body: UpsertFirmInterestAlBody): Promise<FirmInterestAlDto> {
+  return apiPost<FirmInterestAlDto>(firmBase(returnId), body);
+}
+
+export function deleteFirmInterest(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${firmBase(returnId)}/${id}`);
 }

@@ -35,3 +35,27 @@ export interface UpsertImmovablePropertyAlBody {
   pincode: string;
   cost: number;
 }
+
+// Schedule AL's InterestHeldInaAsset list — interest in a firm / AOP (ITR-3 only).
+export interface FirmInterestAlDto {
+  id: string;
+  firmName: string;
+  firmPan: string;
+  flatDoorNo: string;
+  locality: string;
+  city: string;
+  stateCode: string;
+  pincode: string;
+  investment: number;
+}
+
+export interface UpsertFirmInterestAlBody {
+  firmName: string;
+  firmPan: string;
+  flatDoorNo: string;
+  locality: string;
+  city: string;
+  stateCode: string;
+  pincode: string;
+  investment: number;
+}

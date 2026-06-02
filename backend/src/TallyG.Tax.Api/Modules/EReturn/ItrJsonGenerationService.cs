@@ -747,8 +747,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             : al.BankDeposits + al.SharesAndSecurities + al.InsurancePolicies + al.LoansAndAdvancesGiven
               + al.CashInHand + al.JewelleryBullion + al.ArtCollections + al.Vehicles + al.Liabilities;
 
-        // Nothing declared either way → omit the schedule.
-        if (movableTotal <= 0m && immovables.Count == 0)
+        // Nothing declared (movable, immovable, or a firm/AOP interest) → omit the schedule.
+        if (movableTotal <= 0m && immovables.Count == 0 && ctx.FirmInterestsAL.Count == 0)
         {
             return;
         }
@@ -777,10 +777,15 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         }
 
         // ITR-3's ScheduleAL additionally requires the "interest held in a firm/AOP as partner/member" flag
-        // (ITR-2 forbids it). We declare "N"; the optional InterestHeldInaAsset detail list stays a later add.
+        // (ITR-2 forbids it), plus the InterestHeldInaAsset detail list when such interests are declared.
         if (ctx.ItrType == ItrType.ITR3)
         {
-            schedule["InterstAOPFlag"] = "N";
+            var firms = ctx.FirmInterestsAL;
+            schedule["InterstAOPFlag"] = firms.Count > 0 ? "Y" : "N";
+            if (firms.Count > 0)
+            {
+                schedule["InterestHeldInaAsset"] = firms.Select(FirmInterestItem).ToList();
+            }
         }
 
         form["ScheduleAL"] = schedule;
@@ -789,16 +794,28 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     private static Dictionary<string, object?> ImmovableAlItem(ImmovablePropertyAL p) => new()
     {
         ["Description"] = Trunc(NonEmpty(p.Description, "Property"), 25),
-        ["AddressAL"] = new Dictionary<string, object?>
-        {
-            ["ResidenceNo"] = Trunc(NonEmpty(p.FlatDoorNo, "NA"), 50),
-            ["LocalityOrArea"] = Trunc(NonEmpty(p.Locality, "NA"), 50),
-            ["CityOrTownOrDistrict"] = Trunc(NonEmpty(p.City, "NA"), 50),
-            ["StateCode"] = ValidStateCode(p.StateCode),
-            ["CountryCode"] = "91", // domestic-assets schedule; the property is in India
-            ["PinCode"] = ValidPin(p.Pincode),
-        },
+        ["AddressAL"] = AddressAlNode(p.FlatDoorNo, p.Locality, p.City, p.StateCode, p.Pincode),
         ["Amount"] = R(Math.Max(0m, p.Cost)),
+    };
+
+    private static Dictionary<string, object?> FirmInterestItem(FirmInterestAL f) => new()
+    {
+        ["NameOfFirm"] = Trunc(NonEmpty(f.FirmName, "NA"), 50),
+        ["PanOfFirm"] = ValidPan(f.FirmPan),
+        ["AddressAL"] = AddressAlNode(f.FlatDoorNo, f.Locality, f.City, f.StateCode, f.Pincode),
+        ["AssesseInvestment"] = R(Math.Max(0m, f.Investment)),
+    };
+
+    // The Schedule AL AddressAL node (shared by immovable property + firm/AOP interest). Domestic assets,
+    // so CountryCode is India ("91").
+    private static Dictionary<string, object?> AddressAlNode(string? flatDoorNo, string? locality, string? city, string? stateCode, string? pincode) => new()
+    {
+        ["ResidenceNo"] = Trunc(NonEmpty(flatDoorNo, "NA"), 50),
+        ["LocalityOrArea"] = Trunc(NonEmpty(locality, "NA"), 50),
+        ["CityOrTownOrDistrict"] = Trunc(NonEmpty(city, "NA"), 50),
+        ["StateCode"] = ValidStateCode(stateCode),
+        ["CountryCode"] = "91",
+        ["PinCode"] = ValidPin(pincode),
     };
 
     // ----------------------------------------------------------------- Schedule SI (special-rate income)

@@ -48,6 +48,7 @@ public class AppDbContext : DbContext
     public DbSet<TaxPaymentChallan> TaxPaymentChallans => Set<TaxPaymentChallan>();
     public DbSet<AssetsLiabilities> AssetsLiabilities => Set<AssetsLiabilities>();
     public DbSet<ImmovablePropertyAL> ImmovablePropertiesAL => Set<ImmovablePropertyAL>();
+    public DbSet<FirmInterestAL> FirmInterestsAL => Set<FirmInterestAL>();
     public DbSet<ForeignBankAccount> ForeignBankAccounts => Set<ForeignBankAccount>();
     public DbSet<ForeignCustodialAccount> ForeignCustodialAccounts => Set<ForeignCustodialAccount>();
     public DbSet<ForeignEquityDebtInterest> ForeignEquityDebtInterests => Set<ForeignEquityDebtInterest>();
