@@ -23,6 +23,7 @@ import { downloadAcknowledgment, downloadComputation } from './download';
 import { isReturnLocked } from './useReturn';
 import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import type { TaxComputationResultDto } from './types';
+import { TaxesPaidCard } from '@/features/taxes-paid';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -126,6 +127,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Prepaid taxes: deductor-wise TDS + advance/self-assessment challans */}
+      <TaxesPaidCard returnId={returnId} editable={!locked} />
     </div>
   );
 }
