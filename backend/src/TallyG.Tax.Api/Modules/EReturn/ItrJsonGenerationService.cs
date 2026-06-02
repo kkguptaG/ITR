@@ -486,13 +486,12 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    // s.234A/B/C split is in the engine trace, not the snapshot — bucket the total into 234B so the
-    // sub-fields reconcile with TotalIntrstPay (a documented MVP simplification; per-section split TODO).
+    // Real per-section s.234A/B/C split from the computation snapshot (s.234F late fee not modelled → 0).
     private static Dictionary<string, object?> IntrstPayNode(TaxComputation? c) => new()
     {
-        ["IntrstPayUs234A"] = R(0m),
-        ["IntrstPayUs234B"] = R(c?.InterestPenalty ?? 0m),
-        ["IntrstPayUs234C"] = R(0m),
+        ["IntrstPayUs234A"] = R(c?.Interest234A ?? 0m),
+        ["IntrstPayUs234B"] = R(c?.Interest234B ?? 0m),
+        ["IntrstPayUs234C"] = R(c?.Interest234C ?? 0m),
         ["LateFilingFee234F"] = R(0m),
     };
 
@@ -833,9 +832,9 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
                 ["NetTaxLiability"] = R(net),
                 ["IntrstPay"] = new Dictionary<string, object?>
                 {
-                    ["IntrstPayUs234A"] = R(0m),
-                    ["IntrstPayUs234B"] = R(interest),
-                    ["IntrstPayUs234C"] = R(0m),
+                    ["IntrstPayUs234A"] = R(c?.Interest234A ?? 0m),
+                    ["IntrstPayUs234B"] = R(c?.Interest234B ?? 0m),
+                    ["IntrstPayUs234C"] = R(c?.Interest234C ?? 0m),
                     ["LateFilingFee234F"] = R(0m),
                     ["TotalIntrstPay"] = R(interest),
                 },

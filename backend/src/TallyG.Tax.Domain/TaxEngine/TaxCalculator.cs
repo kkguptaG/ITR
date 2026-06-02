@@ -171,7 +171,7 @@ public sealed class TaxCalculator : ITaxCalculator
         var interest = InterestCalculator.Compute(input, finalTax, rs, trace);
 
         // --- Stage 14: net refund (positive) or payable (negative) ---
-        var refundOrPayable = TaxMath.RoundTax(prepaid - finalTax - interest, rs.Rounding);
+        var refundOrPayable = TaxMath.RoundTax(prepaid - finalTax - interest.Total, rs.Rounding);
         trace.Add(new TraceLine("RefundOrPayable",
             refundOrPayable >= 0m ? "Refund due" : "Balance tax payable", refundOrPayable, null));
 
@@ -191,7 +191,10 @@ public sealed class TaxCalculator : ITaxCalculator
             TotalTax = finalTax,
             TdsPaid = input.TdsPaid + input.TcsPaid,
             AdvanceTax = input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid,
-            InterestPenalty = interest,
+            InterestPenalty = interest.Total,
+            Interest234A = interest.S234A,
+            Interest234B = interest.S234B,
+            Interest234C = interest.S234C,
             RefundOrPayable = refundOrPayable,
             AdjustedTotalIncome = amt.AdjustedTotalIncome,
             AlternativeMinimumTax = amt.Amt,

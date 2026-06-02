@@ -21,8 +21,9 @@ public static class InterestCalculator
     private static readonly decimal[] SafeHarbour = { 0.12m, 0.36m, 0.75m, 1.00m };
     private static readonly int[] InstallmentMonths = { 3, 3, 3, 1 };
 
-    /// <summary>Returns total 234A+234B+234C interest and appends a trace line per applicable section.</summary>
-    public static decimal Compute(TaxComputationInput input, decimal totalTax, RuleSet rs, List<TraceLine> trace)
+    /// <summary>Returns the per-section 234A/B/C interest breakdown (and total) and appends a trace
+    /// line per applicable section.</summary>
+    public static InterestBreakdown Compute(TaxComputationInput input, decimal totalTax, RuleSet rs, List<TraceLine> trace)
     {
         var rate = rs.InterestMonthlyRate <= 0m ? 0.01m : rs.InterestMonthlyRate;
         var tdsTcs = input.TdsPaid + input.TcsPaid;
@@ -41,7 +42,7 @@ public static class InterestCalculator
             i234C = Compute234C(input, assessedTax, advance, rate, trace);
         }
 
-        return i234A + i234B + i234C;
+        return new InterestBreakdown(i234A, i234B, i234C, i234A + i234B + i234C);
     }
 
     private static decimal Compute234A(
@@ -185,3 +186,7 @@ public static class InterestCalculator
     private static decimal RoundInterest(decimal value)
         => Math.Round(TaxMath.NonNegative(value), 0, MidpointRounding.AwayFromZero);
 }
+
+/// <summary>Per-section interest breakdown u/s 234A/B/C plus the total (s.234F late-fee is computed
+/// elsewhere and is 0 here). All amounts are whole rupees.</summary>
+public readonly record struct InterestBreakdown(decimal S234A, decimal S234B, decimal S234C, decimal Total);

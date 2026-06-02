@@ -83,7 +83,9 @@ public class InterestCalculatorTests
 
         var interest = InterestCalculator.Compute(input, 163_800m, rs, trace);
 
-        interest.Should().BeGreaterThan(0m);
+        interest.Total.Should().BeGreaterThan(0m);
+        interest.S234A.Should().BeGreaterThan(0m);
+        (interest.S234A + interest.S234B + interest.S234C).Should().Be(interest.Total); // split reconciles
         trace.Should().Contain(t => t.Step == "Interest.234A");
     }
 

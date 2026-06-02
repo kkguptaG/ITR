@@ -31,6 +31,11 @@ public class TaxComputation : BaseEntity, ITenantScoped
     public decimal AdvanceTax { get; set; }
     public decimal InterestPenalty { get; set; }
 
+    // Per-section split of InterestPenalty (s.234A/B/C); feeds the ITR JSON IntrstPay node.
+    public decimal Interest234A { get; set; }
+    public decimal Interest234B { get; set; }
+    public decimal Interest234C { get; set; }
+
     /// <summary>Positive ⇒ refund, negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; set; }
 

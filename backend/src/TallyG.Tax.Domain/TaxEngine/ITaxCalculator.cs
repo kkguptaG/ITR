@@ -190,6 +190,11 @@ public sealed record ComputationResult
     public decimal AdvanceTax { get; init; }
     public decimal InterestPenalty { get; init; }
 
+    /// <summary>Per-section split of <see cref="InterestPenalty"/>: interest u/s 234A / 234B / 234C.</summary>
+    public decimal Interest234A { get; init; }
+    public decimal Interest234B { get; init; }
+    public decimal Interest234C { get; init; }
+
     /// <summary>Positive ⇒ refund due; negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; init; }
 
