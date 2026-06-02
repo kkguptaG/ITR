@@ -29,6 +29,7 @@ import { AssetsLiabilitiesCard, ImmovableAssetsCard } from '@/features/assets-li
 import {
   ForeignAssetsCard, ForeignCustodialCard, ForeignEquityDebtCard,
   ForeignImmovableCard, ForeignFinancialInterestCard,
+  ForeignSigningAuthorityCard, ForeignOtherIncomeCard,
 } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
 
@@ -152,6 +153,8 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           <ForeignEquityDebtCard returnId={returnId} editable={!locked} />
           <ForeignImmovableCard returnId={returnId} editable={!locked} />
           <ForeignFinancialInterestCard returnId={returnId} editable={!locked} />
+          <ForeignSigningAuthorityCard returnId={returnId} editable={!locked} />
+          <ForeignOtherIncomeCard returnId={returnId} editable={!locked} />
         </>
       )}
     </div>

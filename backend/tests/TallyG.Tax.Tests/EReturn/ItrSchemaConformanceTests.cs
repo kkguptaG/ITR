@@ -177,6 +177,19 @@ public class ItrSchemaConformanceTests
         fin.GetProperty("NatureOfInt").GetString().Should().Be("DIRECT");
         fin.GetProperty("IncFromInt").GetInt64().Should().Be(120_000);
         fin.GetProperty("IncTaxSch").GetString().Should().Be("OS");
+
+        var sign = fa.GetProperty("DetailsOfAccntsHvngSigningAuth")[0];
+        sign.GetProperty("NameOfInstitution").GetString().Should().Be("Bank of America");
+        sign.GetProperty("PeakBalanceOrInvestment").GetInt64().Should().Be(3_000_000);
+        sign.GetProperty("IncAccuredTaxFlag").GetString().Should().Be("N"); // not taxable → no IncOffered block
+        sign.TryGetProperty("IncOfferedAmt", out _).Should().BeFalse();
+
+        var oth = fa.GetProperty("DetailsOfOthSourcesIncOutsideIndia")[0];
+        oth.GetProperty("NameOfPerson").GetString().Should().Be("Acme Consulting Inc");
+        oth.GetProperty("IncDrvTaxFlag").GetString().Should().Be("Y");
+        oth.GetProperty("IncDerived").GetInt64().Should().Be(250_000);
+        oth.GetProperty("IncOfferedAmt").GetInt64().Should().Be(250_000);
+        oth.GetProperty("IncOfferedSch").GetString().Should().Be("OS");
     }
 
     [Fact]
@@ -607,6 +620,12 @@ public class ItrSchemaConformanceTests
             ForeignFinancialInterests = withForeignInvestments
                 ? new[] { new ForeignFinancialInterest { CountryCode = "2", CountryName = "United States", ZipCode = "94043", NatureOfEntity = "Private company", EntityName = "Initech LLC", EntityAddress = "500 Tech Park, Mountain View", NatureOfInterest = "DIRECT", DateHeld = new DateOnly(2021, 1, 15), TotalInvestment = 5_000_000m, IncomeFromInterest = 120_000m, NatureOfIncome = "Dividend", TaxableIncomeAmount = 120_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1" } }
                 : Array.Empty<ForeignFinancialInterest>(),
+            ForeignSigningAuthorities = withForeignInvestments
+                ? new[] { new ForeignSigningAuthority { CountryCode = "2", CountryName = "United States", ZipCode = "28255", InstitutionName = "Bank of America", InstitutionAddress = "100 N Tryon St, Charlotte", AccountHolderName = "Globex Corporation Pvt Ltd", AccountNumber = "BOA556677", PeakBalanceOrInvestment = 3_000_000m, IncomeTaxable = false } }
+                : Array.Empty<ForeignSigningAuthority>(),
+            ForeignOtherIncomes = withForeignInvestments
+                ? new[] { new ForeignOtherIncome { CountryCode = "2", CountryName = "United States", ZipCode = "94016", PayerName = "Acme Consulting Inc", PayerAddress = "1 Market St, San Francisco", IncomeDerived = 250_000m, NatureOfIncome = "Consultancy fees", IncomeTaxable = true, IncomeOffered = 250_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1" } }
+                : Array.Empty<ForeignOtherIncome>(),
             // Donee-wise 80G donations so the ITR-2/3 gate exercises the itemised Schedule 80G tables:
             // a 100%-no-limit donee (full eligible) + a 50%-with-limit donee (half eligible).
             Donations80G = withDonees

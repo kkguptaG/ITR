@@ -329,6 +329,23 @@ public static class DbInitializer
             IncomeFromInterest = 120_000m, NatureOfIncome = "Dividend", TaxableIncomeAmount = 120_000m,
             IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
         });
+        db.ForeignSigningAuthorities.Add(new ForeignSigningAuthority
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", ZipCode = "28255",
+            InstitutionName = "Bank of America", InstitutionAddress = "100 N Tryon St, Charlotte",
+            AccountHolderName = "Globex Corporation Pvt Ltd", AccountNumber = "BOA556677",
+            PeakBalanceOrInvestment = 3_000_000m, IncomeTaxable = false, IncomeAccrued = 0m, IncomeOffered = 0m,
+            IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
+        });
+        db.ForeignOtherIncomes.Add(new ForeignOtherIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", ZipCode = "94016",
+            PayerName = "Acme Consulting Inc", PayerAddress = "1 Market St, San Francisco",
+            IncomeDerived = 250_000m, NatureOfIncome = "Consultancy fees", IncomeTaxable = true,
+            IncomeOffered = 250_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
+        });
 
         // Donee-wise 80G donations (Schedule 80G). Total ₹11,000 (matches the 80G deduction above); eligible
         // ₹8,000 = ₹5,000 (PM CARES, 100%) + 50% × ₹6,000 (a charitable trust, the limited bucket).

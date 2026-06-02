@@ -8,6 +8,8 @@ import type {
   ForeignEquityDebtInterestDto, UpsertForeignEquityDebtInterestBody,
   ForeignImmovablePropertyFaDto, UpsertForeignImmovablePropertyFaBody,
   ForeignFinancialInterestDto, UpsertForeignFinancialInterestBody,
+  ForeignSigningAuthorityDto, UpsertForeignSigningAuthorityBody,
+  ForeignOtherIncomeDto, UpsertForeignOtherIncomeBody,
 } from './types';
 
 export const foreignAssetsKeys = {
@@ -35,11 +37,23 @@ export const foreignFinancialKeys = {
   forReturn: (returnId: string) => [...foreignFinancialKeys.all, returnId] as const,
 };
 
+export const foreignSigningKeys = {
+  all: ['foreign-signing-authority'] as const,
+  forReturn: (returnId: string) => [...foreignSigningKeys.all, returnId] as const,
+};
+
+export const foreignOtherIncomeKeys = {
+  all: ['foreign-other-income'] as const,
+  forReturn: (returnId: string) => [...foreignOtherIncomeKeys.all, returnId] as const,
+};
+
 const base = (returnId: string) => `/returns/${returnId}/foreign-bank-accounts`;
 const custBase = (returnId: string) => `/returns/${returnId}/foreign-custodial-accounts`;
 const eqBase = (returnId: string) => `/returns/${returnId}/foreign-equity-debt`;
 const immBase = (returnId: string) => `/returns/${returnId}/foreign-immovable`;
 const finBase = (returnId: string) => `/returns/${returnId}/foreign-financial-interest`;
+const signBase = (returnId: string) => `/returns/${returnId}/foreign-signing-authority`;
+const othIncBase = (returnId: string) => `/returns/${returnId}/foreign-other-income`;
 
 export function listForeignBankAccounts(returnId: string): Promise<ForeignBankAccountDto[]> {
   return apiGet<ForeignBankAccountDto[]>(base(returnId));
@@ -99,4 +113,28 @@ export function addForeignFinancialInterest(returnId: string, body: UpsertForeig
 
 export function deleteForeignFinancialInterest(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${finBase(returnId)}/${id}`);
+}
+
+export function listForeignSigningAuthority(returnId: string): Promise<ForeignSigningAuthorityDto[]> {
+  return apiGet<ForeignSigningAuthorityDto[]>(signBase(returnId));
+}
+
+export function addForeignSigningAuthority(returnId: string, body: UpsertForeignSigningAuthorityBody): Promise<ForeignSigningAuthorityDto> {
+  return apiPost<ForeignSigningAuthorityDto>(signBase(returnId), body);
+}
+
+export function deleteForeignSigningAuthority(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${signBase(returnId)}/${id}`);
+}
+
+export function listForeignOtherIncome(returnId: string): Promise<ForeignOtherIncomeDto[]> {
+  return apiGet<ForeignOtherIncomeDto[]>(othIncBase(returnId));
+}
+
+export function addForeignOtherIncome(returnId: string, body: UpsertForeignOtherIncomeBody): Promise<ForeignOtherIncomeDto> {
+  return apiPost<ForeignOtherIncomeDto>(othIncBase(returnId), body);
+}
+
+export function deleteForeignOtherIncome(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${othIncBase(returnId)}/${id}`);
 }

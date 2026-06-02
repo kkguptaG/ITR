@@ -1014,7 +1014,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             && ctx.ForeignCustodialAccounts.Count == 0
             && ctx.ForeignEquityDebtInterests.Count == 0
             && ctx.ForeignImmovableProperties.Count == 0
-            && ctx.ForeignFinancialInterests.Count == 0)
+            && ctx.ForeignFinancialInterests.Count == 0
+            && ctx.ForeignSigningAuthorities.Count == 0
+            && ctx.ForeignOtherIncomes.Count == 0)
         {
             return;
         }
@@ -1045,7 +1047,74 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             fa["DetailsFinancialInterest"] = ctx.ForeignFinancialInterests.Select(FinancialInterestItem).ToList();
         }
 
+        if (ctx.ForeignSigningAuthorities.Count > 0)
+        {
+            fa["DetailsOfAccntsHvngSigningAuth"] = ctx.ForeignSigningAuthorities.Select(SigningAuthItem).ToList();
+        }
+
+        if (ctx.ForeignOtherIncomes.Count > 0)
+        {
+            fa["DetailsOfOthSourcesIncOutsideIndia"] = ctx.ForeignOtherIncomes.Select(OtherIncomeItem).ToList();
+        }
+
         form["ScheduleFA"] = fa;
+    }
+
+    private static Dictionary<string, object?> SigningAuthItem(ForeignSigningAuthority s)
+    {
+        var item = new Dictionary<string, object?>
+        {
+            ["NameOfInstitution"] = Trunc(NonEmpty(s.InstitutionName, "NA"), 125),
+            ["AddressOfInstitution"] = Trunc(NonEmpty(s.InstitutionAddress, "NA"), 200),
+            ["CountryName"] = Trunc(NonEmpty(s.CountryName, "NA"), 55),
+            ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(s.CountryCode) ? "2" : s.CountryCode.Trim(),
+            ["ZipCode"] = Trunc(NonEmpty(s.ZipCode, "NA"), 8),
+            ["NameMentionedInAccnt"] = Trunc(NonEmpty(s.AccountHolderName, "NA"), 125),
+            ["InstitutionAccountNumber"] = Trunc(NonEmpty(s.AccountNumber, "NA"), 34),
+            ["PeakBalanceOrInvestment"] = R(s.PeakBalanceOrInvestment),
+            ["IncAccuredTaxFlag"] = s.IncomeTaxable ? "Y" : "N",
+        };
+        if (s.IncomeAccrued > 0m)
+        {
+            item["IncAccuredInAcc"] = R(s.IncomeAccrued);
+        }
+
+        // The income-offered detail is only meaningful when the accrued income is taxable here.
+        if (s.IncomeTaxable && s.IncomeOffered > 0m)
+        {
+            item["IncOfferedAmt"] = R(s.IncomeOffered);
+            item["IncOfferedSch"] = IncomeOfferedSchedule(s.IncomeTaxSchedule);
+            item["IncOfferedSchNo"] = Trunc(NonEmpty(s.IncomeTaxScheduleItem, "1"), 50);
+        }
+
+        return item;
+    }
+
+    private static Dictionary<string, object?> OtherIncomeItem(ForeignOtherIncome o)
+    {
+        var item = new Dictionary<string, object?>
+        {
+            ["CountryName"] = Trunc(NonEmpty(o.CountryName, "NA"), 55),
+            ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(o.CountryCode) ? "2" : o.CountryCode.Trim(),
+            ["ZipCode"] = Trunc(NonEmpty(o.ZipCode, "NA"), 8),
+            ["NameOfPerson"] = Trunc(NonEmpty(o.PayerName, "NA"), 125),
+            ["AddressOfPerson"] = Trunc(NonEmpty(o.PayerAddress, "NA"), 200),
+            ["NatureOfInc"] = Trunc(NonEmpty(o.NatureOfIncome, "Other"), 100),
+            ["IncDrvTaxFlag"] = o.IncomeTaxable ? "Y" : "N",
+        };
+        if (o.IncomeDerived > 0m)
+        {
+            item["IncDerived"] = R(o.IncomeDerived);
+        }
+
+        if (o.IncomeTaxable && o.IncomeOffered > 0m)
+        {
+            item["IncOfferedAmt"] = R(o.IncomeOffered);
+            item["IncOfferedSch"] = IncomeOfferedSchedule(o.IncomeTaxSchedule);
+            item["IncOfferedSchNo"] = Trunc(NonEmpty(o.IncomeTaxScheduleItem, "1"), 50);
+        }
+
+        return item;
     }
 
     private static Dictionary<string, object?> ImmovableFaItem(ForeignImmovablePropertyFA p) => new()

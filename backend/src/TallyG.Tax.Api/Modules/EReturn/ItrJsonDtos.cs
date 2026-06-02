@@ -95,6 +95,12 @@ public sealed class ItrFilingContext
     /// <summary>Financial interest in any foreign entity (Schedule FA DetailsFinancialInterest).</summary>
     public IReadOnlyList<ForeignFinancialInterest> ForeignFinancialInterests { get; init; } = Array.Empty<ForeignFinancialInterest>();
 
+    /// <summary>Foreign accounts with signing authority (Schedule FA DetailsOfAccntsHvngSigningAuth).</summary>
+    public IReadOnlyList<ForeignSigningAuthority> ForeignSigningAuthorities { get; init; } = Array.Empty<ForeignSigningAuthority>();
+
+    /// <summary>Other income from outside India (Schedule FA DetailsOfOthSourcesIncOutsideIndia).</summary>
+    public IReadOnlyList<ForeignOtherIncome> ForeignOtherIncomes { get; init; } = Array.Empty<ForeignOtherIncome>();
+
     /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
     public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
 

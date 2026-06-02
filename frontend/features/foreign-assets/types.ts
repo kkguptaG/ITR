@@ -160,3 +160,67 @@ export interface UpsertForeignFinancialInterestBody {
   incomeTaxSchedule: string;
   incomeTaxScheduleItem: string;
 }
+
+// Schedule FA — foreign account with signing authority (DetailsOfAccntsHvngSigningAuth).
+export interface ForeignSigningAuthorityDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  institutionName: string;
+  institutionAddress: string;
+  accountHolderName: string;
+  accountNumberMasked: string;
+  peakBalanceOrInvestment: number;
+  incomeTaxable: boolean;
+  incomeAccrued: number;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignSigningAuthorityBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  institutionName: string;
+  institutionAddress: string;
+  accountHolderName: string;
+  accountNumber: string;
+  peakBalanceOrInvestment: number;
+  incomeTaxable: boolean;
+  incomeAccrued: number;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+// Schedule FA — other income from outside India (DetailsOfOthSourcesIncOutsideIndia).
+export interface ForeignOtherIncomeDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  payerName: string;
+  payerAddress: string;
+  incomeDerived: number;
+  natureOfIncome: string;
+  incomeTaxable: boolean;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignOtherIncomeBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  payerName: string;
+  payerAddress: string;
+  incomeDerived: number;
+  natureOfIncome: string;
+  incomeTaxable: boolean;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
