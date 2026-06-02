@@ -99,12 +99,96 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Choose Old or New in the Regime step (or accept the recommended regime) so the filed regime is explicit.");
         }
 
-        // --- refund needs a bank account ---
+        // --- refund / bank account (driven by the fed bank-accounts list, not the legacy profile IFSC) ---
         var refundOrPayable = c?.RefundOrPayable ?? 0m;
-        if (refundOrPayable > 0m && string.IsNullOrWhiteSpace(ctx.Profile?.BankIfsc))
+        var hasBank = ctx.BankAccounts.Count > 0;
+        if (refundOrPayable > 0m && !hasBank)
         {
-            Err("REFUND.BANK_MISSING", "$..Refund.BankAccountDtls", "A refund is due but no bank account (IFSC) is on file.",
-                "Add a pre-validated bank account (account number + IFSC) in Settings → Profile so the refund can be credited.");
+            Err("REFUND.BANK_MISSING", "$..Refund.BankAccountDtls", "A refund is due but no bank account is on file.",
+                "Add a pre-validated bank account (number + IFSC) in Settings → Bank accounts and mark one for the refund.");
+        }
+        else if (refundOrPayable > 0m && !ctx.BankAccounts.Any(b => b.UseForRefund))
+        {
+            Warn("REFUND.NO_ACCOUNT_FLAGGED", "$..Refund.BankAccountDtls", "A refund is due but no account is marked to receive it.",
+                "Mark one account 'use for refund' in Settings → Bank accounts so the refund is credited there.");
+        }
+        if (!hasBank && refundOrPayable <= 0m)
+        {
+            Warn("BANK.NONE", "$..BankAccountDtls", "No bank account has been added to the return.",
+                "The portal expects at least one bank account even when no refund is due — add one in Settings → Bank accounts.");
+        }
+
+        // --- regime ⇄ deduction interlock: most Chapter VI-A deductions vanish under the new regime ---
+        var regime = ctx.Return.Regime ?? c?.Regime;
+        if (regime == Regime.New)
+        {
+            var disallowed = ctx.Deductions
+                .Where(d => d.Amount > 0m && !NewRegimeAllowsDeduction(d.Section))
+                .Select(d => d.Section.Trim())
+                .Where(s => s.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (disallowed.Count > 0)
+            {
+                Warn("REGIME.DEDUCTION_IGNORED", "$..DeductUndChapVIA",
+                    $"Under the new regime these deductions are not allowed and have been ignored: {string.Join(", ", disallowed)}.",
+                    "If their combined tax benefit beats the new regime's lower slabs, switch to the old regime in the Regime step.");
+            }
+        }
+
+        // --- Chapter VI-A statutory ceilings (a claim over the cap is only allowed up to the cap) ---
+        var sec80C = ctx.Deductions.Where(d => Is80CBucket(d.Section)).Sum(d => d.Amount);
+        if (sec80C > 150_000m)
+        {
+            Warn("DEDUCTION.80C_CAP", "$..Section80C",
+                $"80C + 80CCC + 80CCD(1) claimed (₹{sec80C:N0}) exceeds the ₹1,50,000 ceiling.",
+                "Only ₹1,50,000 is allowed in aggregate — trim the claim (the extra ₹50,000 NPS window is 80CCD(1B), separate).");
+        }
+        var sec80ccd1b = ctx.Deductions.Where(d => NormSection(d.Section) is "80CCD(1B)" or "80CCD1B").Sum(d => d.Amount);
+        if (sec80ccd1b > 50_000m)
+        {
+            Warn("DEDUCTION.80CCD1B_CAP", "$..Section80CCD1B",
+                $"80CCD(1B) claimed (₹{sec80ccd1b:N0}) exceeds the ₹50,000 NPS ceiling.",
+                "Cap the 80CCD(1B) claim at ₹50,000.");
+        }
+
+        // --- presumptive-scheme eligibility (s.44AD / 44ADA): turnover ceilings + minimum declared margin ---
+        foreach (var b in ctx.Businesses.Where(x => x.IsPresumptive))
+        {
+            var sec = (b.PresumptiveSection ?? string.Empty).ToUpperInvariant();
+            var cashShare = b.Turnover > 0m ? b.GrossReceiptsCash / b.Turnover : 0m;
+            if (sec == "44AD")
+            {
+                var cap = cashShare <= 0.05m ? 30_000_000m : 20_000_000m;   // ₹3cr if ≤5% cash, else ₹2cr
+                if (b.Turnover > cap)
+                {
+                    Err("PRESUMPTIVE.44AD_TURNOVER", "$..ScheduleBP",
+                        $"44AD turnover (₹{b.Turnover:N0}) exceeds the ₹{cap:N0} limit.",
+                        "44AD doesn't apply above the limit — file under regular books (ITR-3), with a tax audit if applicable.");
+                }
+                var minPct = cashShare <= 0.05m ? 0.06m : 0.08m;
+                if (b.Turnover > 0m && b.NetProfit < minPct * b.Turnover)
+                {
+                    Warn("PRESUMPTIVE.44AD_MARGIN", "$..ScheduleBP",
+                        $"Declared 44AD profit is below the presumptive minimum ({minPct:P0} of turnover).",
+                        "Declare at least the presumptive minimum, or maintain books + a tax audit to declare a lower profit.");
+                }
+            }
+            else if (sec == "44ADA")
+            {
+                if (b.Turnover > 7_500_000m)
+                {
+                    Err("PRESUMPTIVE.44ADA_RECEIPTS", "$..ScheduleBP",
+                        $"44ADA gross receipts (₹{b.Turnover:N0}) exceed the ₹75,00,000 limit.",
+                        "44ADA doesn't apply above ₹75 lakh — file under regular books (ITR-3).");
+                }
+                if (b.Turnover > 0m && b.NetProfit < 0.50m * b.Turnover)
+                {
+                    Warn("PRESUMPTIVE.44ADA_MARGIN", "$..ScheduleBP",
+                        "Declared 44ADA profit is below 50% of gross receipts.",
+                        "Declare at least 50%, or maintain books + a tax audit to declare a lower profit.");
+                }
+            }
         }
 
         // --- lifecycle ---
@@ -146,4 +230,16 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             : NoticeText;
         return new ValidationReportDto(errors == 0, errors, warnings, issues, notice);
     }
+
+    private static string NormSection(string? section)
+        => (section ?? string.Empty).Replace(" ", string.Empty).ToUpperInvariant();
+
+    /// <summary>Deductions still allowed under the new regime (s.115BAC): employer NPS 80CCD(2),
+    /// 80CCH (Agniveer), 80JJAA (new employment). Everything else in Chapter VI-A is disallowed.</summary>
+    private static bool NewRegimeAllowsDeduction(string? section)
+        => NormSection(section) is "80CCD(2)" or "80CCD2" or "80CCH" or "80JJAA";
+
+    /// <summary>Sections sharing the single ₹1,50,000 ceiling (s.80CCE): 80C, 80CCC, 80CCD(1).</summary>
+    private static bool Is80CBucket(string? section)
+        => NormSection(section) is "80C" or "80CCC" or "80CCD(1)" or "80CCD1";
 }
