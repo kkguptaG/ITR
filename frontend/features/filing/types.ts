@@ -39,12 +39,14 @@ export type Money = number | DecimalString;
 // Backend enum names that aren't in lib/api-types (richer than the generic set).
 export type HousePropertyType = 'SelfOccupied' | 'LetOut' | 'DeemedLetOut';
 export type CapitalGainAssetType =
-  | 'ListedEquityShare'
+  | 'ListedEquity'
   | 'EquityMutualFund'
-  | 'UnlistedShare'
-  | 'ImmovableProperty'
   | 'DebtMutualFund'
+  | 'UnlistedShares'
+  | 'ImmovableProperty'
+  | 'Bonds'
   | 'Gold'
+  | 'CryptoVda'
   | 'Other';
 export type CapitalGainTerm = 'Short' | 'Long';
 export type IncomeType =

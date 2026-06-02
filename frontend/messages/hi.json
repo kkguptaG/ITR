@@ -383,12 +383,14 @@
     "otherPlaceholder": "जैसे बचत खाते का ब्याज",
     "amount": "राशि",
     "asset": {
-      "ListedEquityShare": "सूचीबद्ध इक्विटी शेयर",
+      "ListedEquity": "सूचीबद्ध इक्विटी शेयर",
       "EquityMutualFund": "इक्विटी म्यूचुअल फंड",
-      "UnlistedShare": "असूचीबद्ध शेयर",
-      "ImmovableProperty": "अचल संपत्ति",
       "DebtMutualFund": "डेट म्यूचुअल फंड",
+      "UnlistedShares": "असूचीबद्ध शेयर",
+      "ImmovableProperty": "अचल संपत्ति",
+      "Bonds": "बॉन्ड / डिबेंचर",
       "Gold": "स्वर्ण",
+      "CryptoVda": "क्रिप्टो / वर्चुअल डिजिटल एसेट",
       "Other": "अन्य परिसंपत्ति"
     }
   },

@@ -383,12 +383,14 @@
     "otherPlaceholder": "e.g. Savings account interest",
     "amount": "Amount",
     "asset": {
-      "ListedEquityShare": "Listed equity shares",
+      "ListedEquity": "Listed equity shares",
       "EquityMutualFund": "Equity mutual funds",
-      "UnlistedShare": "Unlisted shares",
-      "ImmovableProperty": "Immovable property",
       "DebtMutualFund": "Debt mutual funds",
+      "UnlistedShares": "Unlisted shares",
+      "ImmovableProperty": "Immovable property",
+      "Bonds": "Bonds / debentures",
       "Gold": "Gold",
+      "CryptoVda": "Crypto / virtual digital assets",
       "Other": "Other asset"
     }
   },

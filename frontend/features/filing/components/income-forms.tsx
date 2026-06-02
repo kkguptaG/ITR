@@ -347,12 +347,14 @@ export function HousePropertyForm({
 
 // ----------------------------------------------------------------- Capital gain
 const ASSET_OPTIONS = [
-  'ListedEquityShare',
+  'ListedEquity',
   'EquityMutualFund',
-  'UnlistedShare',
-  'ImmovableProperty',
   'DebtMutualFund',
+  'UnlistedShares',
+  'ImmovableProperty',
+  'Bonds',
   'Gold',
+  'CryptoVda',
   'Other',
 ] as const;
 
@@ -372,7 +374,7 @@ export function CapitalGainForm({
   const { control, register, handleSubmit, watch, formState: { errors } } = useForm<CapitalGainFormValues>({
     resolver: zodResolver(capitalGainSchema),
     defaultValues: {
-      assetType: 'ListedEquityShare', term: 'Long', acquisitionDate: '', transferDate: '',
+      assetType: 'ListedEquity', term: 'Long', acquisitionDate: '', transferDate: '',
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
       exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0,
       ...defaultValues,
@@ -381,7 +383,7 @@ export function CapitalGainForm({
 
   // s.112A grandfathering applies only to listed equity / equity MF held long-term.
   const is112AEligible = watch('term') === 'Long'
-    && (watch('assetType') === 'ListedEquityShare' || watch('assetType') === 'EquityMutualFund');
+    && (watch('assetType') === 'ListedEquity' || watch('assetType') === 'EquityMutualFund');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">

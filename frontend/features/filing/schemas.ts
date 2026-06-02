@@ -85,12 +85,14 @@ export type HousePropertyFormValues = z.infer<typeof housePropertySchema>;
 // ----------------------------------------------------------------- capital gains
 export const capitalGainSchema = z.object({
   assetType: z.enum([
-    'ListedEquityShare',
+    'ListedEquity',
     'EquityMutualFund',
-    'UnlistedShare',
-    'ImmovableProperty',
     'DebtMutualFund',
+    'UnlistedShares',
+    'ImmovableProperty',
+    'Bonds',
     'Gold',
+    'CryptoVda',
     'Other',
   ]),
   term: z.enum(['Short', 'Long']),
