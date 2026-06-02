@@ -163,6 +163,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleCfl(root, ctx);
         AddScheduleAl(root, ctx);
         AddScheduleSi(root, ctx);
+        AddSchedule80G(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -193,6 +194,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleCfl(skel, ctx);
         AddScheduleAl(skel, ctx);
         AddScheduleSi(skel, ctx);
+        AddSchedule80G(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -820,6 +822,35 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["SplCodeRateTax"] = rows,
             ["TotSplRateInc"] = R(totInc),
             ["TotSplRateIncTax"] = R(totTax),
+        };
+    }
+
+    // ----------------------------------------------------------------- Schedule 80G (donations)
+    // The dedicated donation schedule: total donations (split cash / other-mode) + the eligible amount,
+    // from the captured 80G deductions. Per-donee rows (name / PAN / address / 50%-100% category) live in
+    // the optional category objects and are a later capture addition; cash is assumed nil (a cash donation
+    // over ₹2,000 is disallowed). Emitted only when an 80G donation exists.
+    private static void AddSchedule80G(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        var donations = ctx.Deductions.Where(d => ViaKey(d.Section) == "Section80G").ToList();
+        if (donations.Count == 0)
+        {
+            return;
+        }
+
+        var total = donations.Sum(d => Math.Max(0m, d.Amount));
+        var eligible = donations.Sum(d => Math.Max(0m, d.EligibleAmount ?? d.Amount));
+        if (total <= 0m)
+        {
+            return;
+        }
+
+        form["Schedule80G"] = new Dictionary<string, object?>
+        {
+            ["TotalDonationsUs80GCash"] = 0L,
+            ["TotalDonationsUs80GOtherMode"] = R(total),
+            ["TotalDonationsUs80G"] = R(total),
+            ["TotalEligibleDonationsUs80G"] = R(eligible),
         };
     }
 

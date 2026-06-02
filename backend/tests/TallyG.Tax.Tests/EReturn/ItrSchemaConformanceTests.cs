@@ -141,6 +141,23 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_donations_in_schedule80G()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule 80G must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var g = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("Schedule80G");
+
+        g.GetProperty("TotalDonationsUs80G").GetInt64().Should().Be(5_000);          // the fixture's 80G donation
+        g.GetProperty("TotalDonationsUs80GOtherMode").GetInt64().Should().Be(5_000); // assumed non-cash
+        g.GetProperty("TotalDonationsUs80GCash").GetInt64().Should().Be(0);
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
