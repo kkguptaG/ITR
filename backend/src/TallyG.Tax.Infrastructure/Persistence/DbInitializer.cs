@@ -278,6 +278,15 @@ public static class DbInitializer
             Vehicles = 1_200_000m, CashInHand = 50_000m, Liabilities = 2_500_000m,
         });
 
+        db.ForeignBankAccounts.Add(new ForeignBankAccount
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", BankName = "Chase Bank",
+            Address = "270 Park Avenue, New York", ZipCode = "10017", AccountNumber = "9876543210",
+            OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1),
+            PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m,
+        });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

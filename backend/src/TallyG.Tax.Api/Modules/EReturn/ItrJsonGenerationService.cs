@@ -164,6 +164,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleAl(root, ctx);
         AddScheduleSi(root, ctx);
         AddSchedule80G(root, ctx);
+        AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -195,6 +196,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleAl(skel, ctx);
         AddScheduleSi(skel, ctx);
         AddSchedule80G(skel, ctx);
+        AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -852,6 +854,44 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["TotalDonationsUs80G"] = R(total),
             ["TotalEligibleDonationsUs80G"] = R(eligible),
         };
+    }
+
+    // ----------------------------------------------------------------- Schedule FA (foreign assets)
+    // Foreign depository / bank accounts disclosed by a resident (DetailsForiegnBank). The other nine FA
+    // tables (custodial, equity/debt, immovable, trusts, signing authority, …) are a later addition. The
+    // whole schedule is optional; emitted only when a foreign account is declared.
+    private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ForeignBankAccounts.Count == 0)
+        {
+            return;
+        }
+
+        form["ScheduleFA"] = new Dictionary<string, object?>
+        {
+            ["DetailsForiegnBank"] = ctx.ForeignBankAccounts.Select(ForeignBankItem).ToList(),
+        };
+    }
+
+    private static Dictionary<string, object?> ForeignBankItem(ForeignBankAccount f) => new()
+    {
+        ["CountryName"] = string.IsNullOrWhiteSpace(f.CountryName) ? "NA" : f.CountryName.Trim(),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(f.CountryCode) ? "2" : f.CountryCode.Trim(),
+        ["Bankname"] = string.IsNullOrWhiteSpace(f.BankName) ? "NA" : f.BankName.Trim(),
+        ["AddressOfBank"] = string.IsNullOrWhiteSpace(f.Address) ? "NA" : f.Address.Trim(),
+        ["ZipCode"] = string.IsNullOrWhiteSpace(f.ZipCode) ? "NA" : f.ZipCode.Trim(),
+        ["ForeignAccountNumber"] = string.IsNullOrWhiteSpace(f.AccountNumber) ? "NA" : f.AccountNumber.Trim(),
+        ["OwnerStatus"] = ForeignOwnerStatus(f.OwnerStatus),
+        ["AccOpenDate"] = (f.AccountOpenDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["PeakBalanceDuringYear"] = R(f.PeakBalance),
+        ["ClosingBalance"] = R(f.ClosingBalance),
+        ["IntrstAccured"] = R(f.InterestAccrued),
+    };
+
+    private static string ForeignOwnerStatus(string? s)
+    {
+        var v = (s ?? string.Empty).Trim().ToUpperInvariant();
+        return v is "OWNER" or "BENEFICIAL_OWNER" or "BENIFICIARY" ? v : "OWNER";
     }
 
     private static long MobileDigits(string? mobile)

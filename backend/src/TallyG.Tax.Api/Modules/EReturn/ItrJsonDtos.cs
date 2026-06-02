@@ -77,6 +77,9 @@ public sealed class ItrFilingContext
     /// <summary>Schedule AL declaration (movable assets + liabilities, &gt;₹50L income); null when not declared.</summary>
     public TallyG.Tax.Domain.Entities.AssetsLiabilities? AssetsLiabilities { get; init; }
 
+    /// <summary>Foreign bank accounts disclosed in Schedule FA (resident only).</summary>
+    public IReadOnlyList<ForeignBankAccount> ForeignBankAccounts { get; init; } = Array.Empty<ForeignBankAccount>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

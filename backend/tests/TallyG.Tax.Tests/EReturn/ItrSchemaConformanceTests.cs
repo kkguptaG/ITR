@@ -123,6 +123,26 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_discloses_foreign_bank_accounts_in_scheduleFA()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withForeignBank: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule FA must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var bank = doc.RootElement.GetProperty("ITR").GetProperty("ITR2")
+            .GetProperty("ScheduleFA").GetProperty("DetailsForiegnBank")[0];
+
+        bank.GetProperty("Bankname").GetString().Should().Be("Chase Bank");
+        bank.GetProperty("CountryCodeExcludingIndia").GetString().Should().Be("2");
+        bank.GetProperty("OwnerStatus").GetString().Should().Be("OWNER");
+        bank.GetProperty("ClosingBalance").GetInt64().Should().Be(1_200_000);
+        bank.GetProperty("IntrstAccured").GetInt64().Should().Be(45_000);
+    }
+
+    [Fact]
     public void Itr2_declares_assets_and_liabilities_in_scheduleAL()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withAssets: true);
@@ -337,7 +357,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false)
     {
         var user = new User
         {
@@ -437,6 +457,10 @@ public class ItrSchemaConformanceTests
             AssetsLiabilities = withAssets
                 ? new TallyG.Tax.Domain.Entities.AssetsLiabilities { BankDeposits = 500_000m, SharesAndSecurities = 300_000m, JewelleryBullion = 200_000m, Vehicles = 800_000m, CashInHand = 50_000m, Liabilities = 400_000m }
                 : null,
+            // A foreign bank account so the ITR-2/3 gate exercises Schedule FA (DetailsForiegnBank).
+            ForeignBankAccounts = withForeignBank
+                ? new[] { new ForeignBankAccount { CountryCode = "2", CountryName = "United States", BankName = "Chase Bank", Address = "270 Park Ave, New York", ZipCode = "10017", AccountNumber = "9876543210", OwnerStatus = "OWNER", AccountOpenDate = new DateOnly(2019, 6, 1), PeakBalance = 1_500_000m, ClosingBalance = 1_200_000m, InterestAccrued = 45_000m } }
+                : Array.Empty<ForeignBankAccount>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]
