@@ -421,6 +421,14 @@ public static class DbInitializer
             ReliefSection = ForeignTaxReliefSection.Section90, DtaaArticle = "Article 23",
         });
 
+        // Clubbed income (Schedule SPI): a minor child's bank interest clubbed into the assessee's income (s.64(1A)).
+        db.ClubbedIncomes.Add(new ClubbedIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            SpecifiedPersonName = "Aarav Sharma (minor)", Relationship = "Minor son", Aadhaar = "456789012345",
+            AmountIncluded = 18_500m, IncomeHead = ClubbedIncomeHead.OtherSources,
+        });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

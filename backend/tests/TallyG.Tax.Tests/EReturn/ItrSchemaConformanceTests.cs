@@ -455,6 +455,44 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_clubbed_income_in_scheduleSPI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withClubbedIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule SPI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var people = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleSPI").GetProperty("SpecifiedPerson");
+        people.GetArrayLength().Should().Be(2);
+
+        var minor = people.EnumerateArray().First(p => p.GetProperty("SpecifiedPersonName").GetString()!.Contains("Aarav"));
+        minor.GetProperty("ReltnShip").GetString().Should().Be("Minor son");
+        minor.GetProperty("AmtIncluded").GetInt64().Should().Be(18_500);
+        minor.GetProperty("HeadIncIncluded").GetString().Should().Be("OS");
+        minor.GetProperty("AaadhaarOfSpecPerson").GetString().Should().Be("456789012345");
+
+        var spouse = people.EnumerateArray().First(p => p.GetProperty("SpecifiedPersonName").GetString() == "Priya Sharma");
+        spouse.GetProperty("HeadIncIncluded").GetString().Should().Be("HP");
+        spouse.GetProperty("PANofSpecPerson").GetString().Should().Be("ABCPS1234K");
+    }
+
+    [Fact]
+    public void Itr3_reports_clubbed_income_in_scheduleSPI()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withClubbedIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule SPI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleSPI")
+            .GetProperty("SpecifiedPerson").GetArrayLength().Should().Be(2);
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
@@ -749,7 +787,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false)
     {
         var user = new User
         {
@@ -943,6 +981,15 @@ public class ItrSchemaConformanceTests
                     new ForeignSourceIncome { CountryCode = "44", CountryName = "United Kingdom", TaxIdentificationNo = "AB123456C", Head = ForeignIncomeHead.Salary, IncomeFromOutsideIndia = 200_000m, TaxPaidOutsideIndia = 40_000m, ReliefSection = ForeignTaxReliefSection.Section91, DtaaArticle = null },
                 }
                 : Array.Empty<ForeignSourceIncome>(),
+            // Clubbed income so the ITR-2/3 gate exercises Schedule SPI: a minor child's interest (OS head,
+            // with Aadhaar) + a spouse's house-property income (HP head, with PAN).
+            ClubbedIncomes = withClubbedIncome
+                ? new[]
+                {
+                    new ClubbedIncome { SpecifiedPersonName = "Aarav Sharma (minor)", Relationship = "Minor son", Aadhaar = "456789012345", AmountIncluded = 18_500m, IncomeHead = ClubbedIncomeHead.OtherSources },
+                    new ClubbedIncome { SpecifiedPersonName = "Priya Sharma", Relationship = "Spouse", Pan = "ABCPS1234K", AmountIncluded = 60_000m, IncomeHead = ClubbedIncomeHead.HouseProperty },
+                }
+                : Array.Empty<ClubbedIncome>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

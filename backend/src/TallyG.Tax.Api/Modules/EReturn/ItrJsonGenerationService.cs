@@ -165,6 +165,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSi(root, ctx);
         AddSchedule80G(root, ctx);
         AddScheduleEI(root, ctx);
+        AddScheduleSpi(root, ctx);
         AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
@@ -199,6 +200,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSi(skel, ctx);
         AddSchedule80G(skel, ctx);
         AddScheduleEI(skel, ctx);
+        AddScheduleSpi(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1245,6 +1247,66 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ForeignTaxReliefSection.Section90 => "90",
         ForeignTaxReliefSection.Section90A => "90A",
         _ => "91",
+    };
+
+    // ----------------------------------------------------------------- Schedule SPI (clubbed income of specified persons)
+    // Income of a spouse / minor child / other specified person clubbed into the assessee's income (s.64).
+    // Each row attributes a clubbed amount to a person + head. ITR-2/3 share the shape EXCEPT the head enum:
+    // ITR-3 additionally allows BP (business) — so a Business-head row is emitted on ITR-3 only. ITR-2/3 only.
+    private static void AddScheduleSpi(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || ctx.ClubbedIncomes.Count == 0)
+        {
+            return;
+        }
+
+        var isItr3 = ctx.ItrType == ItrType.ITR3;
+        var rows = new List<Dictionary<string, object?>>();
+        foreach (var s in ctx.ClubbedIncomes)
+        {
+            // Business-head clubbing only applies to a business return (ITR-3); skip it on ITR-2 (its enum lacks BP).
+            if (s.IncomeHead == ClubbedIncomeHead.Business && !isItr3)
+            {
+                continue;
+            }
+
+            var row = new Dictionary<string, object?>
+            {
+                ["SpecifiedPersonName"] = Trunc(s.SpecifiedPersonName.Trim(), 125),
+                ["ReltnShip"] = Trunc(string.IsNullOrWhiteSpace(s.Relationship) ? "Other" : s.Relationship.Trim(), 50),
+                ["AmtIncluded"] = R(TaxMath0(s.AmountIncluded)),
+                ["HeadIncIncluded"] = ClubbedHeadCode(s.IncomeHead),
+            };
+            var pan = (s.Pan ?? string.Empty).Trim().ToUpperInvariant();
+            if (System.Text.RegularExpressions.Regex.IsMatch(pan, "^[A-Z]{5}[0-9]{4}[A-Z]$"))
+            {
+                row["PANofSpecPerson"] = pan;
+            }
+            else
+            {
+                var aadhaar = new string((s.Aadhaar ?? string.Empty).Where(char.IsDigit).ToArray());
+                if (aadhaar.Length == 12)
+                {
+                    row["AaadhaarOfSpecPerson"] = aadhaar;   // schema spelling: AaadhaarOfSpecPerson
+                }
+            }
+            rows.Add(row);
+        }
+
+        if (rows.Count > 0)
+        {
+            form["ScheduleSPI"] = new Dictionary<string, object?> { ["SpecifiedPerson"] = rows };
+        }
+    }
+
+    private static string ClubbedHeadCode(ClubbedIncomeHead h) => h switch
+    {
+        ClubbedIncomeHead.Salary => "SA",
+        ClubbedIncomeHead.HouseProperty => "HP",
+        ClubbedIncomeHead.CapitalGains => "CG",
+        ClubbedIncomeHead.ExemptIncome => "EI",
+        ClubbedIncomeHead.Business => "BP",
+        _ => "OS",
     };
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)

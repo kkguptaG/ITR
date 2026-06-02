@@ -122,6 +122,9 @@ public sealed class ItrFilingContext
     /// <summary>Foreign-source income + tax-relief items disclosed in Schedule FSI / TR1 (ITR-2/3).</summary>
     public IReadOnlyList<ForeignSourceIncome> ForeignSourceIncomes { get; init; } = Array.Empty<ForeignSourceIncome>();
 
+    /// <summary>Clubbed income of specified persons disclosed in Schedule SPI (ITR-2/3).</summary>
+    public IReadOnlyList<ClubbedIncome> ClubbedIncomes { get; init; } = Array.Empty<ClubbedIncome>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }
