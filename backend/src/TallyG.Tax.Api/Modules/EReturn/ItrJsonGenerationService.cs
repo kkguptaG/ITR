@@ -164,6 +164,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleAl(root, ctx);
         AddScheduleSi(root, ctx);
         AddSchedule80G(root, ctx);
+        AddScheduleEI(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
@@ -196,6 +197,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleAl(skel, ctx);
         AddScheduleSi(skel, ctx);
         AddSchedule80G(skel, ctx);
+        AddScheduleEI(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
@@ -873,6 +875,107 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["TotSplRateInc"] = R(totInc),
             ["TotSplRateIncTax"] = R(totTax),
         };
+    }
+
+    // ----------------------------------------------------------------- Schedule EI (exempt income)
+    // Exempt income is reported but never taxed (it stays out of GTI). We bucket the captured items into the
+    // schedule's three usable rows — exempt interest, net agricultural income, and "others" (with a per-item
+    // OthersIncDtls breakdown) — plus the district-wise ExcNetAgriIncDtls when land details were supplied.
+    // Emitted for ITR-2/3 only, when there is positive exempt income. GOTCHA: IncNotChrgblToTax is REQUIRED
+    // on ITR-2 but ABSENT from the ITR-3 schema (additionalProperties:false forbids it), so it is ITR-2-only.
+    private static void AddScheduleEI(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || ctx.ExemptIncomes.Count == 0)
+        {
+            return;
+        }
+
+        decimal interest = 0m, grossAgri = 0m, others = 0m;
+        var otherRows = new List<Dictionary<string, object?>>();
+        var agriDistricts = new List<Dictionary<string, object?>>();
+
+        foreach (var e in ctx.ExemptIncomes)
+        {
+            var amount = Math.Max(0m, e.Amount);
+            if (amount <= 0m)
+            {
+                continue;
+            }
+
+            switch (e.Category)
+            {
+                case ExemptIncomeCategory.Interest:
+                    interest += amount;
+                    break;
+
+                case ExemptIncomeCategory.Agricultural:
+                    grossAgri += amount;
+                    // The district table is required only when net agri income > ₹5L, but it is always valid;
+                    // emit a row whenever the land details were captured in full.
+                    if (!string.IsNullOrWhiteSpace(e.District)
+                        && e.PinCode is { Length: 6 } pin && pin.All(char.IsDigit) && pin[0] != '0')
+                    {
+                        agriDistricts.Add(new Dictionary<string, object?>
+                        {
+                            ["NameOfDistrict"] = Trunc(e.District!.Trim(), 125),
+                            ["PinCode"] = int.Parse(pin),
+                            ["MeasurementOfLand"] = Math.Round(e.LandMeasurement ?? 0m, 2),
+                            ["AgriLandOwnedFlag"] = (e.LandOwned ?? true) ? "O" : "H",
+                            ["AgriLandIrrigatedFlag"] = (e.LandIrrigated ?? false) ? "IRG" : "RF",
+                        });
+                    }
+                    break;
+
+                default: // Other
+                    others += amount;
+                    otherRows.Add(new Dictionary<string, object?>
+                    {
+                        ["NatureDesc"] = "OTH",
+                        ["OthNatOfInc"] = Trunc(string.IsNullOrWhiteSpace(e.Description) ? "Exempt income" : e.Description.Trim(), 125),
+                        ["OthAmount"] = R(amount),
+                    });
+                    break;
+            }
+        }
+
+        var netAgri = Math.Max(0m, grossAgri);   // no agricultural expenditure / unabsorbed loss captured yet
+        var total = interest + netAgri + others;
+        if (total <= 0m)
+        {
+            return;
+        }
+
+        var ei = new Dictionary<string, object?>
+        {
+            ["InterestInc"] = R(interest),
+            ["GrossAgriRecpt"] = R(grossAgri),
+            ["ExpIncAgri"] = R(0m),
+            ["UnabAgriLossPrev8"] = R(0m),
+            ["NetAgriIncOrOthrIncRule7"] = R(netAgri),
+            ["Others"] = R(others),
+            ["TotalExemptInc"] = R(total),
+        };
+        if (otherRows.Count > 0)
+        {
+            var othersInc = new Dictionary<string, object?> { ["OthersIncDtls"] = otherRows };
+            if (ctx.ItrType == ItrType.ITR3)
+            {
+                // ITR-3's OthersInc additionally requires a separate exempt-dividend line (we capture none → 0).
+                othersInc["NatureofDescDivName"] = "Dividend";
+                othersInc["OthDividendAmt"] = R(0m);
+            }
+            ei["OthersInc"] = othersInc;
+        }
+        if (agriDistricts.Count > 0)
+        {
+            ei["ExcNetAgriInc"] = new Dictionary<string, object?> { ["ExcNetAgriIncDtls"] = agriDistricts };
+        }
+        if (ctx.ItrType == ItrType.ITR2)
+        {
+            ei["IncNotChrgblToTax"] = R(0m);   // ITR-2-only required field (DTAA-exempt total); absent in ITR-3
+        }
+
+        form["ScheduleEI"] = ei;
     }
 
     // ----------------------------------------------------------------- Schedule 80G (donations)

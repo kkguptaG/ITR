@@ -357,6 +357,55 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_exempt_income_in_scheduleEI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withExemptIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule EI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var ei = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleEI");
+
+        // ₹45k exempt interest + ₹6L net agri + ₹25k other = ₹6.7L total exempt income.
+        ei.GetProperty("InterestInc").GetInt64().Should().Be(45_000);
+        ei.GetProperty("GrossAgriRecpt").GetInt64().Should().Be(600_000);
+        ei.GetProperty("NetAgriIncOrOthrIncRule7").GetInt64().Should().Be(600_000);
+        ei.GetProperty("Others").GetInt64().Should().Be(25_000);
+        ei.GetProperty("TotalExemptInc").GetInt64().Should().Be(670_000);
+        ei.GetProperty("IncNotChrgblToTax").GetInt64().Should().Be(0);   // ITR-2-only required field
+
+        // Agricultural land details (drives the district-wise table) + the "others" breakdown row.
+        var agri = ei.GetProperty("ExcNetAgriInc").GetProperty("ExcNetAgriIncDtls")[0];
+        agri.GetProperty("NameOfDistrict").GetString().Should().Be("Nashik");
+        agri.GetProperty("PinCode").GetInt32().Should().Be(422001);
+        agri.GetProperty("AgriLandOwnedFlag").GetString().Should().Be("O");
+        agri.GetProperty("AgriLandIrrigatedFlag").GetString().Should().Be("IRG");
+        var oth = ei.GetProperty("OthersInc").GetProperty("OthersIncDtls")[0];
+        oth.GetProperty("NatureDesc").GetString().Should().Be("OTH");
+        oth.GetProperty("OthAmount").GetInt64().Should().Be(25_000);
+    }
+
+    [Fact]
+    public void Itr3_reports_exempt_income_without_the_itr2_only_dtaa_field()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withExemptIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule EI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var ei = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleEI");
+
+        ei.GetProperty("NetAgriIncOrOthrIncRule7").GetInt64().Should().Be(600_000);
+        ei.GetProperty("TotalExemptInc").GetInt64().Should().Be(670_000);
+        // IncNotChrgblToTax is ITR-2-only — emitting it on ITR-3 would break additionalProperties:false.
+        ei.TryGetProperty("IncNotChrgblToTax", out _).Should().BeFalse("IncNotChrgblToTax is absent from the ITR-3 ScheduleEI schema");
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
@@ -651,7 +700,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false)
     {
         var user = new User
         {
@@ -825,6 +874,16 @@ public class ItrSchemaConformanceTests
                     new Donation80G { Category = Donation80GCategory.FiftyPercentWithLimit, DoneeName = "Helping Hands Trust", DoneePan = "AABTH1234Q", AddressLine = "44 Sector 18", City = "Noida", StateCode = "09", Pincode = "201301", CashAmount = 0m, OtherModeAmount = 4_000m },
                 }
                 : Array.Empty<Donation80G>(),
+            // Exempt income so the ITR-2/3 gate exercises Schedule EI: exempt PPF interest, agricultural
+            // income with land details (drives ExcNetAgriIncDtls), and an "other" exempt item (OthersIncDtls).
+            ExemptIncomes = withExemptIncome
+                ? new[]
+                {
+                    new ExemptIncome { Category = ExemptIncomeCategory.Interest, Description = "PPF interest", Amount = 45_000m },
+                    new ExemptIncome { Category = ExemptIncomeCategory.Agricultural, Description = "Paddy farm income", Amount = 600_000m, District = "Nashik", PinCode = "422001", LandMeasurement = 4.5m, LandOwned = true, LandIrrigated = true },
+                    new ExemptIncome { Category = ExemptIncomeCategory.Other, Description = "Share of profit from firm u/s 10(2A)", Amount = 25_000m },
+                }
+                : Array.Empty<ExemptIncome>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

@@ -60,6 +60,7 @@ public class AppDbContext : DbContext
     public DbSet<ForeignOtherAsset> ForeignOtherAssets => Set<ForeignOtherAsset>();
     public DbSet<ForeignTrustInterest> ForeignTrustInterests => Set<ForeignTrustInterest>();
     public DbSet<Donation80G> Donations80G => Set<Donation80G>();
+    public DbSet<ExemptIncome> ExemptIncomes => Set<ExemptIncome>();
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();
 

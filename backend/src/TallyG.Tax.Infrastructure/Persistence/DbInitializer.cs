@@ -391,6 +391,25 @@ public static class DbInitializer
             Category = Donation80GCategory.FiftyPercentWithLimit, CashAmount = 0m, OtherModeAmount = 6_000m,
         });
 
+        // Exempt income (Schedule EI): tax-free PPF interest, net agricultural income with land details
+        // (so the district-wise ExcNetAgriIncDtls table is exercised), and an exempt firm profit share.
+        db.ExemptIncomes.Add(new ExemptIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Category = ExemptIncomeCategory.Interest, Description = "PPF interest (s.10(11))", Amount = 48_000m,
+        });
+        db.ExemptIncomes.Add(new ExemptIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Category = ExemptIncomeCategory.Agricultural, Description = "Sugarcane farm (s.10(1))", Amount = 700_000m,
+            District = "Nashik", PinCode = "422001", LandMeasurement = 5.5m, LandOwned = true, LandIrrigated = true,
+        });
+        db.ExemptIncomes.Add(new ExemptIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Category = ExemptIncomeCategory.Other, Description = "Share of profit from partnership firm (s.10(2A))", Amount = 30_000m,
+        });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

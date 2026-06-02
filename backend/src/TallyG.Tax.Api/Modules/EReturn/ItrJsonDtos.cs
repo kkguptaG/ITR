@@ -116,6 +116,9 @@ public sealed class ItrFilingContext
     /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
     public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
 
+    /// <summary>Exempt-income items disclosed in Schedule EI (ITR-2/3).</summary>
+    public IReadOnlyList<ExemptIncome> ExemptIncomes { get; init; } = Array.Empty<ExemptIncome>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

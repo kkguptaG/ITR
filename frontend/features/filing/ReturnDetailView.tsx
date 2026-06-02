@@ -28,6 +28,7 @@ import { ReconciliationCard } from '@/features/reconciliation';
 import { AssetsLiabilitiesCard, ImmovableAssetsCard, FirmInterestCard } from '@/features/assets-liabilities';
 import { ForeignAssetsSection } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
+import { ExemptIncomeCard } from '@/features/exempt-income';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -143,6 +144,7 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
       {(detail.itrType === 'ITR2' || detail.itrType === 'ITR3') && (
         <>
           <Donations80GCard returnId={returnId} editable={!locked} />
+          <ExemptIncomeCard returnId={returnId} editable={!locked} />
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
           <ImmovableAssetsCard returnId={returnId} editable={!locked} />
           {/* Interest in a firm/AOP is an ITR-3-only Schedule AL disclosure. */}
