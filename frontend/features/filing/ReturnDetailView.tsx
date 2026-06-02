@@ -25,7 +25,7 @@ import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
-import { AssetsLiabilitiesCard } from '@/features/assets-liabilities';
+import { AssetsLiabilitiesCard, ImmovableAssetsCard } from '@/features/assets-liabilities';
 import { ForeignAssetsCard } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
 
@@ -143,6 +143,7 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
         <>
           <Donations80GCard returnId={returnId} editable={!locked} />
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
+          <ImmovableAssetsCard returnId={returnId} editable={!locked} />
           <ForeignAssetsCard returnId={returnId} editable={!locked} />
         </>
       )}

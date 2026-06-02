@@ -278,6 +278,14 @@ public static class DbInitializer
             Vehicles = 1_200_000m, CashInHand = 50_000m, Liabilities = 2_500_000m,
         });
 
+        db.ImmovablePropertiesAL.Add(new ImmovablePropertyAL
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Description = "Residential flat", FlatDoorNo = "Flat 1203, Tower B",
+            Locality = "Sector 137", City = "Noida", StateCode = "09", Pincode = "201305",
+            Cost = 8_000_000m,
+        });
+
         db.ForeignBankAccounts.Add(new ForeignBankAccount
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,

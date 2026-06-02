@@ -741,34 +741,65 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     private static void AddScheduleAl(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
         var al = ctx.AssetsLiabilities;
-        if (al is null)
+        var immovables = ctx.ImmovablePropertiesAL;
+
+        var movableTotal = al is null ? 0m
+            : al.BankDeposits + al.SharesAndSecurities + al.InsurancePolicies + al.LoansAndAdvancesGiven
+              + al.CashInHand + al.JewelleryBullion + al.ArtCollections + al.Vehicles + al.Liabilities;
+
+        // Nothing declared either way → omit the schedule.
+        if (movableTotal <= 0m && immovables.Count == 0)
         {
             return;
         }
 
-        var any = al.BankDeposits + al.SharesAndSecurities + al.InsurancePolicies + al.LoansAndAdvancesGiven
-                  + al.CashInHand + al.JewelleryBullion + al.ArtCollections + al.Vehicles + al.Liabilities;
-        if (any <= 0m)
-        {
-            return;
-        }
-
-        form["ScheduleAL"] = new Dictionary<string, object?>
+        // MovableAsset + LiabilityInRelatAssets are required whenever ScheduleAL is present, so emit them
+        // (all-zero when only immovable property was declared).
+        var schedule = new Dictionary<string, object?>
         {
             ["MovableAsset"] = new Dictionary<string, object?>
             {
-                ["DepositsInBank"] = R(al.BankDeposits),
-                ["SharesAndSecurities"] = R(al.SharesAndSecurities),
-                ["InsurancePolicies"] = R(al.InsurancePolicies),
-                ["LoansAndAdvancesGiven"] = R(al.LoansAndAdvancesGiven),
-                ["CashInHand"] = R(al.CashInHand),
-                ["JewelleryBullionEtc"] = R(al.JewelleryBullion),
-                ["ArchCollDrawPaintSulpArt"] = R(al.ArtCollections),
-                ["VehiclYachtsBoatsAircrafts"] = R(al.Vehicles),
+                ["DepositsInBank"] = R(al?.BankDeposits ?? 0m),
+                ["SharesAndSecurities"] = R(al?.SharesAndSecurities ?? 0m),
+                ["InsurancePolicies"] = R(al?.InsurancePolicies ?? 0m),
+                ["LoansAndAdvancesGiven"] = R(al?.LoansAndAdvancesGiven ?? 0m),
+                ["CashInHand"] = R(al?.CashInHand ?? 0m),
+                ["JewelleryBullionEtc"] = R(al?.JewelleryBullion ?? 0m),
+                ["ArchCollDrawPaintSulpArt"] = R(al?.ArtCollections ?? 0m),
+                ["VehiclYachtsBoatsAircrafts"] = R(al?.Vehicles ?? 0m),
             },
-            ["LiabilityInRelatAssets"] = R(al.Liabilities),
+            ["LiabilityInRelatAssets"] = R(al?.Liabilities ?? 0m),
         };
+
+        if (immovables.Count > 0)
+        {
+            schedule["ImmovableDetails"] = immovables.Select(ImmovableAlItem).ToList();
+        }
+
+        // ITR-3's ScheduleAL additionally requires the "interest held in a firm/AOP as partner/member" flag
+        // (ITR-2 forbids it). We declare "N"; the optional InterestHeldInaAsset detail list stays a later add.
+        if (ctx.ItrType == ItrType.ITR3)
+        {
+            schedule["InterstAOPFlag"] = "N";
+        }
+
+        form["ScheduleAL"] = schedule;
     }
+
+    private static Dictionary<string, object?> ImmovableAlItem(ImmovablePropertyAL p) => new()
+    {
+        ["Description"] = Trunc(NonEmpty(p.Description, "Property"), 25),
+        ["AddressAL"] = new Dictionary<string, object?>
+        {
+            ["ResidenceNo"] = Trunc(NonEmpty(p.FlatDoorNo, "NA"), 50),
+            ["LocalityOrArea"] = Trunc(NonEmpty(p.Locality, "NA"), 50),
+            ["CityOrTownOrDistrict"] = Trunc(NonEmpty(p.City, "NA"), 50),
+            ["StateCode"] = ValidStateCode(p.StateCode),
+            ["CountryCode"] = "91", // domestic-assets schedule; the property is in India
+            ["PinCode"] = ValidPin(p.Pincode),
+        },
+        ["Amount"] = R(Math.Max(0m, p.Cost)),
+    };
 
     // ----------------------------------------------------------------- Schedule SI (special-rate income)
     // Summarises income taxed at special rates (111A STCG, 112A/112 LTCG, 115BBH VDA, 115BB winnings),
