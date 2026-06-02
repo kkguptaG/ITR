@@ -182,6 +182,15 @@ export async function apiPatch<T>(
   return data;
 }
 
+export async function apiPut<T>(
+  url: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  const { data } = await api.put<T>(url, body, config);
+  return data;
+}
+
 export async function apiDelete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
   const { data } = await api.delete<T>(url, config);
   return data;

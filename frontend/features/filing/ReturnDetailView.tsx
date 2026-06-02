@@ -25,6 +25,7 @@ import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
+import { AssetsLiabilitiesCard } from '@/features/assets-liabilities';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -134,6 +135,11 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
 
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}
       <ReconciliationCard returnId={returnId} />
+
+      {/* Schedule AL — assets & liabilities (ITR-2/3, mandatory above ₹50L income) */}
+      {(detail.itrType === 'ITR2' || detail.itrType === 'ITR3') && (
+        <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
+      )}
     </div>
   );
 }

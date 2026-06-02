@@ -74,6 +74,9 @@ public sealed class ItrFilingContext
     public IReadOnlyList<TdsEntry> TdsEntries { get; init; } = Array.Empty<TdsEntry>();
     public IReadOnlyList<TaxPaymentChallan> Challans { get; init; } = Array.Empty<TaxPaymentChallan>();
 
+    /// <summary>Schedule AL declaration (movable assets + liabilities, &gt;₹50L income); null when not declared.</summary>
+    public TallyG.Tax.Domain.Entities.AssetsLiabilities? AssetsLiabilities { get; init; }
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

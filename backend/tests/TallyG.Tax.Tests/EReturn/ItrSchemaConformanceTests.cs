@@ -123,6 +123,24 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_declares_assets_and_liabilities_in_scheduleAL()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withAssets: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule AL must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var al = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleAL");
+
+        al.GetProperty("MovableAsset").GetProperty("DepositsInBank").GetInt64().Should().Be(500_000);
+        al.GetProperty("MovableAsset").GetProperty("VehiclYachtsBoatsAircrafts").GetInt64().Should().Be(800_000);
+        al.GetProperty("MovableAsset").GetProperty("JewelleryBullionEtc").GetInt64().Should().Be(200_000);
+        al.GetProperty("LiabilityInRelatAssets").GetInt64().Should().Be(400_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
@@ -281,7 +299,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false)
     {
         var user = new User
         {
@@ -377,6 +395,10 @@ public class ItrSchemaConformanceTests
                     new Deduction { Section = "80TTA", Amount = 8_000m },
                 }
                 : Array.Empty<Deduction>(),
+            // A Schedule AL declaration so the ITR-2/3 gate exercises the assets/liabilities schedule.
+            AssetsLiabilities = withAssets
+                ? new TallyG.Tax.Domain.Entities.AssetsLiabilities { BankDeposits = 500_000m, SharesAndSecurities = 300_000m, JewelleryBullion = 200_000m, Vehicles = 800_000m, CashInHand = 50_000m, Liabilities = 400_000m }
+                : null,
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

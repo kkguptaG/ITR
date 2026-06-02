@@ -161,6 +161,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleOs(root, ctx);
         AddScheduleVia(root, ctx);
         AddScheduleCfl(root, ctx);
+        AddScheduleAl(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -189,6 +190,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleOs(skel, ctx);
         AddScheduleVia(skel, ctx);
         AddScheduleCfl(skel, ctx);
+        AddScheduleAl(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -724,6 +726,42 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         obj["TotPartCAandDchapterVIA"] = R(partCaAndD);
         obj["TotalChapVIADeductions"] = R(total);
         return obj;
+    }
+
+    // ----------------------------------------------------------------- Schedule AL (Assets & Liabilities)
+    // Movable assets by category (at cost) + related liabilities, declared when total income > ₹50L.
+    // Immovable property (which needs a structured address) is a later addition. Emitted only when a
+    // non-empty declaration exists; ITR-1/4 don't have this schedule.
+    private static void AddScheduleAl(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        var al = ctx.AssetsLiabilities;
+        if (al is null)
+        {
+            return;
+        }
+
+        var any = al.BankDeposits + al.SharesAndSecurities + al.InsurancePolicies + al.LoansAndAdvancesGiven
+                  + al.CashInHand + al.JewelleryBullion + al.ArtCollections + al.Vehicles + al.Liabilities;
+        if (any <= 0m)
+        {
+            return;
+        }
+
+        form["ScheduleAL"] = new Dictionary<string, object?>
+        {
+            ["MovableAsset"] = new Dictionary<string, object?>
+            {
+                ["DepositsInBank"] = R(al.BankDeposits),
+                ["SharesAndSecurities"] = R(al.SharesAndSecurities),
+                ["InsurancePolicies"] = R(al.InsurancePolicies),
+                ["LoansAndAdvancesGiven"] = R(al.LoansAndAdvancesGiven),
+                ["CashInHand"] = R(al.CashInHand),
+                ["JewelleryBullionEtc"] = R(al.JewelleryBullion),
+                ["ArchCollDrawPaintSulpArt"] = R(al.ArtCollections),
+                ["VehiclYachtsBoatsAircrafts"] = R(al.Vehicles),
+            },
+            ["LiabilityInRelatAssets"] = R(al.Liabilities),
+        };
     }
 
     private static long MobileDigits(string? mobile)
