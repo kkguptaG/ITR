@@ -406,6 +406,55 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_foreign_source_income_in_scheduleFSI_and_TR1()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withForeignSourceIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule FSI/TR1 must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        var fsi = itr2.GetProperty("ScheduleFSI").GetProperty("ScheduleFSIDtls");
+        fsi.GetArrayLength().Should().Be(2);
+        var usa = fsi.EnumerateArray().First(r => r.GetProperty("CountryCodeExcludingIndia").GetString() == "1");
+        var os = usa.GetProperty("IncOthSrc");
+        os.GetProperty("IncFrmOutsideInd").GetInt64().Should().Be(500_000);
+        os.GetProperty("TaxPaidOutsideInd").GetInt64().Should().Be(15_000);
+        // Indian tax on ₹5L at the ~4.5% average rate (≈₹22.5k) exceeds the ₹15k foreign tax, so relief = ₹15k.
+        os.GetProperty("TaxReliefinInd").GetInt64().Should().Be(15_000);
+        os.GetProperty("DTAAReliefUs90or90A").GetString().Should().Be("Article 23");
+        // ITR-2 must NOT carry the ITR-3-only business head.
+        usa.TryGetProperty("IncFromBusiness", out _).Should().BeFalse("IncFromBusiness is an ITR-3-only FSI column");
+
+        var tr1 = itr2.GetProperty("ScheduleTR1");
+        tr1.GetProperty("ScheduleTR").GetArrayLength().Should().Be(2);
+        tr1.GetProperty("TotalTaxPaidOutsideIndia").GetInt64().Should().Be(55_000);  // 15k + 40k
+        tr1.GetProperty("TaxReliefOutsideIndiaDTAA").GetInt64().Should().Be(15_000); // USA s.90
+        tr1.GetProperty("TaxReliefOutsideIndiaNotDTAA").GetInt64().Should().BeGreaterThan(0); // UK s.91 (capped at Indian tax)
+        tr1.GetProperty("TaxPaidOutsideIndFlg").GetString().Should().Be("YES");
+    }
+
+    [Fact]
+    public void Itr3_reports_foreign_source_income_with_business_head()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withForeignSourceIncome: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule FSI/TR1 must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var fsi = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleFSI").GetProperty("ScheduleFSIDtls");
+        var usa = fsi.EnumerateArray().First(r => r.GetProperty("CountryCodeExcludingIndia").GetString() == "1");
+        // ITR-3's FSI row REQUIRES the business head (zeros here, since no foreign business income).
+        usa.GetProperty("IncFromBusiness").GetProperty("IncFrmOutsideInd").GetInt64().Should().Be(0);
+        usa.GetProperty("IncOthSrc").GetProperty("IncFrmOutsideInd").GetInt64().Should().Be(500_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
@@ -700,7 +749,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false)
     {
         var user = new User
         {
@@ -884,6 +933,16 @@ public class ItrSchemaConformanceTests
                     new ExemptIncome { Category = ExemptIncomeCategory.Other, Description = "Share of profit from firm u/s 10(2A)", Amount = 25_000m },
                 }
                 : Array.Empty<ExemptIncome>(),
+            // Foreign-source income so the ITR-2/3 gate exercises Schedule FSI + TR1: a US "other sources"
+            // income with s.90 (DTAA) relief — foreign tax ₹15k < Indian tax, so relief = ₹15k — plus a UK
+            // salary with s.91 (non-DTAA, unilateral) relief — foreign tax ₹40k > Indian tax, so capped.
+            ForeignSourceIncomes = withForeignSourceIncome
+                ? new[]
+                {
+                    new ForeignSourceIncome { CountryCode = "1", CountryName = "United States of America", TaxIdentificationNo = "123-45-6789", Head = ForeignIncomeHead.OtherSources, IncomeFromOutsideIndia = 500_000m, TaxPaidOutsideIndia = 15_000m, ReliefSection = ForeignTaxReliefSection.Section90, DtaaArticle = "Article 23" },
+                    new ForeignSourceIncome { CountryCode = "44", CountryName = "United Kingdom", TaxIdentificationNo = "AB123456C", Head = ForeignIncomeHead.Salary, IncomeFromOutsideIndia = 200_000m, TaxPaidOutsideIndia = 40_000m, ReliefSection = ForeignTaxReliefSection.Section91, DtaaArticle = null },
+                }
+                : Array.Empty<ForeignSourceIncome>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

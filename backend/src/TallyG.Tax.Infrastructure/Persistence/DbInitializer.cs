@@ -410,6 +410,17 @@ public static class DbInitializer
             Category = ExemptIncomeCategory.Other, Description = "Share of profit from partnership firm (s.10(2A))", Amount = 30_000m,
         });
 
+        // Foreign-source income (Schedule FSI / TR1): US consultancy income taxed in the US, with s.90
+        // treaty relief claimed in India. Discloses the foreign tax paid + the relief that resolves the
+        // double taxation.
+        db.ForeignSourceIncomes.Add(new ForeignSourceIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "1", CountryName = "United States of America", TaxIdentificationNo = "123-45-6789",
+            Head = ForeignIncomeHead.OtherSources, IncomeFromOutsideIndia = 500_000m, TaxPaidOutsideIndia = 75_000m,
+            ReliefSection = ForeignTaxReliefSection.Section90, DtaaArticle = "Article 23",
+        });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

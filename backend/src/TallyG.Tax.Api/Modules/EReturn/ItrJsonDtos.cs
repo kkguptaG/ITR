@@ -119,6 +119,9 @@ public sealed class ItrFilingContext
     /// <summary>Exempt-income items disclosed in Schedule EI (ITR-2/3).</summary>
     public IReadOnlyList<ExemptIncome> ExemptIncomes { get; init; } = Array.Empty<ExemptIncome>();
 
+    /// <summary>Foreign-source income + tax-relief items disclosed in Schedule FSI / TR1 (ITR-2/3).</summary>
+    public IReadOnlyList<ForeignSourceIncome> ForeignSourceIncomes { get; init; } = Array.Empty<ForeignSourceIncome>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

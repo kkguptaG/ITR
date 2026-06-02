@@ -165,6 +165,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSi(root, ctx);
         AddSchedule80G(root, ctx);
         AddScheduleEI(root, ctx);
+        AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
@@ -198,6 +199,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSi(skel, ctx);
         AddSchedule80G(skel, ctx);
         AddScheduleEI(skel, ctx);
+        AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
@@ -1128,6 +1130,123 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     // (DtlsForeignEquityDebtInterest) holdings disclosed by a resident. The remaining FA tables (cash-value
     // insurance, financial interest, immovable, trusts, signing authority, …) are a later addition. The
     // whole schedule is optional; each table is emitted only when that asset class is declared.
+    // ----------------------------------------------------------------- Schedule FSI + TR1 (foreign-source income + tax relief)
+    // A resident is taxed on global income, so foreign income is reported per country × head in Schedule FSI
+    // (with the foreign tax paid, the Indian tax on it, and the relief that resolves the double taxation),
+    // and the country-wise relief is summarised in Schedule TR1. We compute the Indian tax on each foreign
+    // income at the return's average rate and the relief as the lower of (foreign tax paid, Indian tax) — the
+    // standard s.90/91 measure. NOTE: this DISCLOSES the relief; crediting it against the PartB-TTI net payable
+    // (TaxRelief.Section90/90A/91) needs engine support for the foreign-tax credit and is a deferred follow-up.
+    // ITR-2/3 only; ITR-3's FSI row additionally requires an IncFromBusiness head (emitted form-aware).
+    private static void AddScheduleFsiTr(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || ctx.ForeignSourceIncomes.Count == 0)
+        {
+            return;
+        }
+
+        // Average rate of tax on total income, used to size the Indian tax on each foreign income.
+        var taxable = ctx.Computation?.TaxableIncome ?? 0m;
+        var totalTax = ctx.Computation?.TotalTax ?? 0m;
+        var avgRate = taxable > 0m ? totalTax / taxable : 0m;
+        var isItr3 = ctx.ItrType == ItrType.ITR3;
+
+        var fsiRows = new List<Dictionary<string, object?>>();
+        var trRows = new List<Dictionary<string, object?>>();
+        decimal totPaid = 0m, totRelief = 0m, reliefDtaa = 0m, reliefNonDtaa = 0m;
+
+        foreach (var group in ctx.ForeignSourceIncomes
+                     .GroupBy(f => f.CountryCode)
+                     .OrderBy(g => g.Key))
+        {
+            var first = group.First();
+            decimal cPaid = 0m, cRelief = 0m, cInc = 0m, cPayable = 0m;
+
+            // One sub-object per head; TaxPayableinInd = income × avg rate, TaxReliefinInd = min(foreign tax, Indian tax).
+            Dictionary<string, object?> Head(ForeignIncomeHead head)
+            {
+                var rows = group.Where(r => r.Head == head).ToList();
+                var inc = TaxMath0(rows.Sum(r => r.IncomeFromOutsideIndia));
+                var paid = TaxMath0(rows.Sum(r => r.TaxPaidOutsideIndia));
+                var payable = TaxMath0(Math.Round(inc * avgRate, MidpointRounding.AwayFromZero));
+                var relief = Math.Min(paid, payable);
+                cInc += inc; cPaid += paid; cPayable += payable; cRelief += relief;
+
+                var node = new Dictionary<string, object?>
+                {
+                    ["IncFrmOutsideInd"] = R(inc),
+                    ["TaxPaidOutsideInd"] = R(paid),
+                    ["TaxPayableinInd"] = R(payable),
+                    ["TaxReliefinInd"] = R(relief),
+                };
+                var article = rows.Select(r => r.DtaaArticle).FirstOrDefault(a => !string.IsNullOrWhiteSpace(a));
+                if (inc > 0m && first.ReliefSection != ForeignTaxReliefSection.Section91 && !string.IsNullOrWhiteSpace(article))
+                {
+                    node["DTAAReliefUs90or90A"] = Trunc(article!.Trim(), 16);
+                }
+                return node;
+            }
+
+            var fsiRow = new Dictionary<string, object?>
+            {
+                ["CountryName"] = Trunc(first.CountryName.Trim(), 55),
+                ["CountryCodeExcludingIndia"] = first.CountryCode.Trim(),
+                ["TaxIdentificationNo"] = Trunc(first.TaxIdentificationNo.Trim(), 75),
+                ["IncFromSal"] = Head(ForeignIncomeHead.Salary),
+                ["IncFromHP"] = Head(ForeignIncomeHead.HouseProperty),
+                ["IncCapGain"] = Head(ForeignIncomeHead.CapitalGains),
+                ["IncOthSrc"] = Head(ForeignIncomeHead.OtherSources),
+            };
+            if (isItr3)
+            {
+                fsiRow["IncFromBusiness"] = Head(ForeignIncomeHead.Business);
+            }
+            fsiRow["TotalCountryWise"] = new Dictionary<string, object?>
+            {
+                ["IncFrmOutsideInd"] = R(cInc),
+                ["TaxPaidOutsideInd"] = R(cPaid),
+                ["TaxPayableinInd"] = R(cPayable),
+                ["TaxReliefinInd"] = R(cRelief),
+            };
+            fsiRows.Add(fsiRow);
+
+            trRows.Add(new Dictionary<string, object?>
+            {
+                ["CountryName"] = Trunc(first.CountryName.Trim(), 55),
+                ["CountryCodeExcludingIndia"] = first.CountryCode.Trim(),
+                ["TaxIdentificationNo"] = Trunc(first.TaxIdentificationNo.Trim(), 75),
+                ["TaxPaidOutsideIndia"] = R(cPaid),
+                ["TaxReliefOutsideIndia"] = R(cRelief),
+                ["ReliefClaimedUsSection"] = ReliefSectionCode(first.ReliefSection),
+            });
+
+            totPaid += cPaid;
+            totRelief += cRelief;
+            if (first.ReliefSection == ForeignTaxReliefSection.Section91) reliefNonDtaa += cRelief; else reliefDtaa += cRelief;
+        }
+
+        if (fsiRows.Count > 0)
+        {
+            form["ScheduleFSI"] = new Dictionary<string, object?> { ["ScheduleFSIDtls"] = fsiRows };
+        }
+        form["ScheduleTR1"] = new Dictionary<string, object?>
+        {
+            ["ScheduleTR"] = trRows,
+            ["TotalTaxPaidOutsideIndia"] = R(totPaid),
+            ["TotalTaxReliefOutsideIndia"] = R(totRelief),
+            ["TaxReliefOutsideIndiaDTAA"] = R(reliefDtaa),
+            ["TaxReliefOutsideIndiaNotDTAA"] = R(reliefNonDtaa),
+            ["TaxPaidOutsideIndFlg"] = totPaid > 0m ? "YES" : "NO",
+        };
+    }
+
+    private static string ReliefSectionCode(ForeignTaxReliefSection s) => s switch
+    {
+        ForeignTaxReliefSection.Section90 => "90",
+        ForeignTaxReliefSection.Section90A => "90A",
+        _ => "91",
+    };
+
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
         if (ctx.ForeignBankAccounts.Count == 0
