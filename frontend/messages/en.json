@@ -719,6 +719,36 @@
     "dataRightsBody": "Request a copy, correction or erasure of your data.",
     "signOut": "Sign out"
   },
+  "bankAccounts": {
+    "cardTitle": "Bank accounts",
+    "cardSubtitle": "Add the accounts you want on your return. Pick one to receive any refund.",
+    "loading": "Loading bank accounts…",
+    "loadError": "We couldn’t load your bank accounts.",
+    "empty": "No bank accounts yet. Add one to receive your refund.",
+    "addButton": "Add account",
+    "formHint": "All four fields are mandatory and must match your bank records.",
+    "bankName": "Bank name",
+    "accountNumber": "Account number",
+    "accountType": "Account type",
+    "ifsc": "IFSC code",
+    "ifscLookingUp": "Looking up IFSC…",
+    "ifscNotFound": "IFSC not in our directory — enter the bank name manually.",
+    "useForRefund": "Use this account for my refund",
+    "refundBadge": "Refund account",
+    "setRefund": "Use for refund",
+    "saved": "Bank account added.",
+    "deleted": "Bank account removed.",
+    "deleteConfirm": "Remove this account?",
+    "delete": "Remove",
+    "accountTypeOptions": {
+      "SB": "Savings (SB)",
+      "CA": "Current (CA)",
+      "CC": "Cash Credit (CC)",
+      "OD": "Overdraft (OD)",
+      "NRO": "NRO",
+      "OTH": "Other"
+    }
+  },
   "help": {
     "pageTitle": "Help Centre",
     "pageSubtitle": "Answers to common questions about filing with TallyG Tax.",

@@ -16,6 +16,7 @@ import {
   LanguagePreferenceCard,
   SecurityCard,
 } from '@/features/settings';
+import { BankAccountsCard } from '@/features/bank-accounts';
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
@@ -30,6 +31,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <ProfileCard />
+          <BankAccountsCard />
           <LanguagePreferenceCard />
         </div>
         <div className="space-y-6">
