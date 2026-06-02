@@ -162,6 +162,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleVia(root, ctx);
         AddScheduleCfl(root, ctx);
         AddScheduleAl(root, ctx);
+        AddScheduleSi(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -191,6 +192,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleVia(skel, ctx);
         AddScheduleCfl(skel, ctx);
         AddScheduleAl(skel, ctx);
+        AddScheduleSi(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -761,6 +763,63 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 ["VehiclYachtsBoatsAircrafts"] = R(al.Vehicles),
             },
             ["LiabilityInRelatAssets"] = R(al.Liabilities),
+        };
+    }
+
+    // ----------------------------------------------------------------- Schedule SI (special-rate income)
+    // Summarises income taxed at special rates (111A STCG, 112A/112 LTCG, 115BBH VDA, 115BB winnings),
+    // each with its ITD SecCode, rate and tax, derived from the captured gains + other-sources. The rates
+    // are the AY2025-26 post-23-Jul-2024 rates. Emitted only when special-rate income exists; the headline
+    // tax in PartB_TTI remains the engine's authoritative figure.
+    private static void AddScheduleSi(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        static decimal GainOf(CapitalGain g) =>
+            Math.Max(0m, g.SalePrice - g.CostOfAcquisition - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount);
+        static bool Sec(CapitalGain g, string s) => (g.TaxSection ?? string.Empty).Contains(s);
+
+        var stcg111A = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Short && Sec(g, "111A")).Sum(GainOf);
+        var ltcg112A = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112A")).Sum(GainOf);
+        var ltcg112 = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112") && !Sec(g, "112A")).Sum(GainOf);
+        var vda = ctx.Gains.Where(g => Sec(g, "115BBH")).Sum(GainOf);
+        var lottery = ctx.OtherIncomes.Where(o => OsNature(o) == "lottery_115bb").Sum(o => o.Amount);
+
+        var rows = new List<object?>();
+        decimal totInc = 0m, totTax = 0m;
+        void Add(string secCode, decimal ratePct, decimal income)
+        {
+            if (income <= 0m)
+            {
+                return;
+            }
+
+            var tax = Math.Round(ratePct / 100m * income, MidpointRounding.AwayFromZero);
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["SecCode"] = secCode,
+                ["SplRatePercent"] = ratePct,    // numeric enum (e.g. 20 or 12.5)
+                ["SplRateInc"] = R(income),
+                ["SplRateIncTax"] = R(tax),
+            });
+            totInc += income;
+            totTax += tax;
+        }
+
+        Add("1A", 20m, stcg111A);      // 111A STCG on STT-paid shares (post 23-Jul-2024)
+        Add("2A", 12.5m, ltcg112A);    // 112A LTCG on equity (post 23-Jul-2024)
+        Add("22", 12.5m, ltcg112);     // 112 LTCG without indexing (post 23-Jul-2024)
+        Add("5BBH", 30m, vda);         // 115BBH virtual digital assets
+        Add("5BB", 30m, lottery);      // 115BB winnings from lotteries / games
+
+        if (totInc <= 0m)
+        {
+            return;
+        }
+
+        form["ScheduleSI"] = new Dictionary<string, object?>
+        {
+            ["SplCodeRateTax"] = rows,
+            ["TotSplRateInc"] = R(totInc),
+            ["TotSplRateIncTax"] = R(totTax),
         };
     }
 

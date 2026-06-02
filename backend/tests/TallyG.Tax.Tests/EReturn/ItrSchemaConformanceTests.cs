@@ -204,6 +204,27 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_summarizes_special_rate_income_in_scheduleSI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGains: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule SI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var si = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleSI");
+
+        // 111A STCG ₹50k @ 20% = ₹10k; 112A LTCG ₹2L @ 12.5% = ₹25k → ₹2.5L income, ₹35k tax.
+        si.GetProperty("TotSplRateInc").GetInt64().Should().Be(250_000);
+        si.GetProperty("TotSplRateIncTax").GetInt64().Should().Be(35_000);
+        var rows = si.GetProperty("SplCodeRateTax");
+        var ltcg = rows.EnumerateArray().Single(r => r.GetProperty("SecCode").GetString() == "2A");
+        ltcg.GetProperty("SplRateInc").GetInt64().Should().Be(200_000);
+        ltcg.GetProperty("SplRateIncTax").GetInt64().Should().Be(25_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_capital_gains_into_scheduleCG()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGains: true);
