@@ -123,6 +123,46 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_itemizes_chapterVIA_deductions_into_scheduleVIA()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withDeductions: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule VIA must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var via = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleVIA")
+            .GetProperty("DeductUndChapVIA");
+
+        via.GetProperty("Section80C").GetInt64().Should().Be(100_000);
+        via.GetProperty("Section80D").GetInt64().Should().Be(20_000);
+        via.GetProperty("Section80G").GetInt64().Should().Be(5_000);
+        via.GetProperty("Section80TTA").GetInt64().Should().Be(8_000);
+        via.GetProperty("TotalChapVIADeductions").GetInt64().Should().Be(133_000);
+    }
+
+    [Fact]
+    public void Itr3_groups_chapterVIA_into_part_subtotals()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withDeductions: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule VIA must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var via = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleVIA")
+            .GetProperty("DeductUndChapVIA");
+
+        // Part B = 80C (1L); Part CA&D = 80D + 80G + 80TTA (33k); Part C = 0; they sum to the total.
+        via.GetProperty("TotPartBchapterVIA").GetInt64().Should().Be(100_000);
+        via.GetProperty("TotPartCAandDchapterVIA").GetInt64().Should().Be(33_000);
+        via.GetProperty("TotPartCchapterVIA").GetInt64().Should().Be(0);
+        via.GetProperty("TotalChapVIADeductions").GetInt64().Should().Be(133_000);
+    }
+
+    [Fact]
     public void Itr2_carries_losses_forward_in_scheduleCFL()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withCarryForward: true);
@@ -241,7 +281,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false)
     {
         var user = new User
         {
@@ -327,6 +367,16 @@ public class ItrSchemaConformanceTests
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
                 }
                 : Array.Empty<CapitalGain>(),
+            // Chapter VI-A deductions so the ITR-2/3 gate exercises the itemised Schedule VIA.
+            Deductions = withDeductions
+                ? new[]
+                {
+                    new Deduction { Section = "80C", Amount = 100_000m },
+                    new Deduction { Section = "80D", Amount = 20_000m },
+                    new Deduction { Section = "80G", Amount = 5_000m },
+                    new Deduction { Section = "80TTA", Amount = 8_000m },
+                }
+                : Array.Empty<Deduction>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

@@ -159,6 +159,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleHp(root, ctx);
         AddScheduleCg(root, ctx);
         AddScheduleOs(root, ctx);
+        AddScheduleVia(root, ctx);
         AddScheduleCfl(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
@@ -186,6 +187,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleHp(skel, ctx);
         AddScheduleCg(skel, ctx);
         AddScheduleOs(skel, ctx);
+        AddScheduleVia(skel, ctx);
         AddScheduleCfl(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
@@ -650,6 +652,78 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     {
         var digits = new string((code ?? string.Empty).Where(char.IsDigit).ToArray());
         return int.TryParse(digits, out var n) && n is >= 1 and <= 37 ? n.ToString("D2") : "99";
+    }
+
+    // ----------------------------------------------------------------- Schedule VIA (Chapter VI-A, detailed)
+    // ITR-2/3 carry a full itemised Schedule VIA (each 80-section), not just the lump in PartB-TI. ITR-2
+    // reuses the flat ViaObject; ITR-3 additionally needs the Part-B / Part-C / Part-CA&D subtotals (its
+    // schema requires them). Both UsrDeductUndChapVIA (claimed) and DeductUndChapVIA (allowed) are emitted;
+    // we report the claimed amounts in both. Emitted only when deductions exist; ITR-1/4 keep their own VIA.
+    private static void AddScheduleVia(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.Deductions.Count == 0)
+        {
+            return;
+        }
+
+        var itr3 = ctx.ItrType == ItrType.ITR3;
+        Dictionary<string, object?> Build() => itr3 ? ViaObjectItr3(ctx.Deductions) : ViaObject(ctx.Deductions, Itr1DeductViaKeys);
+
+        form["ScheduleVIA"] = new Dictionary<string, object?>
+        {
+            ["UsrDeductUndChapVIA"] = Build(),
+            ["DeductUndChapVIA"] = Build(),
+        };
+    }
+
+    // ITR-3's Chapter-VIA object: the individual 80-section lines + the three statutory part subtotals
+    // (Part B = the 80C investment group incl. 80CCH; Part CA&D = 80D…80U + the 80G donation group; Part C
+    // = the business/professional 80-IA/IB/… group, taken as the reconciling remainder). The three always
+    // sum to TotalChapVIADeductions.
+    private static Dictionary<string, object?> ViaObjectItr3(IReadOnlyList<Deduction> deductions)
+    {
+        var byKey = new Dictionary<string, decimal>();
+        foreach (var d in deductions)
+        {
+            var k = ViaKey(d.Section);
+            byKey[k] = (byKey.TryGetValue(k, out var v) ? v : 0m) + Math.Max(0m, d.Amount);
+        }
+
+        decimal Get(string k) => byKey.TryGetValue(k, out var v) ? v : 0m;
+        var total = deductions.Sum(d => Math.Max(0m, d.Amount));
+
+        string[] sectionKeys =
+        {
+            "Section80C", "Section80CCC", "Section80CCDEmployeeOrSE", "Section80CCD1B", "Section80CCDEmployer",
+            "Section80D", "Section80DD", "Section80DDB", "Section80E", "Section80EE", "Section80EEA", "Section80EEB",
+            "Section80G", "Section80GG", "Section80GGA", "Section80GGC", "Section80TTA", "Section80TTB", "Section80U",
+        };
+
+        var obj = new Dictionary<string, object?>();
+        decimal listed = 0m;
+        foreach (var k in sectionKeys)
+        {
+            var a = Get(k);
+            obj[k] = R(a);
+            listed += a;
+        }
+
+        var anyOth = Math.Max(0m, total - listed);   // unmapped sections (e.g. 80CCH) → Part B
+        obj["AnyOthSec80CCH"] = R(anyOth);
+
+        var partB = Get("Section80C") + Get("Section80CCC") + Get("Section80CCDEmployeeOrSE")
+                    + Get("Section80CCD1B") + Get("Section80CCDEmployer") + anyOth;
+        var partCaAndD = Get("Section80D") + Get("Section80DD") + Get("Section80DDB") + Get("Section80E")
+                         + Get("Section80EE") + Get("Section80EEA") + Get("Section80EEB") + Get("Section80U")
+                         + Get("Section80G") + Get("Section80GG") + Get("Section80GGA") + Get("Section80GGC")
+                         + Get("Section80TTA") + Get("Section80TTB");
+        var partC = Math.Max(0m, total - partB - partCaAndD);
+
+        obj["TotPartBchapterVIA"] = R(partB);
+        obj["TotPartCchapterVIA"] = R(partC);
+        obj["TotPartCAandDchapterVIA"] = R(partCaAndD);
+        obj["TotalChapVIADeductions"] = R(total);
+        return obj;
     }
 
     private static long MobileDigits(string? mobile)
