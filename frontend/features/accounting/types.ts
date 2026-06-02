@@ -28,6 +28,34 @@ export type LedgerNature = 'Asset' | 'Liability' | 'Income' | 'Expense' | 'Equit
 
 export type DrCr = 'Debit' | 'Credit';
 
+// ---- Financial statements (derived from the books) ------------------------
+
+export interface GroupBalanceDto {
+  group: string;
+  amount: number;
+}
+
+export interface ProfitAndLossDto {
+  income: GroupBalanceDto[];
+  totalIncome: number;
+  expenses: GroupBalanceDto[];
+  totalExpenses: number;
+  netProfit: number;
+}
+
+export interface BalanceSheetDto {
+  assets: GroupBalanceDto[];
+  totalAssets: number;
+  liabilitiesAndCapital: GroupBalanceDto[];
+  totalLiabilitiesAndCapital: number;
+  isBalanced: boolean;
+}
+
+export interface FinancialStatementsDto {
+  profitAndLoss: ProfitAndLossDto;
+  balanceSheet: BalanceSheetDto;
+}
+
 export type VoucherType = 'Receipt' | 'Payment' | 'Contra' | 'Journal';
 
 export type BankImportStatus =

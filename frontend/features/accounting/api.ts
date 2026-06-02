@@ -16,6 +16,7 @@ import type {
   BankImportDetailDto,
   BankImportDto,
   CreateLedgerBody,
+  FinancialStatementsDto,
   LedgerDto,
   LedgerGroup,
   PostImportBody,
@@ -42,7 +43,14 @@ export const accountingKeys = {
   imports: (params: ListImportsParams = {}) =>
     [...accountingKeys.all, 'imports', params] as const,
   import: (id: string) => [...accountingKeys.all, 'import', id] as const,
+  financialStatements: () => [...accountingKeys.all, 'financial-statements'] as const,
 };
+
+// ---- Financial statements (Balance Sheet + P&L derived from the books) ----
+
+export function getFinancialStatements(): Promise<FinancialStatementsDto> {
+  return apiGet<FinancialStatementsDto>('/accounting/financial-statements');
+}
 
 // ---- Chart of accounts ----------------------------------------------------
 

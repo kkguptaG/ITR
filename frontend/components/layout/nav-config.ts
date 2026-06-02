@@ -20,6 +20,7 @@ import {
   FileDown,
   Landmark,
   BookOpenCheck,
+  Scale,
 } from 'lucide-react';
 import type { Role } from '@/lib/api-types';
 
@@ -61,6 +62,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/accounting/vouchers', messageKey: 'vouchers', icon: Landmark },
       { href: '/accounting/ledgers', messageKey: 'chartOfAccounts', icon: BookOpenCheck },
+      { href: '/accounting/financial-statements', messageKey: 'financialStatements', icon: Scale },
     ],
   },
   {
