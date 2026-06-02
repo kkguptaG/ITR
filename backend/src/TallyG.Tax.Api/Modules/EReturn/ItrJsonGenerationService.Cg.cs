@@ -55,17 +55,13 @@ public sealed partial class ItrJsonGenerationService
             {
                 D(lt["SaleOfEquityShareUs112A"])["CapgainonAssets"] = R(cgLong);
 
-                // Per-scrip Schedule 112A (LTCG on STT-paid listed equity / equity MF) — ITR-2 only for now.
-                // ITR-3's Schedule112A item diverges (LTCGBeforelower6and11 + ShareTransferredOnOrBefore) and
-                // its ScheduleCGFor23 skeleton needs extra required leaves when gains are present, so the full
-                // ITR-3 capital-gains path is a separate refinement.
-                if (ctx.ItrType == ItrType.ITR2)
+                // Per-scrip Schedule 112A (LTCG on STT-paid listed equity / equity MF). Form-aware: the ITR-3
+                // per-scrip item uses LTCGBeforelower6and11 + ShareTransferredOnOrBefore (ITR-2 uses
+                // LTCGBeforelowerB1B2). Grandfathering (pre-01-Feb-2018 shares) remains a future refinement.
+                var sch112A = BuildSchedule112A(ctx);
+                if (sch112A is not null)
                 {
-                    var sch112A = BuildSchedule112A(ctx);
-                    if (sch112A is not null)
-                    {
-                        form["Schedule112A"] = sch112A;
-                    }
+                    form["Schedule112A"] = sch112A;
                 }
             }
 
@@ -78,7 +74,47 @@ public sealed partial class ItrJsonGenerationService
         skel["SumOfCGIncm"] = R(cgShort + cgLong);
         skel["TotScheduleCGFor23"] = R(cgShort + cgLong);
 
+        // ITR-3's ScheduleCGFor23 requires a few sub-objects that ITR-2 doesn't (slump sale STCG/LTCG, sale
+        // of other unquoted assets, the VDA accrual quarter). The shared skeleton is ITR-2-shaped, so add
+        // them as zero structures when generating ITR-3 — otherwise ScheduleCGFor23 is non-conformant for
+        // ITR-3 once gains are present.
+        if (ctx.ItrType == ItrType.ITR3)
+        {
+            var st = D(skel["ShortTermCapGainFor23"]);
+            st["SlumpSaleInStcg"] = Zeros("FMV11UAEii", "FMV11UAEiii", "FullConsideration", "NetWorthOfDivision", "CapgainonAssets");
+            st["SaleOnOtherAssets"] = new Dictionary<string, object?>
+            {
+                ["FullValueConsdRecvUnqshr"] = 0L,
+                ["FairMrktValueUnqshr"] = 0L,
+                ["FullValueConsdSec50CA"] = 0L,
+                ["FullValueConsdOthUnqshr"] = 0L,
+                ["FullConsideration"] = 0L,
+                ["DeductSec48"] = Zeros("AquisitCost", "ImproveCost", "ExpOnTrans", "TotalDedn"),
+                ["BalanceCG"] = 0L,
+                ["LossSec94of7Or94of8"] = 0L,
+                ["DeemedStcgOnAssets"] = 0L,
+                ["ExemptionOrDednUs54"] = Zeros("ExemptionGrandTotal"),
+                ["CapgainonAssets"] = 0L,
+            };
+            D(skel["LongTermCapGain23"])["SlumpSaleInLtcgDtls"] = new Dictionary<string, object?>();
+            D(skel["AccruOrRecOfCG"])["VDATrnsfGainsUnder30Per"] = new Dictionary<string, object?>
+            {
+                ["DateRange"] = Zeros("Upto15Of6", "Upto15Of9", "Up16Of9To15Of12", "Up16Of12To15Of3", "Up16Of3To31Of3"),
+            };
+        }
+
         form["ScheduleCGFor23"] = skel;
+    }
+
+    private static Dictionary<string, object?> Zeros(params string[] keys)
+    {
+        var d = new Dictionary<string, object?>();
+        foreach (var k in keys)
+        {
+            d[k] = 0L;
+        }
+
+        return d;
     }
 
     // Schedule 112A — the scrip-wise breakup of LTCG on STT-paid listed equity / equity MF (s.112A). Each
@@ -90,6 +126,7 @@ public sealed partial class ItrJsonGenerationService
     private static Dictionary<string, object?>? BuildSchedule112A(ItrFilingContext ctx)
     {
         var rows = new List<Dictionary<string, object?>>();
+        var isItr3 = ctx.ItrType == ItrType.ITR3;
         long saleTot = 0, costTot = 0, expTot = 0, balTot = 0;
 
         foreach (var g in ctx.Gains.Where(x => x.Term == CapitalGainTerm.Long && (x.TaxSection ?? string.Empty).Contains("112A")))
@@ -104,7 +141,7 @@ public sealed partial class ItrJsonGenerationService
                 continue;
             }
 
-            rows.Add(new Dictionary<string, object?>
+            var row = new Dictionary<string, object?>
             {
                 ["ShareOnOrBefore"] = "AE",
                 ["ISINCode"] = ValidIsin(g.Isin),
@@ -112,14 +149,26 @@ public sealed partial class ItrJsonGenerationService
                 ["TotSaleValue"] = sale,
                 ["CostAcqWithoutIndx"] = cost,
                 ["AcquisitionCost"] = cost,
-                ["LTCGBeforelowerB1B2"] = balance,
                 ["FairMktValuePerShareunit"] = 0,
                 ["TotFairMktValueCapAst"] = 0L,
                 ["ExpExclCnctTransfer"] = exp,
                 ["TotalDeductions"] = deductions,
                 ["Balance"] = balance,
-            });
+            };
 
+            // ITR-3 renames the "LTCG before lower of B1/B2" leaf and additionally requires the
+            // shares-transferred-on-or-before flag.
+            if (isItr3)
+            {
+                row["ShareTransferredOnOrBefore"] = "AE";
+                row["LTCGBeforelower6and11"] = balance;
+            }
+            else
+            {
+                row["LTCGBeforelowerB1B2"] = balance;
+            }
+
+            rows.Add(row);
             saleTot += sale;
             costTot += cost;
             expTot += exp;

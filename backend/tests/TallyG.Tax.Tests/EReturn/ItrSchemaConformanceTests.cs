@@ -465,6 +465,31 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr3_emits_capital_gains_and_per_scrip_schedule112A()
+    {
+        // First ITR-3-with-gains gate: exercises both the augmented ScheduleCGFor23 (ITR-3 needs slump-sale /
+        // other-assets / VDA sub-objects ITR-2 doesn't) and the form-specific Schedule112A item.
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withGains: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with capital gains + Schedule 112A must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+        itr3.GetProperty("ScheduleCGFor23").GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(200_000);
+
+        var s112a = itr3.GetProperty("Schedule112A");
+        s112a.GetProperty("Balance112A").GetInt64().Should().Be(200_000);
+        var row = s112a.GetProperty("Schedule112ADtls")[0];
+        row.GetProperty("ISINCode").GetString().Should().Be("INE002A01018");
+        // ITR-3 uses the renamed leaf + the extra transfer flag.
+        row.GetProperty("LTCGBeforelower6and11").GetInt64().Should().Be(200_000);
+        row.GetProperty("ShareTransferredOnOrBefore").GetString().Should().Be("AE");
+        row.TryGetProperty("LTCGBeforelowerB1B2", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void Itr2_itemizes_house_property_into_scheduleHP()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true);
