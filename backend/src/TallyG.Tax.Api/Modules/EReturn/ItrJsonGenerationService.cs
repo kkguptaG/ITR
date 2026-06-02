@@ -159,6 +159,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleHp(root, ctx);
         AddScheduleCg(root, ctx);
         AddScheduleOs(root, ctx);
+        AddScheduleCfl(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -185,6 +186,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleHp(skel, ctx);
         AddScheduleCg(skel, ctx);
         AddScheduleOs(skel, ctx);
+        AddScheduleCfl(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -247,25 +249,73 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     };
 
     /// <summary>
-    /// Schedule CFL — current-year losses carried forward after inter-head set-off (s.71B/72/73).
-    /// ITR-2/ITR-3 only. All-zero is a valid empty schedule (no losses to carry).
+    /// Schedule CFL — losses carried forward: brought-forward from earlier years (on the return) + the
+    /// current year's unabsorbed losses (from the computation), and their total. ITR-2 columns are
+    /// HP / STCG / LTCG (+ race-horse); ITR-3 adds business / speculative / specified-business. The
+    /// per-year matrix (LossCFFromPrev*YearFromAY, each needing that year's filing date) is optional and
+    /// deferred — we report the brought-forward total. Emitted only when there is a loss to carry;
+    /// ITR-1/4 don't have this schedule.
     /// </summary>
-    private static Dictionary<string, object?> ScheduleCflNode(TaxComputation? c)
+    private static void AddScheduleCfl(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
-        var hp = c?.HousePropertyLossCarriedForward ?? 0m;
-        var biz = c?.BusinessLossCarriedForward ?? 0m;
-        var spec = c?.SpeculativeLossCarriedForward ?? 0m;
-        var stcl = c?.ShortTermCapitalLossCarriedForward ?? 0m;
-        var ltcl = c?.LongTermCapitalLossCarriedForward ?? 0m;
-        return new Dictionary<string, object?>
+        var r = ctx.Return;
+        var c = ctx.Computation;
+
+        // Brought-forward from earlier years (the return; no separate BF-speculative column is captured).
+        var bfHp = r.BroughtForwardHousePropertyLoss;
+        var bfBus = r.BroughtForwardBusinessLoss;
+        var bfStcl = r.BroughtForwardShortTermCapitalLoss;
+        var bfLtcl = r.BroughtForwardLongTermCapitalLoss;
+
+        // Current-year unabsorbed losses (the computation, after inter-head set-off s.71/71B/72/73/74).
+        var curHp = c?.HousePropertyLossCarriedForward ?? 0m;
+        var curBus = c?.BusinessLossCarriedForward ?? 0m;
+        var curSpec = c?.SpeculativeLossCarriedForward ?? 0m;
+        var curStcl = c?.ShortTermCapitalLossCarriedForward ?? 0m;
+        var curLtcl = c?.LongTermCapitalLossCarriedForward ?? 0m;
+
+        if (bfHp + bfBus + bfStcl + bfLtcl + curHp + curBus + curSpec + curStcl + curLtcl <= 0m)
         {
-            ["HousePropertyLossCF"] = R(hp),          // s.71B — 8 years, vs HP income
-            ["BusinessLossCF"] = R(biz),              // s.72  — 8 years, vs business income
-            ["SpeculativeBusinessLossCF"] = R(spec),  // s.73  — 4 years, vs speculative income
-            ["ShortTermCapitalLossCF"] = R(stcl),     // s.74  — 8 years, vs STCG/LTCG
-            ["LongTermCapitalLossCF"] = R(ltcl),      // s.74  — 8 years, vs LTCG only
-            ["TotalLossCarriedForward"] = R(hp + biz + spec + stcl + ltcl)
+            return;
+        }
+
+        var itr3 = ctx.ItrType == ItrType.ITR3;
+        form["ScheduleCFL"] = new Dictionary<string, object?>
+        {
+            ["CurrentAYloss"] = new Dictionary<string, object?>
+            {
+                ["LossSummaryDetail"] = CflLossSummary(curHp, curBus, curSpec, curStcl, curLtcl, itr3),
+            },
+            ["TotalOfBFLossesEarlierYrs"] = new Dictionary<string, object?>
+            {
+                ["LossSummaryDetail"] = CflLossSummary(bfHp, bfBus, 0m, bfStcl, bfLtcl, itr3),
+            },
+            ["TotalLossCFSummary"] = new Dictionary<string, object?>
+            {
+                ["LossSummaryDetail"] = CflLossSummary(bfHp + curHp, bfBus + curBus, curSpec, bfStcl + curStcl, bfLtcl + curLtcl, itr3),
+            },
         };
+    }
+
+    /// <summary>One CFL row (LossSummaryDetail). ITR-3 carries the business/speculative columns; ITR-2 must
+    /// not emit them (its schema forbids extra properties).</summary>
+    private static Dictionary<string, object?> CflLossSummary(decimal hp, decimal business, decimal speculative, decimal stcl, decimal ltcl, bool itr3)
+    {
+        var d = new Dictionary<string, object?>
+        {
+            ["TotalHPPTILossCF"] = R(hp),
+            ["TotalSTCGPTILossCF"] = R(stcl),
+            ["TotalLTCGPTILossCF"] = R(ltcl),
+            ["OthSrcLossRaceHorseCF"] = 0L,
+        };
+        if (itr3)
+        {
+            d["BusLossOthThanSpecLossCF"] = R(business);
+            d["LossFrmSpecBusCF"] = R(speculative);
+            d["LossFrmSpecifiedBusCF"] = 0L;
+        }
+
+        return d;
     }
 
     private static Dictionary<string, object?> TaxComputationNode(TaxComputation? c)

@@ -123,6 +123,29 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_carries_losses_forward_in_scheduleCFL()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withCarryForward: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule CFL must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var cfl = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleCFL");
+
+        cfl.GetProperty("TotalOfBFLossesEarlierYrs").GetProperty("LossSummaryDetail")
+            .GetProperty("TotalSTCGPTILossCF").GetInt64().Should().Be(40_000);
+        cfl.GetProperty("TotalOfBFLossesEarlierYrs").GetProperty("LossSummaryDetail")
+            .GetProperty("TotalHPPTILossCF").GetInt64().Should().Be(100_000);
+        cfl.GetProperty("CurrentAYloss").GetProperty("LossSummaryDetail")
+            .GetProperty("TotalSTCGPTILossCF").GetInt64().Should().Be(10_000);
+        // Total to carry = brought-forward 40k + current 10k.
+        cfl.GetProperty("TotalLossCFSummary").GetProperty("LossSummaryDetail")
+            .GetProperty("TotalSTCGPTILossCF").GetInt64().Should().Be(50_000);
+    }
+
+    [Fact]
     public void Itr2_itemizes_capital_gains_into_scheduleCG()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGains: true);
@@ -218,7 +241,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false)
     {
         var user = new User
         {
@@ -266,6 +289,16 @@ public class ItrSchemaConformanceTests
             Status = ReturnStatus.ComputedReady,
             TdsPaid = 50_000m,
         };
+
+        if (withCarryForward)
+        {
+            // Brought-forward (earlier-year) capital losses on the return + a current-year STCL from the
+            // computation, so the gate exercises Schedule CFL.
+            ret.BroughtForwardShortTermCapitalLoss = 40_000m;
+            ret.BroughtForwardLongTermCapitalLoss = 25_000m;
+            ret.BroughtForwardHousePropertyLoss = 100_000m;
+            comp.ShortTermCapitalLossCarriedForward = 10_000m;
+        }
 
         var businesses = presumptiveBusiness
             ? new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m, GrossReceiptsDigital = 2_000_000m } }
