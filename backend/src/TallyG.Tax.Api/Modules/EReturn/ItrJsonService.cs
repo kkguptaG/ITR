@@ -223,6 +223,12 @@ public sealed class ItrJsonService : IItrJsonService
                 .Where(s => s.TaxReturnId == returnId && s.TenantId == ret.TenantId).ToListAsync(ct),
             ForeignOtherIncomes = await _db.ForeignOtherIncomes
                 .Where(o => o.TaxReturnId == returnId && o.TenantId == ret.TenantId).ToListAsync(ct),
+            ForeignCashValueInsurances = await _db.ForeignCashValueInsurances
+                .Where(c => c.TaxReturnId == returnId && c.TenantId == ret.TenantId).ToListAsync(ct),
+            ForeignOtherAssets = await _db.ForeignOtherAssets
+                .Where(a => a.TaxReturnId == returnId && a.TenantId == ret.TenantId).ToListAsync(ct),
+            ForeignTrustInterests = await _db.ForeignTrustInterests
+                .Where(t => t.TaxReturnId == returnId && t.TenantId == ret.TenantId).ToListAsync(ct),
         };
     }
 

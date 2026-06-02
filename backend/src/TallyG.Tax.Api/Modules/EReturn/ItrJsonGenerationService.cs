@@ -1016,7 +1016,10 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             && ctx.ForeignImmovableProperties.Count == 0
             && ctx.ForeignFinancialInterests.Count == 0
             && ctx.ForeignSigningAuthorities.Count == 0
-            && ctx.ForeignOtherIncomes.Count == 0)
+            && ctx.ForeignOtherIncomes.Count == 0
+            && ctx.ForeignCashValueInsurances.Count == 0
+            && ctx.ForeignOtherAssets.Count == 0
+            && ctx.ForeignTrustInterests.Count == 0)
         {
             return;
         }
@@ -1057,7 +1060,83 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             fa["DetailsOfOthSourcesIncOutsideIndia"] = ctx.ForeignOtherIncomes.Select(OtherIncomeItem).ToList();
         }
 
+        if (ctx.ForeignCashValueInsurances.Count > 0)
+        {
+            fa["DtlsForeignCashValueInsurance"] = ctx.ForeignCashValueInsurances.Select(CashValueInsuranceItem).ToList();
+        }
+
+        if (ctx.ForeignOtherAssets.Count > 0)
+        {
+            fa["DetailsOthAssets"] = ctx.ForeignOtherAssets.Select(OtherAssetItem).ToList();
+        }
+
+        if (ctx.ForeignTrustInterests.Count > 0)
+        {
+            fa["DetailsOfTrustOutIndiaTrustee"] = ctx.ForeignTrustInterests.Select(TrustItem).ToList();
+        }
+
         form["ScheduleFA"] = fa;
+    }
+
+    private static Dictionary<string, object?> CashValueInsuranceItem(ForeignCashValueInsurance c) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(c.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(c.CountryCode) ? "2" : c.CountryCode.Trim(),
+        ["FinancialInstName"] = Trunc(NonEmpty(c.InstitutionName, "NA"), 125),
+        ["FinancialInstAddress"] = Trunc(NonEmpty(c.InstitutionAddress, "NA"), 200),
+        ["ZipCode"] = Trunc(NonEmpty(c.ZipCode, "NA"), 8),
+        ["ContractDate"] = (c.ContractDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["CashValOrSurrenderVal"] = R(c.CashOrSurrenderValue),
+        ["TotGrossAmtPaidCredited"] = R(c.GrossAmountCredited),
+    };
+
+    private static Dictionary<string, object?> OtherAssetItem(ForeignOtherAsset a) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(a.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(a.CountryCode) ? "2" : a.CountryCode.Trim(),
+        ["ZipCode"] = Trunc(NonEmpty(a.ZipCode, "NA"), 8),
+        ["NatureOfAsset"] = Trunc(NonEmpty(a.NatureOfAsset, "Other asset"), 100),
+        ["Ownership"] = ForeignOwnershipKind(a.Ownership),
+        ["DateOfAcq"] = (a.AcquisitionDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["TotalInvestment"] = R(a.TotalInvestment),
+        ["IncDrvAsset"] = R(a.IncomeDerived),
+        ["NatureOfInc"] = Trunc(NonEmpty(a.NatureOfIncome, "Other"), 100),
+        ["IncTaxAmt"] = R(a.TaxableIncomeAmount),
+        ["IncTaxSch"] = IncomeOfferedSchedule(a.IncomeTaxSchedule),
+        ["IncTaxSchNo"] = Trunc(NonEmpty(a.IncomeTaxScheduleItem, "1"), 50),
+    };
+
+    private static Dictionary<string, object?> TrustItem(ForeignTrustInterest t)
+    {
+        var item = new Dictionary<string, object?>
+        {
+            ["CountryName"] = Trunc(NonEmpty(t.CountryName, "NA"), 55),
+            ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(t.CountryCode) ? "2" : t.CountryCode.Trim(),
+            ["ZipCode"] = Trunc(NonEmpty(t.ZipCode, "NA"), 8),
+            ["NameOfTrust"] = Trunc(NonEmpty(t.TrustName, "NA"), 125),
+            ["AddressOfTrust"] = Trunc(NonEmpty(t.TrustAddress, "NA"), 200),
+            ["NameOfOtherTrustees"] = Trunc(NonEmpty(t.TrusteeNames, "NA"), 125),
+            ["AddressOfOtherTrustees"] = Trunc(NonEmpty(t.TrusteeAddresses, "NA"), 200),
+            ["NameOfSettlor"] = Trunc(NonEmpty(t.SettlorName, "NA"), 125),
+            ["AddressOfSettlor"] = Trunc(NonEmpty(t.SettlorAddress, "NA"), 200),
+            ["NameOfBeneficiaries"] = Trunc(NonEmpty(t.BeneficiaryNames, "NA"), 125),
+            ["AddressOfBeneficiaries"] = Trunc(NonEmpty(t.BeneficiaryAddresses, "NA"), 200),
+            ["DateHeld"] = (t.DateHeld ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+            ["IncDrvTaxFlag"] = t.IncomeTaxable ? "Y" : "N",
+        };
+        if (t.IncomeFromTrust > 0m)
+        {
+            item["IncDrvFromTrust"] = R(t.IncomeFromTrust);
+        }
+
+        if (t.IncomeTaxable && t.IncomeOffered > 0m)
+        {
+            item["IncOfferedAmt"] = R(t.IncomeOffered);
+            item["IncOfferedSch"] = IncomeOfferedSchedule(t.IncomeTaxSchedule);
+            item["IncOfferedSchNo"] = Trunc(NonEmpty(t.IncomeTaxScheduleItem, "1"), 50);
+        }
+
+        return item;
     }
 
     private static Dictionary<string, object?> SigningAuthItem(ForeignSigningAuthority s)

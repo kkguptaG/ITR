@@ -55,6 +55,9 @@ public class AppDbContext : DbContext
     public DbSet<ForeignFinancialInterest> ForeignFinancialInterests => Set<ForeignFinancialInterest>();
     public DbSet<ForeignSigningAuthority> ForeignSigningAuthorities => Set<ForeignSigningAuthority>();
     public DbSet<ForeignOtherIncome> ForeignOtherIncomes => Set<ForeignOtherIncome>();
+    public DbSet<ForeignCashValueInsurance> ForeignCashValueInsurances => Set<ForeignCashValueInsurance>();
+    public DbSet<ForeignOtherAsset> ForeignOtherAssets => Set<ForeignOtherAsset>();
+    public DbSet<ForeignTrustInterest> ForeignTrustInterests => Set<ForeignTrustInterest>();
     public DbSet<Donation80G> Donations80G => Set<Donation80G>();
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();

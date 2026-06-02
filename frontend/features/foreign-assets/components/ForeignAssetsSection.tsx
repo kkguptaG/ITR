@@ -15,6 +15,9 @@ import { ForeignImmovableCard } from './ForeignImmovableCard';
 import { ForeignFinancialInterestCard } from './ForeignFinancialInterestCard';
 import { ForeignSigningAuthorityCard } from './ForeignSigningAuthorityCard';
 import { ForeignOtherIncomeCard } from './ForeignOtherIncomeCard';
+import { ForeignCashValueInsuranceCard } from './ForeignCashValueInsuranceCard';
+import { ForeignOtherAssetCard } from './ForeignOtherAssetCard';
+import { ForeignTrustCard } from './ForeignTrustCard';
 
 export function ForeignAssetsSection({ returnId, editable }: { returnId: string; editable: boolean }) {
   const [open, setOpen] = useState(false);
@@ -48,6 +51,9 @@ export function ForeignAssetsSection({ returnId, editable }: { returnId: string;
           <ForeignFinancialInterestCard returnId={returnId} editable={editable} />
           <ForeignSigningAuthorityCard returnId={returnId} editable={editable} />
           <ForeignOtherIncomeCard returnId={returnId} editable={editable} />
+          <ForeignCashValueInsuranceCard returnId={returnId} editable={editable} />
+          <ForeignOtherAssetCard returnId={returnId} editable={editable} />
+          <ForeignTrustCard returnId={returnId} editable={editable} />
         </div>
       )}
     </details>

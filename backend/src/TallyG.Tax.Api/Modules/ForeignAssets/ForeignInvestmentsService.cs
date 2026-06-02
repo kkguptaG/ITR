@@ -23,6 +23,14 @@ public interface IForeignInvestmentsService
     Task<IReadOnlyList<ForeignFinancialInterestDto>> ListFinancialInterestAsync(Guid returnId, CancellationToken ct = default);
     Task<ForeignFinancialInterestDto> AddFinancialInterestAsync(Guid returnId, UpsertForeignFinancialInterestRequest request, CancellationToken ct = default);
     Task DeleteFinancialInterestAsync(Guid returnId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ForeignCashValueInsuranceDto>> ListCashValueAsync(Guid returnId, CancellationToken ct = default);
+    Task<ForeignCashValueInsuranceDto> AddCashValueAsync(Guid returnId, UpsertForeignCashValueInsuranceRequest request, CancellationToken ct = default);
+    Task DeleteCashValueAsync(Guid returnId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ForeignOtherAssetDto>> ListOtherAssetAsync(Guid returnId, CancellationToken ct = default);
+    Task<ForeignOtherAssetDto> AddOtherAssetAsync(Guid returnId, UpsertForeignOtherAssetRequest request, CancellationToken ct = default);
+    Task DeleteOtherAssetAsync(Guid returnId, Guid id, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -201,7 +209,88 @@ public sealed class ForeignInvestmentsService : IForeignInvestmentsService
         await _db.SaveChangesAsync(ct);
     }
 
+    // ----------------------------------------------------------------- cash-value insurance
+    public async Task<IReadOnlyList<ForeignCashValueInsuranceDto>> ListCashValueAsync(Guid returnId, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var rows = await CashValueQuery(returnId).OrderBy(c => c.CountryName).ThenBy(c => c.InstitutionName).ToListAsync(ct);
+        return rows.Select(ToDto).ToList();
+    }
+
+    public async Task<ForeignCashValueInsuranceDto> AddCashValueAsync(Guid returnId, UpsertForeignCashValueInsuranceRequest r, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new ForeignCashValueInsurance
+        {
+            TenantId = ret.TenantId, UserId = ret.UserId, TaxReturnId = ret.Id,
+            CountryCode = r.CountryCode.Trim(), CountryName = r.CountryName.Trim(), ZipCode = r.ZipCode.Trim(),
+            InstitutionName = r.InstitutionName.Trim(), InstitutionAddress = r.InstitutionAddress.Trim(),
+            ContractDate = r.ContractDate,
+            CashOrSurrenderValue = Clamp(r.CashOrSurrenderValue),
+            GrossAmountCredited = Clamp(r.GrossAmountCredited),
+        };
+        _db.ForeignCashValueInsurances.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteCashValueAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var entity = await CashValueQuery(returnId).FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw AppException.NotFound("Insurance contract not found.", "FOREIGNASSET.NOT_FOUND");
+        _db.ForeignCashValueInsurances.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ----------------------------------------------------------------- other capital assets
+    public async Task<IReadOnlyList<ForeignOtherAssetDto>> ListOtherAssetAsync(Guid returnId, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var rows = await OtherAssetQuery(returnId).OrderBy(a => a.CountryName).ThenBy(a => a.NatureOfAsset).ToListAsync(ct);
+        return rows.Select(ToDto).ToList();
+    }
+
+    public async Task<ForeignOtherAssetDto> AddOtherAssetAsync(Guid returnId, UpsertForeignOtherAssetRequest r, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new ForeignOtherAsset
+        {
+            TenantId = ret.TenantId, UserId = ret.UserId, TaxReturnId = ret.Id,
+            CountryCode = r.CountryCode.Trim(), CountryName = r.CountryName.Trim(), ZipCode = r.ZipCode.Trim(),
+            NatureOfAsset = r.NatureOfAsset.Trim(),
+            Ownership = r.Ownership.Trim().ToUpperInvariant(),
+            AcquisitionDate = r.AcquisitionDate,
+            TotalInvestment = Clamp(r.TotalInvestment),
+            IncomeDerived = Clamp(r.IncomeDerived),
+            NatureOfIncome = r.NatureOfIncome.Trim(),
+            TaxableIncomeAmount = Clamp(r.TaxableIncomeAmount),
+            IncomeTaxSchedule = r.IncomeTaxSchedule.Trim().ToUpperInvariant(),
+            IncomeTaxScheduleItem = r.IncomeTaxScheduleItem.Trim(),
+        };
+        _db.ForeignOtherAssets.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteOtherAssetAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var entity = await OtherAssetQuery(returnId).FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw AppException.NotFound("Foreign asset not found.", "FOREIGNASSET.NOT_FOUND");
+        _db.ForeignOtherAssets.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
     // ----------------------------------------------------------------- helpers
+    private IQueryable<ForeignCashValueInsurance> CashValueQuery(Guid returnId)
+        => _db.ForeignCashValueInsurances.Where(c => c.TaxReturnId == returnId
+                                                    && c.TenantId == _currentUser.TenantId && c.UserId == _currentUser.UserId);
+
+    private IQueryable<ForeignOtherAsset> OtherAssetQuery(Guid returnId)
+        => _db.ForeignOtherAssets.Where(a => a.TaxReturnId == returnId
+                                            && a.TenantId == _currentUser.TenantId && a.UserId == _currentUser.UserId);
+
     private IQueryable<ForeignImmovablePropertyFA> ImmovableQuery(Guid returnId)
         => _db.ForeignImmovableProperties.Where(p => p.TaxReturnId == returnId
                                                     && p.TenantId == _currentUser.TenantId && p.UserId == _currentUser.UserId);
@@ -252,4 +341,12 @@ public sealed class ForeignInvestmentsService : IForeignInvestmentsService
     private static ForeignFinancialInterestDto ToDto(ForeignFinancialInterest f) => new(
         f.Id, f.CountryCode, f.CountryName, f.ZipCode, f.NatureOfEntity, f.EntityName, f.EntityAddress, f.NatureOfInterest,
         f.DateHeld, f.TotalInvestment, f.IncomeFromInterest, f.NatureOfIncome, f.TaxableIncomeAmount, f.IncomeTaxSchedule, f.IncomeTaxScheduleItem);
+
+    private static ForeignCashValueInsuranceDto ToDto(ForeignCashValueInsurance c) => new(
+        c.Id, c.CountryCode, c.CountryName, c.InstitutionName, c.InstitutionAddress, c.ZipCode,
+        c.ContractDate, c.CashOrSurrenderValue, c.GrossAmountCredited);
+
+    private static ForeignOtherAssetDto ToDto(ForeignOtherAsset a) => new(
+        a.Id, a.CountryCode, a.CountryName, a.ZipCode, a.NatureOfAsset, a.Ownership, a.AcquisitionDate,
+        a.TotalInvestment, a.IncomeDerived, a.NatureOfIncome, a.TaxableIncomeAmount, a.IncomeTaxSchedule, a.IncomeTaxScheduleItem);
 }

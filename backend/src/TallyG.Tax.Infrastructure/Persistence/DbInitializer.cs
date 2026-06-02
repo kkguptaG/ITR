@@ -346,6 +346,32 @@ public static class DbInitializer
             IncomeDerived = 250_000m, NatureOfIncome = "Consultancy fees", IncomeTaxable = true,
             IncomeOffered = 250_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
         });
+        db.ForeignCashValueInsurances.Add(new ForeignCashValueInsurance
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", InstitutionName = "MetLife",
+            InstitutionAddress = "200 Park Avenue, New York", ZipCode = "10166",
+            ContractDate = new DateOnly(2018, 3, 20), CashOrSurrenderValue = 1_400_000m, GrossAmountCredited = 30_000m,
+        });
+        db.ForeignOtherAssets.Add(new ForeignOtherAsset
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", ZipCode = "10013",
+            NatureOfAsset = "Artwork", Ownership = "DIRECT", AcquisitionDate = new DateOnly(2021, 11, 5),
+            TotalInvestment = 900_000m, IncomeDerived = 0m, NatureOfIncome = "None", TaxableIncomeAmount = 0m,
+            IncomeTaxSchedule = "NI", IncomeTaxScheduleItem = "1",
+        });
+        db.ForeignTrustInterests.Add(new ForeignTrustInterest
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "44", CountryName = "United Kingdom", ZipCode = "EC2R8AH",
+            TrustName = "Smith Family Trust", TrustAddress = "10 Old Broad Street, London",
+            TrusteeNames = "John Smith; Jane Smith", TrusteeAddresses = "10 Old Broad Street, London",
+            SettlorName = "Robert Smith", SettlorAddress = "10 Old Broad Street, London",
+            BeneficiaryNames = "Demo Taxpayer", BeneficiaryAddresses = "1 Main Street, Pune",
+            DateHeld = new DateOnly(2017, 5, 1), IncomeTaxable = true, IncomeFromTrust = 150_000m,
+            IncomeOffered = 150_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
+        });
 
         // Donee-wise 80G donations (Schedule 80G). Total ₹11,000 (matches the 80G deduction above); eligible
         // ₹8,000 = ₹5,000 (PM CARES, 100%) + 50% × ₹6,000 (a charitable trust, the limited bucket).

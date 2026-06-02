@@ -145,7 +145,8 @@ public class ItrSchemaConformanceTests
     [Fact]
     public void Itr2_discloses_foreign_investments_in_scheduleFA()
     {
-        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withForeignInvestments: true);
+        // Both toggles so the gate exercises every Schedule FA table (bank + the nine other classes).
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withForeignBank: true, withForeignInvestments: true);
         var json = _gen.Generate(ctx).Json;
 
         var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
@@ -190,6 +191,23 @@ public class ItrSchemaConformanceTests
         oth.GetProperty("IncDerived").GetInt64().Should().Be(250_000);
         oth.GetProperty("IncOfferedAmt").GetInt64().Should().Be(250_000);
         oth.GetProperty("IncOfferedSch").GetString().Should().Be("OS");
+
+        // All ten Schedule FA tables are now exercised.
+        var ins = fa.GetProperty("DtlsForeignCashValueInsurance")[0];
+        ins.GetProperty("FinancialInstName").GetString().Should().Be("MetLife");
+        ins.GetProperty("CashValOrSurrenderVal").GetInt64().Should().Be(1_400_000);
+
+        var asset = fa.GetProperty("DetailsOthAssets")[0];
+        asset.GetProperty("NatureOfAsset").GetString().Should().Be("Artwork");
+        asset.GetProperty("Ownership").GetString().Should().Be("DIRECT");
+        asset.GetProperty("IncTaxSch").GetString().Should().Be("NI");
+
+        var trust = fa.GetProperty("DetailsOfTrustOutIndiaTrustee")[0];
+        trust.GetProperty("NameOfTrust").GetString().Should().Be("Smith Family Trust");
+        trust.GetProperty("IncDrvTaxFlag").GetString().Should().Be("Y");
+        trust.GetProperty("IncOfferedAmt").GetInt64().Should().Be(150_000);
+
+        fa.EnumerateObject().Count().Should().Be(10, "all ten Schedule FA tables are emitted");
     }
 
     [Fact]
@@ -626,6 +644,15 @@ public class ItrSchemaConformanceTests
             ForeignOtherIncomes = withForeignInvestments
                 ? new[] { new ForeignOtherIncome { CountryCode = "2", CountryName = "United States", ZipCode = "94016", PayerName = "Acme Consulting Inc", PayerAddress = "1 Market St, San Francisco", IncomeDerived = 250_000m, NatureOfIncome = "Consultancy fees", IncomeTaxable = true, IncomeOffered = 250_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1" } }
                 : Array.Empty<ForeignOtherIncome>(),
+            ForeignCashValueInsurances = withForeignInvestments
+                ? new[] { new ForeignCashValueInsurance { CountryCode = "2", CountryName = "United States", InstitutionName = "MetLife", InstitutionAddress = "200 Park Avenue, New York", ZipCode = "10166", ContractDate = new DateOnly(2018, 3, 20), CashOrSurrenderValue = 1_400_000m, GrossAmountCredited = 30_000m } }
+                : Array.Empty<ForeignCashValueInsurance>(),
+            ForeignOtherAssets = withForeignInvestments
+                ? new[] { new ForeignOtherAsset { CountryCode = "2", CountryName = "United States", ZipCode = "10013", NatureOfAsset = "Artwork", Ownership = "DIRECT", AcquisitionDate = new DateOnly(2021, 11, 5), TotalInvestment = 900_000m, IncomeDerived = 0m, NatureOfIncome = "None", TaxableIncomeAmount = 0m, IncomeTaxSchedule = "NI", IncomeTaxScheduleItem = "1" } }
+                : Array.Empty<ForeignOtherAsset>(),
+            ForeignTrustInterests = withForeignInvestments
+                ? new[] { new ForeignTrustInterest { CountryCode = "44", CountryName = "United Kingdom", ZipCode = "EC2R8AH", TrustName = "Smith Family Trust", TrustAddress = "10 Old Broad Street, London", TrusteeNames = "John Smith", TrusteeAddresses = "10 Old Broad Street, London", SettlorName = "Robert Smith", SettlorAddress = "10 Old Broad Street, London", BeneficiaryNames = "Demo Taxpayer", BeneficiaryAddresses = "1 Main Street, Pune", DateHeld = new DateOnly(2017, 5, 1), IncomeTaxable = true, IncomeFromTrust = 150_000m, IncomeOffered = 150_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1" } }
+                : Array.Empty<ForeignTrustInterest>(),
             // Donee-wise 80G donations so the ITR-2/3 gate exercises the itemised Schedule 80G tables:
             // a 100%-no-limit donee (full eligible) + a 50%-with-limit donee (half eligible).
             Donations80G = withDonees

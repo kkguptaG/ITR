@@ -224,3 +224,101 @@ export interface UpsertForeignOtherIncomeBody {
   incomeTaxSchedule: string;
   incomeTaxScheduleItem: string;
 }
+
+// Schedule FA — foreign cash-value insurance / annuity (DtlsForeignCashValueInsurance).
+export interface ForeignCashValueInsuranceDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  institutionName: string;
+  institutionAddress: string;
+  zipCode: string;
+  contractDate: string | null;
+  cashOrSurrenderValue: number;
+  grossAmountCredited: number;
+}
+
+export interface UpsertForeignCashValueInsuranceBody {
+  countryCode: string;
+  countryName: string;
+  institutionName: string;
+  institutionAddress: string;
+  zipCode: string;
+  contractDate: string | null;
+  cashOrSurrenderValue: number;
+  grossAmountCredited: number;
+}
+
+// Schedule FA — any other foreign capital asset (DetailsOthAssets).
+export interface ForeignOtherAssetDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  natureOfAsset: string;
+  ownership: string;
+  acquisitionDate: string | null;
+  totalInvestment: number;
+  incomeDerived: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignOtherAssetBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  natureOfAsset: string;
+  ownership: string;
+  acquisitionDate: string | null;
+  totalInvestment: number;
+  incomeDerived: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+// Schedule FA — interest in a trust outside India (DetailsOfTrustOutIndiaTrustee).
+export interface ForeignTrustInterestDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  trustName: string;
+  trustAddress: string;
+  trusteeNames: string;
+  trusteeAddresses: string;
+  settlorName: string;
+  settlorAddress: string;
+  beneficiaryNames: string;
+  beneficiaryAddresses: string;
+  dateHeld: string | null;
+  incomeTaxable: boolean;
+  incomeFromTrust: number;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignTrustInterestBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  trustName: string;
+  trustAddress: string;
+  trusteeNames: string;
+  trusteeAddresses: string;
+  settlorName: string;
+  settlorAddress: string;
+  beneficiaryNames: string;
+  beneficiaryAddresses: string;
+  dateHeld: string | null;
+  incomeTaxable: boolean;
+  incomeFromTrust: number;
+  incomeOffered: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}

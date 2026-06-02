@@ -15,6 +15,10 @@ public interface IForeignDisclosuresService
     Task<IReadOnlyList<ForeignOtherIncomeDto>> ListOtherIncomeAsync(Guid returnId, CancellationToken ct = default);
     Task<ForeignOtherIncomeDto> AddOtherIncomeAsync(Guid returnId, UpsertForeignOtherIncomeRequest request, CancellationToken ct = default);
     Task DeleteOtherIncomeAsync(Guid returnId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ForeignTrustInterestDto>> ListTrustAsync(Guid returnId, CancellationToken ct = default);
+    Task<ForeignTrustInterestDto> AddTrustAsync(Guid returnId, UpsertForeignTrustInterestRequest request, CancellationToken ct = default);
+    Task DeleteTrustAsync(Guid returnId, Guid id, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -107,7 +111,51 @@ public sealed class ForeignDisclosuresService : IForeignDisclosuresService
         await _db.SaveChangesAsync(ct);
     }
 
+    // ----------------------------------------------------------------- trusts outside India
+    public async Task<IReadOnlyList<ForeignTrustInterestDto>> ListTrustAsync(Guid returnId, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var rows = await TrustQuery(returnId).OrderBy(t => t.CountryName).ThenBy(t => t.TrustName).ToListAsync(ct);
+        return rows.Select(ToDto).ToList();
+    }
+
+    public async Task<ForeignTrustInterestDto> AddTrustAsync(Guid returnId, UpsertForeignTrustInterestRequest r, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new ForeignTrustInterest
+        {
+            TenantId = ret.TenantId, UserId = ret.UserId, TaxReturnId = ret.Id,
+            CountryCode = r.CountryCode.Trim(), CountryName = r.CountryName.Trim(), ZipCode = r.ZipCode.Trim(),
+            TrustName = r.TrustName.Trim(), TrustAddress = r.TrustAddress.Trim(),
+            TrusteeNames = r.TrusteeNames.Trim(), TrusteeAddresses = r.TrusteeAddresses.Trim(),
+            SettlorName = r.SettlorName.Trim(), SettlorAddress = r.SettlorAddress.Trim(),
+            BeneficiaryNames = r.BeneficiaryNames.Trim(), BeneficiaryAddresses = r.BeneficiaryAddresses.Trim(),
+            DateHeld = r.DateHeld,
+            IncomeTaxable = r.IncomeTaxable,
+            IncomeFromTrust = Clamp(r.IncomeFromTrust),
+            IncomeOffered = Clamp(r.IncomeOffered),
+            IncomeTaxSchedule = r.IncomeTaxSchedule.Trim().ToUpperInvariant(),
+            IncomeTaxScheduleItem = r.IncomeTaxScheduleItem.Trim(),
+        };
+        _db.ForeignTrustInterests.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteTrustAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var entity = await TrustQuery(returnId).FirstOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw AppException.NotFound("Trust interest not found.", "FOREIGNASSET.NOT_FOUND");
+        _db.ForeignTrustInterests.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
     // ----------------------------------------------------------------- helpers
+    private IQueryable<ForeignTrustInterest> TrustQuery(Guid returnId)
+        => _db.ForeignTrustInterests.Where(t => t.TaxReturnId == returnId
+                                               && t.TenantId == _currentUser.TenantId && t.UserId == _currentUser.UserId);
+
     private IQueryable<ForeignSigningAuthority> SigningQuery(Guid returnId)
         => _db.ForeignSigningAuthorities.Where(s => s.TaxReturnId == returnId
                                                    && s.TenantId == _currentUser.TenantId && s.UserId == _currentUser.UserId);
@@ -143,4 +191,9 @@ public sealed class ForeignDisclosuresService : IForeignDisclosuresService
     private static ForeignOtherIncomeDto ToDto(ForeignOtherIncome o) => new(
         o.Id, o.CountryCode, o.CountryName, o.ZipCode, o.PayerName, o.PayerAddress, o.IncomeDerived,
         o.NatureOfIncome, o.IncomeTaxable, o.IncomeOffered, o.IncomeTaxSchedule, o.IncomeTaxScheduleItem);
+
+    private static ForeignTrustInterestDto ToDto(ForeignTrustInterest t) => new(
+        t.Id, t.CountryCode, t.CountryName, t.ZipCode, t.TrustName, t.TrustAddress, t.TrusteeNames, t.TrusteeAddresses,
+        t.SettlorName, t.SettlorAddress, t.BeneficiaryNames, t.BeneficiaryAddresses, t.DateHeld, t.IncomeTaxable,
+        t.IncomeFromTrust, t.IncomeOffered, t.IncomeTaxSchedule, t.IncomeTaxScheduleItem);
 }

@@ -91,4 +91,42 @@ public sealed class ForeignInvestmentsController : ControllerBase
         await _svc.DeleteFinancialInterestAsync(returnId, id, ct);
         return NoContent();
     }
+
+    // ----------------------------------------------------------------- cash-value insurance
+    [HttpGet("foreign-cash-value-insurance")]
+    [ProducesResponseType(typeof(IReadOnlyList<ForeignCashValueInsuranceDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<ForeignCashValueInsuranceDto>> ListCashValue([FromRoute] Guid returnId, CancellationToken ct)
+        => _svc.ListCashValueAsync(returnId, ct);
+
+    [HttpPost("foreign-cash-value-insurance")]
+    [ProducesResponseType(typeof(ForeignCashValueInsuranceDto), StatusCodes.Status200OK)]
+    public Task<ForeignCashValueInsuranceDto> AddCashValue([FromRoute] Guid returnId, [FromBody] UpsertForeignCashValueInsuranceRequest request, CancellationToken ct)
+        => _svc.AddCashValueAsync(returnId, request, ct);
+
+    [HttpDelete("foreign-cash-value-insurance/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteCashValue([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteCashValueAsync(returnId, id, ct);
+        return NoContent();
+    }
+
+    // ----------------------------------------------------------------- other capital assets
+    [HttpGet("foreign-other-assets")]
+    [ProducesResponseType(typeof(IReadOnlyList<ForeignOtherAssetDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<ForeignOtherAssetDto>> ListOtherAsset([FromRoute] Guid returnId, CancellationToken ct)
+        => _svc.ListOtherAssetAsync(returnId, ct);
+
+    [HttpPost("foreign-other-assets")]
+    [ProducesResponseType(typeof(ForeignOtherAssetDto), StatusCodes.Status200OK)]
+    public Task<ForeignOtherAssetDto> AddOtherAsset([FromRoute] Guid returnId, [FromBody] UpsertForeignOtherAssetRequest request, CancellationToken ct)
+        => _svc.AddOtherAssetAsync(returnId, request, ct);
+
+    [HttpDelete("foreign-other-assets/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteOtherAsset([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteOtherAssetAsync(returnId, id, ct);
+        return NoContent();
+    }
 }

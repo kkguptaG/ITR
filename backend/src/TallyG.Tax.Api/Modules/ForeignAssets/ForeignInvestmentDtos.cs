@@ -213,3 +213,89 @@ public sealed class UpsertForeignFinancialInterestRequestValidator : AbstractVal
         RuleFor(r => r.TaxableIncomeAmount).InclusiveBetween(0m, max);
     }
 }
+
+/// <summary>A foreign cash-value insurance / annuity contract (Schedule FA DtlsForeignCashValueInsurance).</summary>
+public sealed record ForeignCashValueInsuranceDto(
+    Guid Id,
+    string CountryCode,
+    string CountryName,
+    string InstitutionName,
+    string InstitutionAddress,
+    string ZipCode,
+    DateOnly? ContractDate,
+    decimal CashOrSurrenderValue,
+    decimal GrossAmountCredited);
+
+public sealed record UpsertForeignCashValueInsuranceRequest(
+    string CountryCode,
+    string CountryName,
+    string InstitutionName,
+    string InstitutionAddress,
+    string ZipCode,
+    DateOnly? ContractDate,
+    decimal CashOrSurrenderValue,
+    decimal GrossAmountCredited);
+
+/// <summary>Any other foreign capital asset (Schedule FA DetailsOthAssets).</summary>
+public sealed record ForeignOtherAssetDto(
+    Guid Id,
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string NatureOfAsset,
+    string Ownership,
+    DateOnly? AcquisitionDate,
+    decimal TotalInvestment,
+    decimal IncomeDerived,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+public sealed record UpsertForeignOtherAssetRequest(
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string NatureOfAsset,
+    string Ownership,
+    DateOnly? AcquisitionDate,
+    decimal TotalInvestment,
+    decimal IncomeDerived,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+public sealed class UpsertForeignCashValueInsuranceRequestValidator : AbstractValidator<UpsertForeignCashValueInsuranceRequest>
+{
+    public UpsertForeignCashValueInsuranceRequestValidator()
+    {
+        const decimal max = 99_999_999_999_999m;
+        RuleFor(r => r.CountryCode).NotEmpty().MaximumLength(6);
+        RuleFor(r => r.CountryName).NotEmpty().MaximumLength(55);
+        RuleFor(r => r.InstitutionName).NotEmpty().MaximumLength(125);
+        RuleFor(r => r.InstitutionAddress).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.ZipCode).NotEmpty().MaximumLength(8);
+        RuleFor(r => r.CashOrSurrenderValue).InclusiveBetween(0m, max);
+        RuleFor(r => r.GrossAmountCredited).InclusiveBetween(0m, max);
+    }
+}
+
+public sealed class UpsertForeignOtherAssetRequestValidator : AbstractValidator<UpsertForeignOtherAssetRequest>
+{
+    public UpsertForeignOtherAssetRequestValidator()
+    {
+        const decimal max = 99_999_999_999_999m;
+        RuleFor(r => r.CountryCode).NotEmpty().MaximumLength(6);
+        RuleFor(r => r.CountryName).NotEmpty().MaximumLength(55);
+        RuleFor(r => r.ZipCode).NotEmpty().MaximumLength(8);
+        RuleFor(r => r.NatureOfAsset).NotEmpty().MaximumLength(100);
+        RuleFor(r => r.Ownership).Must(s => ForeignFaEnums.Ownership.Contains(s)).WithMessage("Ownership must be DIRECT, BENEFICIAL_OWNER or BENIFICIARY.");
+        RuleFor(r => r.NatureOfIncome).NotEmpty().MaximumLength(100);
+        RuleFor(r => r.IncomeTaxSchedule).Must(s => ForeignFaEnums.IncomeSchedule.Contains(s)).WithMessage("Income schedule must be SA, HP, CG, OS, EI or NI.");
+        RuleFor(r => r.IncomeTaxScheduleItem).NotEmpty().MaximumLength(50);
+        RuleFor(r => r.TotalInvestment).InclusiveBetween(0m, max);
+        RuleFor(r => r.IncomeDerived).InclusiveBetween(0m, max);
+        RuleFor(r => r.TaxableIncomeAmount).InclusiveBetween(0m, max);
+    }
+}

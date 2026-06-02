@@ -101,6 +101,15 @@ public sealed class ItrFilingContext
     /// <summary>Other income from outside India (Schedule FA DetailsOfOthSourcesIncOutsideIndia).</summary>
     public IReadOnlyList<ForeignOtherIncome> ForeignOtherIncomes { get; init; } = Array.Empty<ForeignOtherIncome>();
 
+    /// <summary>Foreign cash-value insurance contracts (Schedule FA DtlsForeignCashValueInsurance).</summary>
+    public IReadOnlyList<ForeignCashValueInsurance> ForeignCashValueInsurances { get; init; } = Array.Empty<ForeignCashValueInsurance>();
+
+    /// <summary>Other foreign capital assets (Schedule FA DetailsOthAssets).</summary>
+    public IReadOnlyList<ForeignOtherAsset> ForeignOtherAssets { get; init; } = Array.Empty<ForeignOtherAsset>();
+
+    /// <summary>Interests in trusts outside India (Schedule FA DetailsOfTrustOutIndiaTrustee).</summary>
+    public IReadOnlyList<ForeignTrustInterest> ForeignTrustInterests { get; init; } = Array.Empty<ForeignTrustInterest>();
+
     /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
     public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
 

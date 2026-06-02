@@ -53,4 +53,23 @@ public sealed class ForeignDisclosuresController : ControllerBase
         await _svc.DeleteOtherIncomeAsync(returnId, id, ct);
         return NoContent();
     }
+
+    // ----------------------------------------------------------------- trusts outside India
+    [HttpGet("foreign-trusts")]
+    [ProducesResponseType(typeof(IReadOnlyList<ForeignTrustInterestDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<ForeignTrustInterestDto>> ListTrust([FromRoute] Guid returnId, CancellationToken ct)
+        => _svc.ListTrustAsync(returnId, ct);
+
+    [HttpPost("foreign-trusts")]
+    [ProducesResponseType(typeof(ForeignTrustInterestDto), StatusCodes.Status200OK)]
+    public Task<ForeignTrustInterestDto> AddTrust([FromRoute] Guid returnId, [FromBody] UpsertForeignTrustInterestRequest request, CancellationToken ct)
+        => _svc.AddTrustAsync(returnId, request, ct);
+
+    [HttpDelete("foreign-trusts/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteTrust([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteTrustAsync(returnId, id, ct);
+        return NoContent();
+    }
 }

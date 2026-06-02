@@ -10,6 +10,9 @@ import type {
   ForeignFinancialInterestDto, UpsertForeignFinancialInterestBody,
   ForeignSigningAuthorityDto, UpsertForeignSigningAuthorityBody,
   ForeignOtherIncomeDto, UpsertForeignOtherIncomeBody,
+  ForeignCashValueInsuranceDto, UpsertForeignCashValueInsuranceBody,
+  ForeignOtherAssetDto, UpsertForeignOtherAssetBody,
+  ForeignTrustInterestDto, UpsertForeignTrustInterestBody,
 } from './types';
 
 export const foreignAssetsKeys = {
@@ -47,6 +50,21 @@ export const foreignOtherIncomeKeys = {
   forReturn: (returnId: string) => [...foreignOtherIncomeKeys.all, returnId] as const,
 };
 
+export const foreignCashValueKeys = {
+  all: ['foreign-cash-value'] as const,
+  forReturn: (returnId: string) => [...foreignCashValueKeys.all, returnId] as const,
+};
+
+export const foreignOtherAssetKeys = {
+  all: ['foreign-other-assets'] as const,
+  forReturn: (returnId: string) => [...foreignOtherAssetKeys.all, returnId] as const,
+};
+
+export const foreignTrustKeys = {
+  all: ['foreign-trusts'] as const,
+  forReturn: (returnId: string) => [...foreignTrustKeys.all, returnId] as const,
+};
+
 const base = (returnId: string) => `/returns/${returnId}/foreign-bank-accounts`;
 const custBase = (returnId: string) => `/returns/${returnId}/foreign-custodial-accounts`;
 const eqBase = (returnId: string) => `/returns/${returnId}/foreign-equity-debt`;
@@ -54,6 +72,9 @@ const immBase = (returnId: string) => `/returns/${returnId}/foreign-immovable`;
 const finBase = (returnId: string) => `/returns/${returnId}/foreign-financial-interest`;
 const signBase = (returnId: string) => `/returns/${returnId}/foreign-signing-authority`;
 const othIncBase = (returnId: string) => `/returns/${returnId}/foreign-other-income`;
+const cashValBase = (returnId: string) => `/returns/${returnId}/foreign-cash-value-insurance`;
+const othAssetBase = (returnId: string) => `/returns/${returnId}/foreign-other-assets`;
+const trustBase = (returnId: string) => `/returns/${returnId}/foreign-trusts`;
 
 export function listForeignBankAccounts(returnId: string): Promise<ForeignBankAccountDto[]> {
   return apiGet<ForeignBankAccountDto[]>(base(returnId));
@@ -137,4 +158,40 @@ export function addForeignOtherIncome(returnId: string, body: UpsertForeignOther
 
 export function deleteForeignOtherIncome(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${othIncBase(returnId)}/${id}`);
+}
+
+export function listForeignCashValue(returnId: string): Promise<ForeignCashValueInsuranceDto[]> {
+  return apiGet<ForeignCashValueInsuranceDto[]>(cashValBase(returnId));
+}
+
+export function addForeignCashValue(returnId: string, body: UpsertForeignCashValueInsuranceBody): Promise<ForeignCashValueInsuranceDto> {
+  return apiPost<ForeignCashValueInsuranceDto>(cashValBase(returnId), body);
+}
+
+export function deleteForeignCashValue(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${cashValBase(returnId)}/${id}`);
+}
+
+export function listForeignOtherAsset(returnId: string): Promise<ForeignOtherAssetDto[]> {
+  return apiGet<ForeignOtherAssetDto[]>(othAssetBase(returnId));
+}
+
+export function addForeignOtherAsset(returnId: string, body: UpsertForeignOtherAssetBody): Promise<ForeignOtherAssetDto> {
+  return apiPost<ForeignOtherAssetDto>(othAssetBase(returnId), body);
+}
+
+export function deleteForeignOtherAsset(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${othAssetBase(returnId)}/${id}`);
+}
+
+export function listForeignTrust(returnId: string): Promise<ForeignTrustInterestDto[]> {
+  return apiGet<ForeignTrustInterestDto[]>(trustBase(returnId));
+}
+
+export function addForeignTrust(returnId: string, body: UpsertForeignTrustInterestBody): Promise<ForeignTrustInterestDto> {
+  return apiPost<ForeignTrustInterestDto>(trustBase(returnId), body);
+}
+
+export function deleteForeignTrust(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${trustBase(returnId)}/${id}`);
 }
