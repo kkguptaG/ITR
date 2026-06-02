@@ -73,15 +73,16 @@ public static class ItrSchemaValidator
             }
         }
 
-        // AY2025-26: ITR-2 is conformant + validated. ITR-3 schema is bundled but NOT yet mapped — its
-        // generator is still demo-shape (full Balance Sheet + P&L not modelled), so it keeps the
-        // "reconcile" warning rather than a wall of schema errors until the generator is rewritten.
+        // AY2025-26: ITR-2 & ITR-3 are conformant + runtime-validated.
         if (ay.Contains("2025"))
         {
             switch (form)
             {
                 case ItrType.ITR2:
                     resource = "ITR-2_2025.json";
+                    return true;
+                case ItrType.ITR3:
+                    resource = "ITR-3_2025.json";
                     return true;
             }
         }

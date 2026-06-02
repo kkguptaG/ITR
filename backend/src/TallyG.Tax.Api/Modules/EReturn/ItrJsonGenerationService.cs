@@ -17,7 +17,7 @@ namespace TallyG.Tax.Api.Modules.EReturn;
 /// rupees (s.288A/B rounding) to match the schema's integer types.
 /// No Scrutor surprises: class ends in "Service" so I*Service auto-binds scoped.
 /// </summary>
-public sealed class ItrJsonGenerationService : IItrJsonGenerationService
+public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 {
     private const string SchemaVer = "AY2026-27/Ver1.0-provisional";
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
@@ -152,63 +152,24 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
     }
 
     // ----------------------------------------------------------------- ITR-3 (business/profession incl. F&O)
+    // ITR-3 is built from the schema-derived skeleton (Itr3Skeleton, in the .Itr3.cs partial): a
+    // conformant, required-only, all-zero/enum structure. We override the identity nodes with real
+    // values and overlay the engine + books figures onto the headline leaves.
     private static Dictionary<string, object?> BuildItr3(ItrFilingContext ctx)
     {
-        var c = ctx.Computation;
-        var gti = c?.GrossTotalIncome ?? 0m;
-        var hp = HousePropertyIncome(ctx.Houses);
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
-        var cgTotal = cgShort + cgLong;
-        var business = ctx.Businesses.Sum(PresumptiveIncome);  // PresumptiveIncome returns NetProfit when not presumptive
-        var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = gti - hp - cgTotal - business - other; // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
+        var skel = Itr3Skeleton();
 
-        return new Dictionary<string, object?>
+        // Identity nodes the skeleton can't fill (string patterns: PAN, name, dates).
+        skel["CreationInfo"] = CreationInfo(ctx);
+        if (skel["PartA_GEN1"] is Dictionary<string, object?> gen1)
         {
-            ["CreationInfo"] = CreationInfo(ctx),
-            ["Form_ITR3"] = FormHeader("ITR3", "For individuals and HUFs having income from profits and gains of business or profession", ctx),
-            ["PersonalInfo"] = PersonalInfo(ctx),
-            ["FilingStatus"] = FilingStatus(ctx),
-            ["ScheduleS"] = new Dictionary<string, object?> { ["GrossSalary"] = R(grossSalary), ["TotIncUnderHeadSalaries"] = R(salaryNet) },
-            ["ScheduleHP"] = new Dictionary<string, object?> { ["PropertyCount"] = ctx.Houses.Count, ["TotalIncomeChargeableUnderHP"] = R(hp) },
-            ["ScheduleBP"] = new Dictionary<string, object?>
-            {
-                ["IncomeFromBusinessProf"] = R(business),
-                ["Items"] = ctx.Businesses.Select(b => new Dictionary<string, object?>
-                {
-                    ["IsPresumptive"] = b.IsPresumptive,
-                    ["Section"] = b.IsPresumptive ? (b.PresumptiveSection ?? "44AD") : "Regular",
-                    ["Speculative"] = b.SpeculativeFlag,
-                    ["Turnover"] = R(b.Turnover),
-                    ["Income"] = R(PresumptiveIncome(b))
-                }).ToList()
-            },
-            ["ScheduleCG"] = new Dictionary<string, object?>
-            {
-                ["ShortTermCapGain"] = R(cgShort),
-                ["LongTermCapGain"] = R(cgLong),
-                ["TotalCapGains"] = R(cgTotal),
-                ["Items"] = CapitalGainItems(ctx.Gains)
-            },
-            ["ScheduleOS"] = new Dictionary<string, object?> { ["TotIncFromOS"] = R(other) },
-            ["ScheduleVIA"] = ChapterViaSchedule(ctx),
-            ["ScheduleCFL"] = ScheduleCflNode(c),
-            ["PartB_TI"] = new Dictionary<string, object?>
-            {
-                ["Salaries"] = R(salaryNet),
-                ["IncomeFromHP"] = R(hp),
-                ["ProfBusinessGains"] = R(business),
-                ["CapGain"] = new Dictionary<string, object?> { ["ShortTerm"] = R(cgShort), ["LongTerm"] = R(cgLong), ["TotalCapGains"] = R(cgTotal) },
-                ["IncFromOS"] = R(other),
-                ["GrossTotIncome"] = R(gti),
-                ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
-            },
-            ["PartB_TTI"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundNode(ctx, c),
-            ["Verification"] = Verification(ctx)
-        };
+            gen1["PersonalInfo"] = PersonalInfoNonItr1(ctx); // keep the skeleton's FilingStatus (valid enums)
+        }
+
+        skel["Verification"] = VerificationNonItr1(ctx, includeDate: true);
+
+        OverlayItr3Figures(skel, ctx);
+        return skel;
     }
 
     // ----------------------------------------------------------------- shared nodes
@@ -863,17 +824,94 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    private static Dictionary<string, object?> VerificationNonItr1(ItrFilingContext ctx) => new()
+    private static Dictionary<string, object?> VerificationNonItr1(ItrFilingContext ctx, bool includeDate = false)
     {
-        ["Declaration"] = new Dictionary<string, object?>
+        var v = new Dictionary<string, object?>
         {
-            ["AssesseeVerName"] = ctx.User.FullName,
-            ["FatherName"] = NonEmpty(ctx.Profile?.FatherName, "NA"),
-            ["AssesseeVerPAN"] = ctx.User.PanMasked ?? string.Empty,
-        },
-        ["Capacity"] = "S",
-        ["Place"] = NonEmpty(ctx.Profile?.City, "NA"),
-    };
+            ["Declaration"] = new Dictionary<string, object?>
+            {
+                ["AssesseeVerName"] = ctx.User.FullName,
+                ["FatherName"] = NonEmpty(ctx.Profile?.FatherName, "NA"),
+                ["AssesseeVerPAN"] = ctx.User.PanMasked ?? string.Empty,
+            },
+            ["Capacity"] = "S",
+            ["Place"] = NonEmpty(ctx.Profile?.City, "NA"),
+        };
+        if (includeDate)
+        {
+            v["Date"] = ctx.GeneratedOn.ToString("yyyy-MM-dd"); // ITR-3 requires a verification date
+        }
+
+        return v;
+    }
+
+    // Overlay the engine + books figures onto the ITR-3 skeleton's headline INTEGER leaves (defensively:
+    // SetIfInt only replaces a leaf that's already an integer, so the conformant structure is preserved).
+    private static void OverlayItr3Figures(Dictionary<string, object?> skel, ItrFilingContext ctx)
+    {
+        var c = ctx.Computation;
+        var hpRaw = HousePropertyIncome(ctx.Houses);
+        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var businessRaw = ctx.Businesses.Sum(PresumptiveIncome);
+        var otherRaw = ctx.OtherIncomes.Sum(o => o.Amount);
+        var gtiRaw = c?.GrossTotalIncome ?? 0m;
+        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw;
+
+        var gti = R(gtiRaw);
+        var taxable = R(c?.TaxableIncome ?? 0m);
+        var net = R(c?.TotalTax ?? 0m);
+
+        if (skel["PartB-TI"] is Dictionary<string, object?> ti)
+        {
+            SetIfInt(ti, "Salaries", R(salaryNet));
+            SetIfInt(ti, "IncomeFromHP", R(hpRaw));
+            SetIfInt(ti, "GrossTotalIncome", gti);
+            SetIfInt(ti, "TotalTI", gti);
+            SetIfInt(ti, "BalanceAfterSetoffLosses", gti);
+            SetIfInt(ti, "TotalIncome", taxable);
+            SetIfInt(ti, "AggregateIncome", taxable);
+        }
+
+        if (skel["PartB_TTI"] is Dictionary<string, object?> tti)
+        {
+            if (tti["ComputationOfTaxLiability"] is Dictionary<string, object?> col)
+            {
+                SetIfInt(col, "GrossTaxPayable", net);
+                SetIfInt(col, "TaxPayAfterCreditUs115JD", net);
+                SetIfInt(col, "NetTaxLiability", net);
+                SetIfInt(col, "AggregateTaxInterestLiability", R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m)));
+                if (col["IntrstPay"] is Dictionary<string, object?> ip)
+                {
+                    SetIfInt(ip, "IntrstPayUs234A", R(c?.Interest234A ?? 0m));
+                    SetIfInt(ip, "IntrstPayUs234B", R(c?.Interest234B ?? 0m));
+                    SetIfInt(ip, "IntrstPayUs234C", R(c?.Interest234C ?? 0m));
+                }
+            }
+
+            if (tti["TaxPaid"] is Dictionary<string, object?> tp && tp["TaxesPaid"] is Dictionary<string, object?> txp)
+            {
+                SetIfInt(txp, "TotalTaxesPaid", R(ctx.Return.TdsPaid + ctx.Return.TcsPaid + ctx.Return.AdvanceTaxPaid + ctx.Return.SelfAssessmentTaxPaid));
+            }
+
+            if (tti["Refund"] is Dictionary<string, object?> rf)
+            {
+                SetIfInt(rf, "RefundDue", R(Math.Max(0m, c?.RefundOrPayable ?? 0m)));
+            }
+        }
+
+        if (skel["ITR3ScheduleBP"] is Dictionary<string, object?> bp)
+        {
+            SetIfInt(bp, "BusinessIncOthThanSpec", R(businessRaw));
+        }
+    }
+
+    private static void SetIfInt(Dictionary<string, object?> node, string key, long value)
+    {
+        if (node.TryGetValue(key, out var current) && current is long)
+        {
+            node[key] = value;
+        }
+    }
 
     private static Dictionary<string, object?> ChapterViaClaimed(IReadOnlyList<Deduction> deductions)
     {

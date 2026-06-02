@@ -57,6 +57,18 @@ public class ItrSchemaConformanceTests
         result.Errors.Should().BeEmpty("the ITR-2 JSON must match the official AY2025-26 schema. Violations:\n" + Format(result));
     }
 
+    [Fact]
+    public void Itr3_2025_json_conforms_to_official_schema()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+
+        result.SchemaAvailable.Should().BeTrue("the official ITR-3 AY2025-26 schema is bundled");
+        result.Errors.Should().BeEmpty("the ITR-3 JSON must match the official AY2025-26 schema. Violations:\n" + Format(result));
+    }
+
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
     private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27")
     {
