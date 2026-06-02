@@ -123,6 +123,27 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_itemizes_house_property_into_scheduleHP()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true);
+        var json = _gen.Generate(ctx).Json;
+
+        // Still conforms to the official schema with the per-property Schedule HP present.
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule HP must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var hp = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleHP");
+        // NAV 2.8L − 30% (84k) − interest 50k = ₹1.46L.
+        hp.GetProperty("TotalIncomeChargeableUnHP").GetInt64().Should().Be(146_000);
+        var rent = hp.GetProperty("PropertyDetails")[0].GetProperty("Rentdetails");
+        rent.GetProperty("BalanceALV").GetInt64().Should().Be(280_000);
+        rent.GetProperty("ThirtyPercentOfBalance").GetInt64().Should().Be(84_000);
+        rent.GetProperty("IntOnBorwCap").GetInt64().Should().Be(50_000);
+        rent.GetProperty("IncomeOfHP").GetInt64().Should().Be(146_000);
+    }
+
+    [Fact]
     public void Itr2_breaks_salary_into_scheduleS_anchored_to_gti()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
@@ -177,7 +198,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27")
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false)
     {
         var user = new User
         {
@@ -241,6 +262,10 @@ public class ItrSchemaConformanceTests
             // fixture's GTI so Schedule S's TotIncUnderHeadSalaries == PartB-TI Salaries.
             Salaries = new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 950_000m } },
             Businesses = businesses,
+            // A let-out property so the ITR-2/3 gate can exercise the per-property Schedule HP.
+            Houses = withHouse
+                ? new[] { new HouseProperty { Type = HousePropertyType.LetOut, Address = "12 MG Road", AnnualValue = 300_000m, MunicipalTaxPaid = 20_000m, InterestOnLoan = 50_000m, CoOwnerSharePct = 100m } }
+                : Array.Empty<HouseProperty>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

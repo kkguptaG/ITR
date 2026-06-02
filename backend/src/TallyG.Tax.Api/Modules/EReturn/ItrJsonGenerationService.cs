@@ -156,6 +156,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["Verification"] = VerificationNonItr1(ctx),
         };
         AddScheduleS(root, ctx);
+        AddScheduleHp(root, ctx);
         AddScheduleOs(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
@@ -180,6 +181,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         OverlayItr3Figures(skel, ctx);
         AddScheduleS(skel, ctx);
+        AddScheduleHp(skel, ctx);
         AddScheduleOs(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
@@ -1336,6 +1338,97 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["EntertainmntalwncUs16ii"] = 0L,
             ["ProfessionalTaxUs16iii"] = R(profTax),
             ["TotIncUnderHeadSalaries"] = R(salaryNet),
+        };
+    }
+
+    // ----------------------------------------------------------------- Schedule HP (house property, per-property)
+    // Per-property breakup for ITR-2/3: annual letable value → municipal tax → NAV → 30% std deduction
+    // (s.24a) + interest on borrowed capital (s.24b, ₹2L cap for self-occupied) → income of the property.
+    // The per-property IncomeOfHP sums to the engine's HP figure (HousePropertyIncome), so
+    // TotalIncomeChargeableUnHP == PartB-TI IncomeFromHP. Emitted only when a property exists; ITR-1/4 lump.
+    private static void AddScheduleHp(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.Houses.Count == 0)
+        {
+            return;
+        }
+
+        var properties = new List<object?>();
+        var sno = 1;
+        foreach (var h in ctx.Houses)
+        {
+            properties.Add(HousePropertyItem(h, sno++, ctx));
+        }
+
+        form["ScheduleHP"] = new Dictionary<string, object?>
+        {
+            ["PropertyDetails"] = properties,
+            ["TotalIncomeChargeableUnHP"] = R(HousePropertyIncome(ctx.Houses)),
+        };
+    }
+
+    private static Dictionary<string, object?> HousePropertyItem(HouseProperty h, int sno, ItrFilingContext ctx)
+    {
+        var selfOccupied = h.Type == HousePropertyType.SelfOccupied;
+        var ifLetOut = h.Type switch
+        {
+            HousePropertyType.LetOut => "L",
+            HousePropertyType.DeemedLetOut => "D",
+            _ => "S",
+        };
+
+        decimal alv, localTaxes, balanceAlv, annualOfPropOwned, thirtyPct, intOnCap, totalDeduct, incomeOfHp;
+        if (selfOccupied)
+        {
+            alv = localTaxes = balanceAlv = annualOfPropOwned = thirtyPct = 0m;
+            intOnCap = Math.Min(h.InterestOnLoan, 200_000m);     // s.24(b): ₹2L cap for self-occupied
+            totalDeduct = intOnCap;
+            incomeOfHp = -intOnCap;
+        }
+        else
+        {
+            alv = h.AnnualValue;
+            localTaxes = h.MunicipalTaxPaid;
+            balanceAlv = Math.Max(0m, alv - localTaxes);          // NAV (net annual value)
+            annualOfPropOwned = balanceAlv;
+            thirtyPct = 0.30m * annualOfPropOwned;                // s.24(a)
+            intOnCap = h.InterestOnLoan;                          // s.24(b)
+            totalDeduct = thirtyPct + intOnCap;
+            incomeOfHp = annualOfPropOwned - totalDeduct;
+        }
+
+        var address = new Dictionary<string, object?>
+        {
+            ["AddrDetail"] = string.IsNullOrWhiteSpace(h.Address) ? "Property address" : h.Address!.Trim(),
+            ["CityOrTownOrDistrict"] = string.IsNullOrWhiteSpace(ctx.Profile?.City) ? "NA" : ctx.Profile!.City!.Trim(),
+            ["StateCode"] = string.IsNullOrWhiteSpace(ctx.Profile?.StateCode) ? "01" : ctx.Profile!.StateCode!.Trim(),
+            ["CountryCode"] = "91",   // India
+        };
+        if (int.TryParse(ctx.Profile?.Pincode, out var pin) && pin is >= 100000 and <= 999999)
+        {
+            address["PinCode"] = (long)pin;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["HPSNo"] = (long)sno,
+            ["AddressDetailWithZipCode"] = address,
+            ["PropertyOwner"] = "SE",      // self
+            ["PropCoOwnedFlg"] = "NO",     // co-owner identities aren't captured; figures are the assessee's
+            ["AsseseeShareProperty"] = 100L,
+            ["ifLetOut"] = ifLetOut,
+            ["Rentdetails"] = new Dictionary<string, object?>
+            {
+                ["AnnualLetableValue"] = R(alv),
+                ["LocalTaxes"] = R(localTaxes),
+                ["TotalUnrealizedAndTax"] = R(localTaxes),
+                ["BalanceALV"] = R(balanceAlv),
+                ["AnnualOfPropOwned"] = R(annualOfPropOwned),
+                ["ThirtyPercentOfBalance"] = R(thirtyPct),
+                ["IntOnBorwCap"] = R(intOnCap),
+                ["TotalDeduct"] = R(totalDeduct),
+                ["IncomeOfHP"] = R(incomeOfHp),
+            },
         };
     }
 
