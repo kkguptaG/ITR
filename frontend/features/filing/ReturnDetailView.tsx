@@ -31,6 +31,7 @@ import { Donations80GCard } from '@/features/donations-80g';
 import { ExemptIncomeCard } from '@/features/exempt-income';
 import { ForeignSourceIncomeCard } from '@/features/foreign-source-income';
 import { ClubbedIncomeCard } from '@/features/clubbed-income';
+import { PassThroughIncomeCard } from '@/features/pass-through-income';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -149,6 +150,7 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           <ExemptIncomeCard returnId={returnId} editable={!locked} />
           <ForeignSourceIncomeCard returnId={returnId} editable={!locked} />
           <ClubbedIncomeCard returnId={returnId} editable={!locked} />
+          <PassThroughIncomeCard returnId={returnId} editable={!locked} />
           <AssetsLiabilitiesCard returnId={returnId} editable={!locked} />
           <ImmovableAssetsCard returnId={returnId} editable={!locked} />
           {/* Interest in a firm/AOP is an ITR-3-only Schedule AL disclosure. */}

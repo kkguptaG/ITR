@@ -455,6 +455,43 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_pass_through_income_in_schedulePTI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withPassThrough: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule PTI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var pti = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("SchedulePTI").GetProperty("SchedulePTIDtls");
+        pti.GetArrayLength().Should().Be(1);   // three components grouped under one REIT (by PAN)
+        var row = pti[0];
+        row.GetProperty("InvstmntCvrdUs115UA115UB").GetString().Should().Be("A");   // 115UA business trust
+        row.GetProperty("BusinessPAN").GetString().Should().Be("AABCE1234R");
+        row.GetProperty("IncFromHP").GetProperty("AmountOfInc").GetInt64().Should().Be(40_000);
+        row.GetProperty("IncFromHP").GetProperty("TDSAmount").GetInt64().Should().Be(4_000);
+        row.GetProperty("OS_Dividend").GetProperty("AmountOfInc").GetInt64().Should().Be(15_000);
+        row.GetProperty("CapitalGainsPTI").GetProperty("LTCG_Sec112A").GetProperty("AmountOfInc").GetInt64().Should().Be(25_000);
+        // The required-but-unused s.23FBB exempt buckets are present as zeros.
+        row.GetProperty("IncClmdPTI").GetProperty("Sec23FBB").GetProperty("AmountOfInc").GetInt64().Should().Be(0);
+    }
+
+    [Fact]
+    public void Itr3_reports_pass_through_income_in_schedulePTI()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withPassThrough: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule PTI must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("SchedulePTI")
+            .GetProperty("SchedulePTIDtls").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
     public void Itr2_reports_clubbed_income_in_scheduleSPI()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withClubbedIncome: true);
@@ -787,7 +824,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false)
     {
         var user = new User
         {
@@ -990,6 +1027,16 @@ public class ItrSchemaConformanceTests
                     new ClubbedIncome { SpecifiedPersonName = "Priya Sharma", Relationship = "Spouse", Pan = "ABCPS1234K", AmountIncluded = 60_000m, IncomeHead = ClubbedIncomeHead.HouseProperty },
                 }
                 : Array.Empty<ClubbedIncome>(),
+            // Pass-through income so the ITR-2/3 gate exercises Schedule PTI: a REIT (115UA) distributing
+            // rental income (HP, with TDS), a dividend and an LTCG-112A — grouped into one PTI row.
+            PassThroughIncomes = withPassThrough
+                ? new[]
+                {
+                    new PassThroughIncome { BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R", InvestmentType = PassThroughInvestmentType.BusinessTrust115UA, Category = PassThroughIncomeCategory.HouseProperty, AmountOfIncome = 40_000m, TdsAmount = 4_000m },
+                    new PassThroughIncome { BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R", InvestmentType = PassThroughInvestmentType.BusinessTrust115UA, Category = PassThroughIncomeCategory.Dividend, AmountOfIncome = 15_000m, TdsAmount = 0m },
+                    new PassThroughIncome { BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R", InvestmentType = PassThroughInvestmentType.BusinessTrust115UA, Category = PassThroughIncomeCategory.LongTermCapitalGain112A, AmountOfIncome = 25_000m, TdsAmount = 0m },
+                }
+                : Array.Empty<PassThroughIncome>(),
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

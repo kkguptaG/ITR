@@ -429,6 +429,31 @@ public static class DbInitializer
             AmountIncluded = 18_500m, IncomeHead = ClubbedIncomeHead.OtherSources,
         });
 
+        // Pass-through income (Schedule PTI): a REIT (business trust u/s 115UA) distributing rental income
+        // (house property, with TDS), a dividend, and a small LTCG — each retaining its character.
+        db.PassThroughIncomes.AddRange(
+            new PassThroughIncome
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+                BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R",
+                InvestmentType = PassThroughInvestmentType.BusinessTrust115UA,
+                Category = PassThroughIncomeCategory.HouseProperty, AmountOfIncome = 40_000m, TdsAmount = 4_000m,
+            },
+            new PassThroughIncome
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+                BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R",
+                InvestmentType = PassThroughInvestmentType.BusinessTrust115UA,
+                Category = PassThroughIncomeCategory.Dividend, AmountOfIncome = 15_000m, TdsAmount = 0m,
+            },
+            new PassThroughIncome
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+                BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R",
+                InvestmentType = PassThroughInvestmentType.BusinessTrust115UA,
+                Category = PassThroughIncomeCategory.LongTermCapitalGain112A, AmountOfIncome = 25_000m, TdsAmount = 0m,
+            });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

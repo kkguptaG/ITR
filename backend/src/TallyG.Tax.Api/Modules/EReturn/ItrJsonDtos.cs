@@ -125,6 +125,9 @@ public sealed class ItrFilingContext
     /// <summary>Clubbed income of specified persons disclosed in Schedule SPI (ITR-2/3).</summary>
     public IReadOnlyList<ClubbedIncome> ClubbedIncomes { get; init; } = Array.Empty<ClubbedIncome>();
 
+    /// <summary>Pass-through income (business trust / investment fund) disclosed in Schedule PTI (ITR-2/3).</summary>
+    public IReadOnlyList<PassThroughIncome> PassThroughIncomes { get; init; } = Array.Empty<PassThroughIncome>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

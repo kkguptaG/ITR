@@ -166,6 +166,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddSchedule80G(root, ctx);
         AddScheduleEI(root, ctx);
         AddScheduleSpi(root, ctx);
+        AddSchedulePti(root, ctx);
         AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
@@ -201,6 +202,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddSchedule80G(skel, ctx);
         AddScheduleEI(skel, ctx);
         AddScheduleSpi(skel, ctx);
+        AddSchedulePti(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1307,6 +1309,98 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ClubbedIncomeHead.ExemptIncome => "EI",
         ClubbedIncomeHead.Business => "BP",
         _ => "OS",
+    };
+
+    // ----------------------------------------------------------------- Schedule PTI (pass-through income)
+    // Income received from a business trust (s.115UA: REIT/InvIT), investment fund (s.115UB: AIF Cat I/II) or
+    // securitisation trust (s.115U) retains its character in the unitholder's hands. We group the captured
+    // components by investment (PAN) and place each into its head/rate bucket: house property, the six
+    // capital-gains buckets, and the other-sources split (dividend / others). The required-but-unused exempt
+    // (s.23FBB) sub-objects are emitted as zeros. Each money bucket carries amount, the fund's current-year
+    // loss share (for HP/CG), the net, and TDS. ITR-2/3 only; the shape is identical across the two forms.
+    private static void AddSchedulePti(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || ctx.PassThroughIncomes.Count == 0)
+        {
+            return;
+        }
+
+        var rows = new List<Dictionary<string, object?>>();
+        foreach (var grp in ctx.PassThroughIncomes.GroupBy(p => p.BusinessPan).OrderBy(g => g.Key))
+        {
+            var first = grp.First();
+
+            // 4-int bucket (HP / capital gains): amount + current-year loss share + net + TDS.
+            Dictionary<string, object?> B4(PassThroughIncomeCategory cat)
+            {
+                var amt = TaxMath0(grp.Where(r => r.Category == cat).Sum(r => r.AmountOfIncome));
+                var loss = TaxMath0(grp.Where(r => r.Category == cat).Sum(r => r.CurrentYearLossShare));
+                var tds = TaxMath0(grp.Where(r => r.Category == cat).Sum(r => r.TdsAmount));
+                return new Dictionary<string, object?>
+                {
+                    ["AmountOfInc"] = R(amt),
+                    ["CurrYrLossShareByInvstFund"] = R(loss),
+                    ["NetIncomeLoss"] = R(amt - loss),   // may be a net loss (negative) — the schema allows it
+                    ["TDSAmount"] = R(tds),
+                };
+            }
+
+            // 3-int bucket (other sources): amount + net + TDS (no fund loss-share column).
+            Dictionary<string, object?> B3(params PassThroughIncomeCategory[] cats)
+            {
+                var amt = TaxMath0(grp.Where(r => cats.Contains(r.Category)).Sum(r => r.AmountOfIncome));
+                var tds = TaxMath0(grp.Where(r => cats.Contains(r.Category)).Sum(r => r.TdsAmount));
+                return new Dictionary<string, object?>
+                {
+                    ["AmountOfInc"] = R(amt),
+                    ["NetIncomeLoss"] = R(amt),
+                    ["TDSAmount"] = R(tds),
+                };
+            }
+
+            static Dictionary<string, object?> Zeros3() => new()
+            {
+                ["AmountOfInc"] = 0L, ["NetIncomeLoss"] = 0L, ["TDSAmount"] = 0L,
+            };
+
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["InvstmntCvrdUs115UA115UB"] = PtiInvestmentCode(first.InvestmentType),
+                ["BusinessName"] = Trunc(first.BusinessName.Trim(), 125),
+                ["BusinessPAN"] = first.BusinessPan.Trim().ToUpperInvariant(),
+                ["IncFromHP"] = B4(PassThroughIncomeCategory.HouseProperty),
+                ["CapitalGainsPTI"] = new Dictionary<string, object?>
+                {
+                    ["ShortTermCG"] = B4(PassThroughIncomeCategory.ShortTermCapitalGain),
+                    ["STCG_Sec111A"] = B4(PassThroughIncomeCategory.ShortTermCapitalGain111A),
+                    ["STCG_Others"] = B4(PassThroughIncomeCategory.ShortTermCapitalGainOther),
+                    ["LongTermCG"] = B4(PassThroughIncomeCategory.LongTermCapitalGain),
+                    ["LTCG_Sec112A"] = B4(PassThroughIncomeCategory.LongTermCapitalGain112A),
+                    ["LTCG_Others"] = B4(PassThroughIncomeCategory.LongTermCapitalGainOther),
+                },
+                // s.23FBB exempt pass-through income is not captured — emit the required zeros.
+                ["IncClmdPTI"] = new Dictionary<string, object?>
+                {
+                    ["Sec23FBB"] = Zeros3(),
+                    ["TotalSec23FBB"] = Zeros3(),
+                },
+                ["IncOthSrc"] = B3(PassThroughIncomeCategory.Dividend, PassThroughIncomeCategory.OtherSources),
+                ["OS_Dividend"] = B3(PassThroughIncomeCategory.Dividend),
+                ["OS_Others"] = B3(PassThroughIncomeCategory.OtherSources),
+            });
+        }
+
+        if (rows.Count > 0)
+        {
+            form["SchedulePTI"] = new Dictionary<string, object?> { ["SchedulePTIDtls"] = rows };
+        }
+    }
+
+    private static string PtiInvestmentCode(PassThroughInvestmentType t) => t switch
+    {
+        PassThroughInvestmentType.BusinessTrust115UA => "A",
+        PassThroughInvestmentType.InvestmentFund115UB => "B",
+        _ => "C",
     };
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
