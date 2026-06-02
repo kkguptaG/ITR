@@ -123,7 +123,7 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    // ----------------------------------------------------------------- ITR-2 (no business)
+    // ----------------------------------------------------------------- ITR-2 (no business) — schema-conformant
     private static Dictionary<string, object?> BuildItr2(ItrFilingContext ctx)
     {
         var c = ctx.Computation;
@@ -132,40 +132,22 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
         var cgTotal = cgShort + cgLong;
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = gti - hp - cgTotal - other;            // anchored to the engine's GTI
-        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
+        var salaryNet = TaxMath0(gti - hp - cgTotal - other);   // anchored to the engine's GTI
 
         return new Dictionary<string, object?>
         {
             ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR2"] = FormHeader("ITR2", "For Individuals and HUFs not having income from profits and gains of business or profession", ctx),
-            ["PersonalInfo"] = PersonalInfo(ctx),
-            ["FilingStatus"] = FilingStatus(ctx),
-            ["ScheduleS"] = new Dictionary<string, object?> { ["GrossSalary"] = R(grossSalary), ["TotIncUnderHeadSalaries"] = R(salaryNet) },
-            ["ScheduleHP"] = new Dictionary<string, object?> { ["PropertyCount"] = ctx.Houses.Count, ["TotalIncomeChargeableUnderHP"] = R(hp) },
-            ["ScheduleCG"] = new Dictionary<string, object?>
+            ["PartA_GEN1"] = new Dictionary<string, object?>
             {
-                ["ShortTermCapGain"] = R(cgShort),
-                ["LongTermCapGain"] = R(cgLong),
-                ["TotalCapGains"] = R(cgTotal),
-                ["Items"] = CapitalGainItems(ctx.Gains)
+                ["PersonalInfo"] = PersonalInfoNonItr1(ctx),
+                ["FilingStatus"] = FilingStatusItr2(ctx),
             },
-            ["ScheduleOS"] = new Dictionary<string, object?> { ["TotIncFromOS"] = R(other) },
-            ["ScheduleVIA"] = ChapterViaSchedule(ctx),
-            ["ScheduleCFL"] = ScheduleCflNode(c),
-            ["PartB_TI"] = new Dictionary<string, object?>
-            {
-                ["Salaries"] = R(salaryNet),
-                ["IncomeFromHP"] = R(hp),
-                ["CapGain"] = new Dictionary<string, object?> { ["ShortTerm"] = R(cgShort), ["LongTerm"] = R(cgLong), ["TotalCapGains"] = R(cgTotal) },
-                ["IncFromOS"] = R(other),
-                ["GrossTotIncome"] = R(gti),
-                ["TotalIncome"] = R(c?.TaxableIncome ?? 0m)
-            },
-            ["PartB_TTI"] = TaxComputationNode(c),
-            ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundNode(ctx, c),
-            ["Verification"] = Verification(ctx)
+            ["ScheduleCYLA"] = ScheduleCylaNode(hp, cgShort, cgLong),
+            ["ScheduleBFLA"] = ScheduleBflaNode(salaryNet, cgShort, cgLong),
+            ["PartB-TI"] = PartBTiNode(ctx, salaryNet, hp, cgShort, cgLong, other),
+            ["PartB_TTI"] = PartBTtiNode(ctx, c),
+            ["Verification"] = VerificationNonItr1(ctx),
         };
     }
 
@@ -632,6 +614,267 @@ public sealed class ItrJsonGenerationService : IItrJsonGenerationService
         var d = ctx.Ay?.DueDateNonAudit ?? default;
         return d.Year >= 2000 ? d.ToString("dd/MM/yyyy") : "31/07/2026";
     }
+
+    // ===================== schema-conformant nodes (ITR-2 / ITR-3, AY2025-26) =====================
+
+    private static decimal TaxMath0(decimal v) => v < 0m ? 0m : v;
+
+    // PersonalInfo for ITR-2/ITR-3: AssesseeName + PAN + Address + DOB + Status (no SecondaryAdd/EmployerCategory).
+    private static Dictionary<string, object?> PersonalInfoNonItr1(ItrFilingContext ctx)
+    {
+        var (first, last) = SplitName(ctx.User.FullName, ctx.Profile);
+        return new Dictionary<string, object?>
+        {
+            ["AssesseeName"] = new Dictionary<string, object?>
+            {
+                ["FirstName"] = NonEmpty(first, "NA"),
+                ["SurNameOrOrgName"] = NonEmpty(string.IsNullOrWhiteSpace(last) ? first : last, "NA"),
+            },
+            ["PAN"] = ctx.User.PanMasked ?? string.Empty,
+            ["Address"] = AddressNode(ctx),
+            ["DOB"] = ctx.Profile?.Dob?.ToString("yyyy-MM-dd") ?? "1980-01-01",
+            ["Status"] = "I",
+        };
+    }
+
+    private static Dictionary<string, object?> FilingStatusItr2(ItrFilingContext ctx) => new()
+    {
+        ["ReturnFileSec"] = 11,
+        ["OptOutNewTaxRegime"] = ctx.Computation?.Regime == Regime.Old ? "Y" : "N",
+        ["SeventhProvisio139"] = "N",
+        ["ResidentialStatus"] = ResidentialStatus(ctx.Profile),
+        ["FiiFpiFlag"] = "N",
+        ["HeldUnlistedEqShrPrYrFlg"] = "N",
+        ["ItrFilingDueDate"] = DueDate(ctx),
+    };
+
+    private static string ResidentialStatus(UserProfile? p) => p?.ResidentialStatus switch
+    {
+        "non_resident" => "NRI",
+        "rnor" => "NOR",
+        _ => "RES",
+    };
+
+    // --- Schedule CYLA (current-year loss adjustment): per-rate CG buckets + HP/OS loss totals ---
+    private static Dictionary<string, object?> CylaCgBucket(decimal inc) => new()
+    {
+        ["IncCYLA"] = new Dictionary<string, object?>
+        {
+            ["IncOfCurYrUnderThatHead"] = R(TaxMath0(inc)),
+            ["IncOfCurYrAfterSetOff"] = R(TaxMath0(inc)),
+        },
+    };
+
+    private static Dictionary<string, object?> ScheduleCylaNode(decimal hp, decimal cgShort, decimal cgLong) => new()
+    {
+        ["STCG15Per"] = CylaCgBucket(0m),
+        ["STCG20Per"] = CylaCgBucket(0m),
+        ["STCG30Per"] = CylaCgBucket(0m),
+        ["STCGAppRate"] = CylaCgBucket(cgShort),
+        ["STCGDTAARate"] = CylaCgBucket(0m),
+        ["LTCG10Per"] = CylaCgBucket(0m),
+        ["LTCG12_5Per"] = CylaCgBucket(cgLong),
+        ["LTCG20Per"] = CylaCgBucket(0m),
+        ["LTCGDTAARate"] = CylaCgBucket(0m),
+        ["TotalCurYr"] = new Dictionary<string, object?>
+        {
+            ["TotHPlossCurYr"] = R(TaxMath0(-hp)),
+            ["TotOthSrcLossNoRaceHorse"] = R(0m),
+        },
+        ["TotalLossSetOff"] = new Dictionary<string, object?>
+        {
+            ["TotHPlossCurYrSetoff"] = R(TaxMath0(-hp)),
+            ["TotOthSrcLossNoRaceHorseSetoff"] = R(0m),
+        },
+        ["LossRemAftSetOff"] = new Dictionary<string, object?>
+        {
+            ["BalHPlossCurYrAftSetoff"] = R(0m),
+            ["BalOthSrcLossNoRaceHorseAftSetoff"] = R(0m),
+        },
+    };
+
+    // --- Schedule BFLA (brought-forward loss adjustment): Salary + per-rate CG buckets ---
+    private static Dictionary<string, object?> BflaCgBucket(decimal inc) => new()
+    {
+        ["IncBFLA"] = new Dictionary<string, object?>
+        {
+            ["IncOfCurYrUndHeadFromCYLA"] = R(TaxMath0(inc)),
+            ["BFlossPrevYrUndSameHeadSetoff"] = R(0m),
+            ["IncOfCurYrAfterSetOffBFLosses"] = R(TaxMath0(inc)),
+        },
+    };
+
+    private static Dictionary<string, object?> ScheduleBflaNode(decimal salary, decimal cgShort, decimal cgLong) => new()
+    {
+        ["Salary"] = new Dictionary<string, object?>
+        {
+            ["IncBFLA"] = new Dictionary<string, object?>
+            {
+                ["IncOfCurYrUndHeadFromCYLA"] = R(TaxMath0(salary)),
+                ["IncOfCurYrAfterSetOffBFLosses"] = R(TaxMath0(salary)),
+            },
+        },
+        ["STCG15Per"] = BflaCgBucket(0m),
+        ["STCG20Per"] = BflaCgBucket(0m),
+        ["STCG30Per"] = BflaCgBucket(0m),
+        ["STCGAppRate"] = BflaCgBucket(cgShort),
+        ["STCGDTAARate"] = BflaCgBucket(0m),
+        ["LTCG10Per"] = BflaCgBucket(0m),
+        ["LTCG12_5Per"] = BflaCgBucket(cgLong),
+        ["LTCG20Per"] = BflaCgBucket(0m),
+        ["LTCGDTAARate"] = BflaCgBucket(0m),
+        ["TotalBFLossSetOff"] = new Dictionary<string, object?> { ["TotBFLossSetoff"] = R(0m) },
+        ["IncomeOfCurrYrAftCYLABFLA"] = R(TaxMath0(salary + cgShort + cgLong)),
+    };
+
+    private static Dictionary<string, object?> PartBTiNode(
+        ItrFilingContext ctx, decimal salaryNet, decimal hp, decimal cgShort, decimal cgLong, decimal other,
+        decimal business = 0m)
+    {
+        var c = ctx.Computation;
+        var gti = c?.GrossTotalIncome ?? 0m;
+        var taxable = c?.TaxableIncome ?? 0m;
+        var via = TaxMath0(gti - taxable);
+        var cgTotal = cgShort + cgLong;
+        var cf = (c?.HousePropertyLossCarriedForward ?? 0m) + (c?.BusinessLossCarriedForward ?? 0m)
+               + (c?.SpeculativeLossCarriedForward ?? 0m) + (c?.ShortTermCapitalLossCarriedForward ?? 0m)
+               + (c?.LongTermCapitalLossCarriedForward ?? 0m);
+        var ti = new Dictionary<string, object?>
+        {
+            ["Salaries"] = R(salaryNet),
+            ["IncomeFromHP"] = R(hp),
+            ["CapGain"] = new Dictionary<string, object?>
+            {
+                ["ShortTerm"] = new Dictionary<string, object?>
+                {
+                    ["ShortTerm15Per"] = R(0m), ["ShortTerm20Per"] = R(0m), ["ShortTerm30Per"] = R(0m),
+                    ["ShortTermAppRate"] = R(cgShort), ["ShortTermSplRateDTAA"] = R(0m), ["TotalShortTerm"] = R(cgShort),
+                },
+                ["LongTerm"] = new Dictionary<string, object?>
+                {
+                    ["LongTerm10Per"] = R(0m), ["LongTerm12_5Per"] = R(cgLong), ["LongTerm20Per"] = R(0m),
+                    ["LongTermSplRateDTAA"] = R(0m), ["TotalLongTerm"] = R(cgLong),
+                },
+                ["ShortTermLongTermTotal"] = R(cgTotal),
+                ["CapGains30Per115BBH"] = R(0m),
+                ["TotalCapGains"] = R(cgTotal),
+            },
+            ["IncFromOS"] = new Dictionary<string, object?>
+            {
+                ["OtherSrcThanOwnRaceHorse"] = R(other),
+                ["IncChargblSplRate"] = R(0m),
+                ["FromOwnRaceHorse"] = R(0m),
+                ["TotIncFromOS"] = R(other),
+            },
+            ["TotalTI"] = R(gti),
+            ["CurrentYearLoss"] = R(0m),
+            ["BalanceAfterSetoffLosses"] = R(gti),
+            ["BroughtFwdLossesSetoff"] = R(0m),
+            ["GrossTotalIncome"] = R(gti),
+            ["IncChargeTaxSplRate111A112"] = R(0m),
+            ["DeductionsUnderScheduleVIA"] = R(via),
+            ["TotalIncome"] = R(taxable),
+            ["IncChargeableTaxSplRates"] = R(0m),
+            ["NetAgricultureIncomeOrOtherIncomeForRate"] = R(0m),
+            ["AggregateIncome"] = R(taxable),
+            ["LossesOfCurrentYearCarriedFwd"] = R(cf),
+            ["DeemedIncomeUs115JC"] = R(c?.AdjustedTotalIncome ?? 0m),
+        };
+        if (business != 0m)
+        {
+            ti["ProfBusinessGains"] = R(business); // ITR-3 only (allowed optional)
+        }
+
+        return ti;
+    }
+
+    private static Dictionary<string, object?> PartBTtiNode(ItrFilingContext ctx, TaxComputation? c)
+    {
+        var rebate = c?.Rebate87A ?? 0m;
+        var surcharge = c?.Surcharge ?? 0m;
+        var taxBeforeCess = c?.TaxBeforeCess ?? 0m;
+        var slabTax = taxBeforeCess + rebate - surcharge;
+        var cess = c?.Cess ?? 0m;
+        var net = c?.TotalTax ?? 0m;
+        var interest = c?.InterestPenalty ?? 0m;
+        var amt = c?.AlternativeMinimumTax ?? 0m;
+        var refund = TaxMath0(c?.RefundOrPayable ?? 0m);
+        var tds = ctx.Return.TdsPaid;
+        var tcs = ctx.Return.TcsPaid;
+        var adv = ctx.Return.AdvanceTaxPaid;
+        var sa = ctx.Return.SelfAssessmentTaxPaid;
+        return new Dictionary<string, object?>
+        {
+            ["TaxPayDeemedTotIncUs115JC"] = R(amt),
+            ["Surcharge"] = R(0m),
+            ["HealthEduCess"] = R(0m),
+            ["TotalTaxPayablDeemedTotInc"] = R(amt),
+            ["ComputationOfTaxLiability"] = new Dictionary<string, object?>
+            {
+                ["TaxPayableOnTI"] = new Dictionary<string, object?>
+                {
+                    ["TaxAtNormalRatesOnAggrInc"] = R(slabTax),
+                    ["TaxAtSpecialRates"] = R(0m),
+                    ["RebateOnAgriInc"] = R(0m),
+                    ["TaxPayableOnTotInc"] = R(slabTax),
+                },
+                ["Rebate87A"] = R(rebate),
+                ["TaxPayableOnRebate"] = R(TaxMath0(slabTax - rebate)),
+                ["Surcharge25ofSI"] = R(0m),
+                ["SurchargeOnAboveCrore"] = R(surcharge),
+                ["Surcharge25ofSIBeforeMarginal"] = R(0m),
+                ["SurchargeOnAboveCroreBeforeMarginal"] = R(surcharge),
+                ["TotalSurcharge"] = R(surcharge),
+                ["EducationCess"] = R(cess),
+                ["GrossTaxLiability"] = R(taxBeforeCess + cess),
+                ["GrossTaxPayable"] = R(taxBeforeCess + cess),
+                ["CreditUS115JD"] = R(c?.AmtCreditSetOff ?? 0m),
+                ["TaxPayAfterCreditUs115JD"] = R(net),
+                ["NetTaxLiability"] = R(net),
+                ["IntrstPay"] = new Dictionary<string, object?>
+                {
+                    ["IntrstPayUs234A"] = R(0m),
+                    ["IntrstPayUs234B"] = R(interest),
+                    ["IntrstPayUs234C"] = R(0m),
+                    ["LateFilingFee234F"] = R(0m),
+                    ["TotalIntrstPay"] = R(interest),
+                },
+                ["AggregateTaxInterestLiability"] = R(net + interest),
+            },
+            ["TaxPaid"] = new Dictionary<string, object?>
+            {
+                ["TaxesPaid"] = new Dictionary<string, object?>
+                {
+                    ["AdvanceTax"] = R(adv),
+                    ["TDS"] = R(tds),
+                    ["TCS"] = R(tcs),
+                    ["SelfAssessmentTax"] = R(sa),
+                    ["TotalTaxesPaid"] = R(adv + tds + tcs + sa),
+                },
+            },
+            ["Refund"] = new Dictionary<string, object?>
+            {
+                ["RefundDue"] = R(refund),
+                ["BankAccountDtls"] = new Dictionary<string, object?>
+                {
+                    ["BankDtlsFlag"] = string.IsNullOrWhiteSpace(ctx.Profile?.BankIfsc) ? "N" : "Y",
+                },
+            },
+            ["AssetOutIndiaFlag"] = "NO",
+        };
+    }
+
+    private static Dictionary<string, object?> VerificationNonItr1(ItrFilingContext ctx) => new()
+    {
+        ["Declaration"] = new Dictionary<string, object?>
+        {
+            ["AssesseeVerName"] = ctx.User.FullName,
+            ["FatherName"] = NonEmpty(ctx.Profile?.FatherName, "NA"),
+            ["AssesseeVerPAN"] = ctx.User.PanMasked ?? string.Empty,
+        },
+        ["Capacity"] = "S",
+        ["Place"] = NonEmpty(ctx.Profile?.City, "NA"),
+    };
 
     private static Dictionary<string, object?> ChapterViaClaimed(IReadOnlyList<Deduction> deductions)
     {

@@ -25,6 +25,8 @@
     <!-- Official ITD AY2026-27 schemas embedded for runtime conformance validation (stable logical names). -->
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-1_2026.json" LogicalName="ITR-1_2026.json" />
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-4_2026.json" LogicalName="ITR-4_2026.json" />
+    <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-2_2025.json" LogicalName="ITR-2_2025.json" />
+    <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-3_2025.json" LogicalName="ITR-3_2025.json" />
   </ItemGroup>
 
   <ItemGroup>

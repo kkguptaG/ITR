@@ -45,8 +45,20 @@ public class ItrSchemaConformanceTests
         result.Errors.Should().BeEmpty("the ITR-4 JSON must match the official AY2026-27 schema. Violations:\n" + Format(result));
     }
 
+    [Fact]
+    public void Itr2_2025_json_conforms_to_official_schema()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+
+        result.SchemaAvailable.Should().BeTrue("the official ITR-2 AY2025-26 schema is bundled");
+        result.Errors.Should().BeEmpty("the ITR-2 JSON must match the official AY2025-26 schema. Violations:\n" + Format(result));
+    }
+
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27")
     {
         var user = new User
         {
@@ -69,7 +81,7 @@ public class ItrSchemaConformanceTests
             ResidentialStatus = "resident",
             BankIfsc = "HDFC0001234",
         };
-        var ay = new AssessmentYear { Code = "AY2026-27", RuleSetVersion = "2026.0.0-provisional" };
+        var ay = new AssessmentYear { Code = ayCode, RuleSetVersion = "2026.0.0-provisional" };
         var comp = new TaxComputation
         {
             Regime = Regime.New,

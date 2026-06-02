@@ -56,8 +56,10 @@ public static class ItrSchemaValidator
 
     private static bool TryResourceName(string assessmentYearCode, ItrType form, out string resource)
     {
-        // Canonicalise the AY ("AY2026-27" / "2026.0.0-provisional" → contains "2026").
+        // Canonicalise the AY ("AY2026-27" / "2026.0.0-provisional" → "2026"; "AY2025-26" → "2025").
         var ay = new string((assessmentYearCode ?? string.Empty).Where(char.IsLetterOrDigit).ToArray());
+
+        // AY2026-27: only ITR-1 & ITR-4 are notified.
         if (ay.Contains("2026"))
         {
             switch (form)
@@ -67,6 +69,19 @@ public static class ItrSchemaValidator
                     return true;
                 case ItrType.ITR4:
                     resource = "ITR-4_2026.json";
+                    return true;
+            }
+        }
+
+        // AY2025-26: ITR-2 is conformant + validated. ITR-3 schema is bundled but NOT yet mapped — its
+        // generator is still demo-shape (full Balance Sheet + P&L not modelled), so it keeps the
+        // "reconcile" warning rather than a wall of schema errors until the generator is rewritten.
+        if (ay.Contains("2025"))
+        {
+            switch (form)
+            {
+                case ItrType.ITR2:
+                    resource = "ITR-2_2025.json";
                     return true;
             }
         }
