@@ -454,6 +454,14 @@ public static class DbInitializer
                 Category = PassThroughIncomeCategory.LongTermCapitalGain112A, AmountOfIncome = 25_000m, TdsAmount = 0m,
             });
 
+        // Schedule 5A: the demo taxpayer is governed by the Portuguese Civil Code (Goa) — non-salary income
+        // is apportioned 50/50 with the spouse.
+        db.SpouseIncomeApportionments.Add(new SpouseIncomeApportionment
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            SpouseName = "Maria Fernandes", SpousePan = "ABCPF1234M", SpouseAadhaar = "789012345678",
+        });
+
         db.TdsEntries.Add(new TdsEntry
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,

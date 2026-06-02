@@ -64,6 +64,7 @@ public class AppDbContext : DbContext
     public DbSet<ForeignSourceIncome> ForeignSourceIncomes => Set<ForeignSourceIncome>();
     public DbSet<ClubbedIncome> ClubbedIncomes => Set<ClubbedIncome>();
     public DbSet<PassThroughIncome> PassThroughIncomes => Set<PassThroughIncome>();
+    public DbSet<SpouseIncomeApportionment> SpouseIncomeApportionments => Set<SpouseIncomeApportionment>();
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();
 

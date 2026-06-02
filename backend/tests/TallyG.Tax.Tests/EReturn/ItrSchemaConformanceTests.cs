@@ -498,6 +498,42 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_apportions_income_with_spouse_in_schedule5A()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true, withGains: true, withSpouseApportionment: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule 5A must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var sched = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("Schedule5A2014");
+        sched.GetProperty("NameOfSpouse").GetString().Should().Be("Maria Fernandes");
+        sched.GetProperty("PANOfSpouse").GetString().Should().Be("ABCPF1234M");
+        // House-property income is apportioned 50% to the spouse.
+        var hp = sched.GetProperty("HPHeadIncome");
+        hp.GetProperty("AmtApprndOfSpouse").GetInt64().Should().Be(hp.GetProperty("IncRecvdUndHead").GetInt64() / 2);
+        // ITR-2 must NOT carry the ITR-3-only business head.
+        sched.TryGetProperty("BusHeadIncome", out _).Should().BeFalse("BusHeadIncome is an ITR-3-only Schedule 5A head");
+    }
+
+    [Fact]
+    public void Itr3_apportions_income_with_spouse_including_business_head()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withSpouseApportionment: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule 5A must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var sched = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("Schedule5A2014");
+        // ITR-3 REQUIRES the business head + the book-audit flags.
+        sched.GetProperty("BusHeadIncome").GetProperty("IncRecvdUndHead").ValueKind.Should().Be(JsonValueKind.Number);
+        sched.GetProperty("BooksSpouse44ABFlg").GetString().Should().Be("N");
+    }
+
+    [Fact]
     public void Itr2_reports_clubbed_income_in_scheduleSPI()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withClubbedIncome: true);
@@ -830,7 +866,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false)
     {
         var user = new User
         {
@@ -1045,6 +1081,10 @@ public class ItrSchemaConformanceTests
                     new PassThroughIncome { BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R", InvestmentType = PassThroughInvestmentType.BusinessTrust115UA, Category = PassThroughIncomeCategory.LongTermCapitalGain112A, AmountOfIncome = 25_000m, TdsAmount = 0m },
                 }
                 : Array.Empty<PassThroughIncome>(),
+            // Portuguese-Civil-Code spouse apportionment so the ITR-2/3 gate exercises Schedule 5A.
+            SpouseApportionment = withSpouseApportionment
+                ? new SpouseIncomeApportionment { SpouseName = "Maria Fernandes", SpousePan = "ABCPF1234M", SpouseAadhaar = "789012345678" }
+                : null,
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
             // ITR-2/3 gates exercise the itemised Schedule OS.
             OtherIncomes = new[]

@@ -167,6 +167,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleEI(root, ctx);
         AddScheduleSpi(root, ctx);
         AddSchedulePti(root, ctx);
+        AddSchedule5A(root, ctx);
         AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
@@ -203,6 +204,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleEI(skel, ctx);
         AddScheduleSpi(skel, ctx);
         AddSchedulePti(skel, ctx);
+        AddSchedule5A(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1402,6 +1404,59 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         PassThroughInvestmentType.InvestmentFund115UB => "B",
         _ => "C",
     };
+
+    // ----------------------------------------------------------------- Schedule 5A (Portuguese Civil Code apportionment)
+    // For an assessee governed by the Portuguese Civil Code (Goa / Dadra & Nagar Haveli / Daman & Diu), income
+    // other than salary is shared equally with the spouse, so half accrues to the spouse. We derive the per-head
+    // income from the return's own heads (HP / capital gains / other sources, + business on ITR-3) and apportion
+    // 50%. ITR-3 additionally requires a business head + the s.44AB/92E book-audit flags. ITR-2/3 only.
+    private static void AddSchedule5A(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        var sp = ctx.SpouseApportionment;
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || sp is null)
+        {
+            return;
+        }
+
+        var isItr3 = ctx.ItrType == ItrType.ITR3;
+        var hp = TaxMath0(HousePropertyIncome(ctx.Houses));
+        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var cg = TaxMath0(cgShort + cgLong);
+        var os = TaxMath0(ctx.OtherIncomes.Sum(o => o.Amount));
+        var business = isItr3 ? TaxMath0(ctx.Businesses.Sum(PresumptiveIncome)) : 0m;
+
+        // The 50% statutory spouse share (Portuguese Civil Code). TDS apportionment is not captured (0).
+        static Dictionary<string, object?> Head(decimal inc) => new()
+        {
+            ["IncRecvdUndHead"] = R(inc),
+            ["AmtApprndOfSpouse"] = R(Math.Round(inc / 2m, MidpointRounding.AwayFromZero)),
+            ["AmtTDSDeducted"] = 0L,
+            ["TDSApprndOfSpouse"] = 0L,
+        };
+
+        var node = new Dictionary<string, object?>
+        {
+            ["NameOfSpouse"] = Trunc(sp.SpouseName.Trim(), 125),
+            ["PANOfSpouse"] = sp.SpousePan.Trim().ToUpperInvariant(),
+            ["HPHeadIncome"] = Head(hp),
+            ["CapGainHeadIncome"] = Head(cg),
+            ["OtherSourcesHeadIncome"] = Head(os),
+            ["TotalHeadIncome"] = Head(hp + cg + os + business),
+        };
+        var aadhaar = new string((sp.SpouseAadhaar ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (aadhaar.Length == 12)
+        {
+            node["AadhaarOfSpouse"] = aadhaar;
+        }
+        if (isItr3)
+        {
+            node["BusHeadIncome"] = Head(business);
+            node["BooksSpouse44ABFlg"] = "N";
+            node["BooksSpouse92EFlg"] = "N";
+        }
+
+        form["Schedule5A2014"] = node;
+    }
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {

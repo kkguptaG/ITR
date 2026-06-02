@@ -128,6 +128,9 @@ public sealed class ItrFilingContext
     /// <summary>Pass-through income (business trust / investment fund) disclosed in Schedule PTI (ITR-2/3).</summary>
     public IReadOnlyList<PassThroughIncome> PassThroughIncomes { get; init; } = Array.Empty<PassThroughIncome>();
 
+    /// <summary>Portuguese-Civil-Code spouse apportionment (Schedule 5A); null unless declared.</summary>
+    public SpouseIncomeApportionment? SpouseApportionment { get; init; }
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }
