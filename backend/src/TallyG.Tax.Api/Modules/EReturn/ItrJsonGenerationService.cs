@@ -1776,9 +1776,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         decimal shortTerm = 0m, longTerm = 0m;
         foreach (var g in gains)
         {
-            // 112A equity LTCG acquired on/before 31-Jan-2018 uses the grandfathered cost (s.55(2)(ac));
-            // this matches the tax engine so the generated CG figures reconcile with the computation.
-            var gain = Math.Max(0m, g.SalePrice - GrandfatheredCost(g) - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount);
+            // SIGNED per-row gain (a negative is a current-year loss). 112A equity LTCG acquired on/before
+            // 31-Jan-2018 uses the grandfathered cost (s.55(2)(ac)).
+            var gain = g.SalePrice - GrandfatheredCost(g) - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount;
             if (g.Term == CapitalGainTerm.Short)
             {
                 shortTerm += gain;
@@ -1788,7 +1788,12 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 longTerm += gain;
             }
         }
-        return (shortTerm, longTerm);
+
+        // Intra-term (s.70) set-off: current-year losses net against gains within the SAME term, matching the
+        // engine, which nets each section signed before exemptions. A term that nets negative is floored at 0
+        // (the loss carries forward via Schedule CFL). Cross-term spill-over of a net STCL onto LTCG and the
+        // per-rate-bucket set-off matrix are a future refinement (they interact with the 112A ₹1.25L exemption).
+        return (Math.Max(0m, shortTerm), Math.Max(0m, longTerm));
     }
 
     /// <summary>s.112A grandfathering cutoff — shares acquired before this date qualify (i.e. on/before 31-Jan-2018).</summary>

@@ -484,6 +484,25 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_nets_current_year_capital_loss_within_the_term()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withCgLoss: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with a netted current-year capital loss must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var cg = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleCGFor23");
+
+        // STCG ₹50k − STCL ₹30k (both 111A short-term) net to ₹20k — not the ₹50k that per-row max(0) gave.
+        cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(20_000);
+        cg.GetProperty("CurrYrLosses").GetProperty("InStcg20Per").GetProperty("CurrYearIncome").GetInt64().Should().Be(20_000);
+        cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(200_000);
+        cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(220_000);
+    }
+
+    [Fact]
     public void Itr2_grandfathers_pre2018_equity_in_schedule112A()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGrandfathering: true);
@@ -608,7 +627,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false)
     {
         var user = new User
         {
@@ -693,6 +712,15 @@ public class ItrSchemaConformanceTests
                 ? new[]
                 {
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 200_000m, AcquisitionDate = new DateOnly(2015, 1, 1), FairMarketValue31Jan2018 = 400_000m, Isin = "INE002A01018" },
+                }
+                : withCgLoss
+                ? new[]
+                {
+                    // Two 111A short-term equity trades — a ₹50k gain and a ₹30k loss — that net to ₹20k STCG,
+                    // plus a ₹2L 112A LTCG. Exercises intra-term current-year loss set-off.
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 100_000m, CostOfAcquisition = 130_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m },
                 }
                 : withGains
                 ? new[]
