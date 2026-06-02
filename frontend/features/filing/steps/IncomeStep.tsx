@@ -53,6 +53,7 @@ import {
   OtherIncomeForm,
   SalaryForm,
 } from '../components/income-forms';
+import { OTHER_INCOME_NATURES } from '../schemas';
 
 export function IncomeStep() {
   const t = useTranslations('wizard');
@@ -389,15 +390,14 @@ function houseTypeKey(type: HousePropertyDto['type']): string {
   }
 }
 
-type OtherNature = 'normal' | 'interest' | 'dividend' | 'lottery_115bb' | 'agricultural';
+type OtherNature = (typeof OTHER_INCOME_NATURES)[number];
 
 /** Read the {"nature":"…"} tag back out of an income source's sourceMetaJson for the edit form. */
 function parseNature(metaJson: string | null | undefined): OtherNature {
   if (!metaJson) return 'normal';
   try {
     const n = (JSON.parse(metaJson) as { nature?: string })?.nature;
-    const valid: OtherNature[] = ['normal', 'interest', 'dividend', 'lottery_115bb', 'agricultural'];
-    return valid.includes(n as OtherNature) ? (n as OtherNature) : 'normal';
+    return (OTHER_INCOME_NATURES as readonly string[]).includes(n ?? '') ? (n as OtherNature) : 'normal';
   } catch {
     return 'normal';
   }

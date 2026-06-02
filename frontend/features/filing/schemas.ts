@@ -129,7 +129,14 @@ export const businessIncomeSchema = z
 export type BusinessIncomeFormValues = z.infer<typeof businessIncomeSchema>;
 
 // ----------------------------------------------------------------- other source
-export const OTHER_INCOME_NATURES = ['normal', 'interest', 'dividend', 'lottery_115bb', 'agricultural'] as const;
+// The finer interest/pension natures drive the itemised Schedule OS (ITR-2/3): savings → IntrstFrmSavingBank,
+// fd → IntrstFrmTermDeposit, refund → IntrstFrmIncmTaxRefund, interest → IntrstFrmOthers, dividend, family
+// pension → FamilyPension. The engine taxes all of these at slab rate (only lottery/agri are special-cased),
+// so adding them is safe; ITR-1/4 still lump them into a single Income-from-other-sources total.
+export const OTHER_INCOME_NATURES = [
+  'normal', 'savings_interest', 'fd_interest', 'refund_interest', 'interest',
+  'dividend', 'family_pension', 'lottery_115bb', 'agricultural',
+] as const;
 
 export const otherIncomeSchema = z.object({
   label: z.string().trim().min(1, 'Describe the income.').max(120),

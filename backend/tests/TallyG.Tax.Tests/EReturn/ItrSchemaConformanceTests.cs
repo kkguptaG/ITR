@@ -123,6 +123,42 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_breaks_salary_into_scheduleS_anchored_to_gti()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var s = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleS");
+
+        s.GetProperty("TotalGrossSalary").GetInt64().Should().Be(950_000);
+        s.GetProperty("DeductionUnderSection16ia").GetInt64().Should().Be(75_000);   // standard deduction
+        s.GetProperty("DeductionUS16").GetInt64().Should().Be(75_000);
+        // Income under the head must equal the salary figure carried into PartB-TI (GTI-anchored).
+        s.GetProperty("TotIncUnderHeadSalaries").GetInt64().Should().Be(875_000);
+    }
+
+    [Fact]
+    public void Itr2_itemizes_other_sources_into_scheduleOS()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var os = doc.RootElement.GetProperty("ITR").GetProperty("ITR2")
+            .GetProperty("ScheduleOS").GetProperty("IncOthThanOwnRaceHorse");
+
+        os.GetProperty("IntrstFrmSavingBank").GetInt64().Should().Be(12_000);
+        os.GetProperty("IntrstFrmTermDeposit").GetInt64().Should().Be(30_000);
+        os.GetProperty("InterestGross").GetInt64().Should().Be(42_000);
+        os.GetProperty("DividendGross").GetInt64().Should().Be(8_000);
+        // Net other-sources income reconciles with the lump (₹50k) the engine summed into GTI.
+        os.GetProperty("GrossIncChrgblTaxAtAppRate").GetInt64().Should().Be(50_000);
+        doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleOS")
+            .GetProperty("IncChargeable").GetInt64().Should().Be(50_000);
+    }
+
+    [Fact]
     public void Itr3_overlays_books_financials_into_partA_bs_and_pl()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26");
@@ -201,8 +237,18 @@ public class ItrSchemaConformanceTests
             Profile = profile,
             Ay = ay,
             Computation = comp,
-            Salaries = new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 1_000_000m } },
+            // Gross 9.5L − 75k standard deduction = 8.75L net, which (with 50k other) reconciles to the
+            // fixture's GTI so Schedule S's TotIncUnderHeadSalaries == PartB-TI Salaries.
+            Salaries = new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 950_000m } },
             Businesses = businesses,
+            // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
+            // ITR-2/3 gates exercise the itemised Schedule OS.
+            OtherIncomes = new[]
+            {
+                new IncomeSource { Type = IncomeType.OtherSources, Label = "SBI savings a/c", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" },
+                new IncomeSource { Type = IncomeType.OtherSources, Label = "HDFC term deposit", Amount = 30_000m, SourceMetaJson = "{\"nature\":\"fd_interest\"}" },
+                new IncomeSource { Type = IncomeType.OtherSources, Label = "Equity dividend", Amount = 8_000m, SourceMetaJson = "{\"nature\":\"dividend\"}" },
+            },
             // ITR-3 carries books-derived financials so the gate exercises the PARTA_BS/PARTA_PL overlay.
             FinancialStatements = itrType == ItrType.ITR3 ? SampleFinancials() : null,
             // Fed bank accounts so the gate exercises BankAccountDtls/AddtnlBankDetails on every form.

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TallyG.Tax.Api.Common;
 using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Entities;
@@ -154,6 +155,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["PartB_TTI"] = PartBTtiNode(ctx, c),
             ["Verification"] = VerificationNonItr1(ctx),
         };
+        AddScheduleS(root, ctx);
+        AddScheduleOs(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
         return root;
     }
@@ -176,6 +179,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         skel["Verification"] = VerificationNonItr1(ctx, includeDate: true);
 
         OverlayItr3Figures(skel, ctx);
+        AddScheduleS(skel, ctx);
+        AddScheduleOs(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
@@ -1292,4 +1297,166 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         AddChallanSchedule(form, ctx, "ScheduleIT");
     }
+
+    // ----------------------------------------------------------------- Schedule S (salary, itemised)
+    // The salary breakup for ITR-2/ITR-3: gross → exempt-u/s-10 → net → s.16 deductions → income under
+    // the head. Anchored to the engine's GTI (TotIncUnderHeadSalaries == PartB-TI "Salaries") exactly as
+    // the ITR-1/4 income node does, so the schedules reconcile. The s.16 deduction is split into 16ia
+    // (standard deduction, ≤₹75k) and 16iii (professional tax, ≤₹5k). The optional per-employer Salaries
+    // array (needs employer address + s.17(1)/(2)/(3) split) is deferred. ITR-1/4 stay totals-only.
+    private static void AddScheduleS(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.Salaries.Count == 0)
+        {
+            return;
+        }
+
+        var c = ctx.Computation;
+        var gti = c?.GrossTotalIncome ?? 0m;
+        var hp = HousePropertyIncome(ctx.Houses);
+        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var business = ctx.Businesses.Sum(PresumptiveIncome);
+        var other = ctx.OtherIncomes.Sum(o => o.Amount);
+        var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other);   // == PartB-TI Salaries
+
+        var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
+        var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
+        var netSalary = TaxMath0(grossSalary - salExempt);
+        var us16 = Math.Max(0m, netSalary - salaryNet);              // total s.16 deduction (GTI-anchored)
+        var profTax = Math.Min(ctx.Salaries.Sum(s => s.ProfessionalTax), 5_000m);
+        var stdDed = Math.Min(Math.Max(0m, us16 - profTax), 75_000m);
+
+        form["ScheduleS"] = new Dictionary<string, object?>
+        {
+            ["TotalGrossSalary"] = R(grossSalary),
+            ["AllwncExtentExemptUs10"] = R(salExempt),
+            ["NetSalary"] = R(netSalary),
+            ["DeductionUS16"] = R(us16),
+            ["DeductionUnderSection16ia"] = R(stdDed),
+            ["EntertainmntalwncUs16ii"] = 0L,
+            ["ProfessionalTaxUs16iii"] = R(profTax),
+            ["TotIncUnderHeadSalaries"] = R(salaryNet),
+        };
+    }
+
+    // ----------------------------------------------------------------- Schedule OS (income from other sources)
+    // Itemises other-sources income for ITR-2/ITR-3. Each captured IncomeSource (Type=OtherSources) may
+    // carry {"osCategory":"savingsInterest|depositInterest|refundInterest|otherInterest|dividend|
+    // familyPension"} in SourceMetaJson; we bucket by that into the schema's interest/dividend/pension
+    // leaves. Anything uncategorised falls to AnyOtherIncome, so the schedule's net IncChargeable always
+    // equals the lump the engine summed into GTI (kept consistent). ITR-1/4 stay lump-only (Sahaj/Sugam
+    // don't itemise). Emitted only when there is other-sources income (the schedule is optional).
+    private static void AddScheduleOs(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.OtherIncomes.Count == 0)
+        {
+            return;
+        }
+
+        decimal Bucket(string nat) => ctx.OtherIncomes.Where(o => OsNature(o) == nat).Sum(o => o.Amount);
+
+        var savings = Bucket("savings_interest");
+        var deposit = Bucket("fd_interest");
+        var refund = Bucket("refund_interest");
+        var otherInt = Bucket("interest");
+        var dividend = Bucket("dividend");
+        var familyPension = Bucket("family_pension");
+        // Uncategorised / special-rate / exempt natures → AnyOtherIncome, so the schedule total still
+        // equals the lump the engine summed into GTI. (s.115BB lottery tax + agricultural rate-effect are
+        // handled in the computation; this schedule itemises only the common normal-rate heads.)
+        var anyOther = ctx.OtherIncomes
+            .Where(o => OsNature(o) is not ("savings_interest" or "fd_interest" or "refund_interest"
+                or "interest" or "dividend" or "family_pension"))
+            .Sum(o => o.Amount);
+
+        var interestGross = savings + deposit + refund + otherInt;
+        var gross = interestGross + dividend + familyPension + anyOther;   // all chargeable at normal rate
+
+        // ITR-3's special-rate date-ranges use a distinct definition (DateRangeTypeOS) whose 2nd period is
+        // "Up16Of6To15Of9"; ITR-2 (DateRangeType) names it "Upto15Of9". Everything else is shared.
+        var secondQ = ctx.ItrType == ItrType.ITR3 ? "Up16Of6To15Of9" : "Upto15Of9";
+
+        form["ScheduleOS"] = new Dictionary<string, object?>
+        {
+            ["IncOthThanOwnRaceHorse"] = new Dictionary<string, object?>
+            {
+                ["GrossIncChrgblTaxAtAppRate"] = R(gross),
+                ["DividendGross"] = R(dividend),
+                ["DividendOthThan22e"] = R(dividend),   // all captured dividends treated as non-deemed
+                ["Dividend22e"] = 0L,                   // deemed dividend u/s 2(22)(e) — not captured yet
+                ["InterestGross"] = R(interestGross),
+                ["IntrstFrmSavingBank"] = R(savings),
+                ["IntrstFrmTermDeposit"] = R(deposit),
+                ["IntrstFrmIncmTaxRefund"] = R(refund),
+                ["NatofPassThrghIncome"] = 0L,
+                ["IntrstFrmOthers"] = R(otherInt),
+                ["RentFromMachPlantBldgs"] = 0L,
+                ["Tot562x"] = 0L,
+                ["Aggrtvaluewithoutcons562x"] = 0L,
+                ["Immovpropwithoutcons562x"] = 0L,
+                ["Immovpropinadeqcons562x"] = 0L,
+                ["Anyotherpropwithoutcons562x"] = 0L,
+                ["Anyotherpropinadeqcons562x"] = 0L,
+                ["FamilyPension"] = R(familyPension),
+                ["AnyOtherIncome"] = R(anyOther),
+                ["IncChargeableSpecialRates"] = 0L,
+                ["LtryPzzlChrgblUs115BB"] = 0L,
+                ["IncChrgblUs115BBE"] = 0L,
+                ["CashCreditsUs68"] = 0L,
+                ["UnExplndInvstmntsUs69"] = 0L,
+                ["UnExplndMoneyUs69A"] = 0L,
+                ["UnDsclsdInvstmntsUs69B"] = 0L,
+                ["UnExplndExpndtrUs69C"] = 0L,
+                ["AmtBrwdRepaidOnHundiUs69D"] = 0L,
+                ["OthersGross"] = 0L,
+                ["PassThrIncOSChrgblSplRate"] = 0L,
+                ["Deductions"] = new Dictionary<string, object?>
+                {
+                    ["Expenses"] = 0L,
+                    ["DeductionUs57iia"] = 0L,
+                    ["Depreciation"] = 0L,
+                    ["TotDeductions"] = 0L,
+                },
+                ["BalanceNoRaceHorse"] = R(gross),
+                ["IncomeNotified89AOS"] = 0L,
+                ["TaxAccumulatedBalRecPF"] = new Dictionary<string, object?>
+                {
+                    ["TotalIncomeBenefit"] = 0L,
+                    ["TotalTaxBenefit"] = 0L,
+                },
+            },
+            ["TotOthSrcNoRaceHorse"] = R(gross),
+            ["IncChargeable"] = R(gross),
+            // Special-rate / quarterly date-range heads are required even when nil → emit zero ranges.
+            ["IncFrmLottery"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115BBDA"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115BBDAaiii"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115A1ai"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115AC"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115ACA"] = ZeroDateRange(secondQ),
+            ["DividendIncUs115AD1i"] = ZeroDateRange(secondQ),
+            ["DividendDTAA"] = ZeroDateRange(secondQ),
+            ["NOT89A"] = ZeroDateRange(secondQ),
+        };
+    }
+
+    /// <summary>A nil quarterly date-range — the 5-period advance-tax-style split, all zero. The second
+    /// period is named differently across forms (<paramref name="secondPeriodKey"/>): ITR-2 "Upto15Of9",
+    /// ITR-3 "Up16Of6To15Of9".</summary>
+    private static Dictionary<string, object?> ZeroDateRange(string secondPeriodKey) => new()
+    {
+        ["DateRange"] = new Dictionary<string, object?>
+        {
+            ["Upto15Of6"] = 0L,
+            [secondPeriodKey] = 0L,
+            ["Up16Of9To15Of12"] = 0L,
+            ["Up16Of12To15Of3"] = 0L,
+            ["Up16Of3To31Of3"] = 0L,
+        },
+    };
+
+    /// <summary>The normalised other-source "nature" tag from SourceMetaJson (shared with the engine's
+    /// <see cref="TaxComputationInputFactory.ExtractNature"/>); "normal" when absent/invalid.</summary>
+    private static string OsNature(IncomeSource s)
+        => (TaxComputationInputFactory.ExtractNature(s.SourceMetaJson) ?? "normal").Trim().ToLowerInvariant();
 }
