@@ -465,6 +465,30 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_grandfathers_pre2018_equity_in_schedule112A()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withGrandfathering: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with grandfathered Schedule 112A must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var s112a = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("Schedule112A");
+        var row = s112a.GetProperty("Schedule112ADtls")[0];
+
+        // Pre-2018 shares: cost = max(actual 2L, min(FMV 4L, sale 5L)) = 4L → LTCG = 5L − 4L = ₹1L.
+        row.GetProperty("ShareOnOrBefore").GetString().Should().Be("BE");
+        row.GetProperty("AcquisitionCost").GetInt64().Should().Be(200_000);          // actual cost
+        row.GetProperty("CostAcqWithoutIndx").GetInt64().Should().Be(400_000);       // grandfathered cost
+        row.GetProperty("TotFairMktValueCapAst").GetInt64().Should().Be(400_000);
+        row.GetProperty("Balance").GetInt64().Should().Be(100_000);
+        s112a.GetProperty("Balance112A").GetInt64().Should().Be(100_000);
+        s112a.GetProperty("Balance112ABE").GetInt64().Should().Be(100_000);
+        s112a.GetProperty("Balance112AAE").GetInt64().Should().Be(0);
+    }
+
+    [Fact]
     public void Itr3_emits_capital_gains_and_per_scrip_schedule112A()
     {
         // First ITR-3-with-gains gate: exercises both the augmented ScheduleCGFor23 (ITR-3 needs slump-sale /
@@ -565,7 +589,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false)
     {
         var user = new User
         {
@@ -644,7 +668,14 @@ public class ItrSchemaConformanceTests
                 ? new[] { new HouseProperty { Type = HousePropertyType.LetOut, Address = "12 MG Road", AnnualValue = 300_000m, MunicipalTaxPaid = 20_000m, InterestOnLoan = 50_000m, CoOwnerSharePct = 100m } }
                 : Array.Empty<HouseProperty>(),
             // An equity STCG (111A) + an equity LTCG (112A) so the ITR-2/3 gate exercises Schedule CG.
-            Gains = withGains
+            // withGrandfathering: a single pre-01-Feb-2018 112A gain with a 31-Jan-2018 FMV so the gate
+            // exercises s.55(2)(ac) grandfathering (cost = max(2L, min(FMV 4L, sale 5L)) = 4L → LTCG ₹1L).
+            Gains = withGrandfathering
+                ? new[]
+                {
+                    new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 200_000m, AcquisitionDate = new DateOnly(2015, 1, 1), FairMarketValue31Jan2018 = 400_000m, Isin = "INE002A01018" },
+                }
+                : withGains
                 ? new[]
                 {
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },

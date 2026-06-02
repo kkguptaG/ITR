@@ -374,10 +374,14 @@ export function CapitalGainForm({
     defaultValues: {
       assetType: 'ListedEquityShare', term: 'Long', acquisitionDate: '', transferDate: '',
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
-      exemptionSection: '', reinvestmentAmount: 0,
+      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0,
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
+
+  // s.112A grandfathering applies only to listed equity / equity MF held long-term.
+  const is112AEligible = watch('term') === 'Long'
+    && (watch('assetType') === 'ListedEquityShare' || watch('assetType') === 'EquityMutualFund');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
@@ -405,6 +409,9 @@ export function CapitalGainForm({
         </Field>
         <MoneyField control={control} name="salePrice" label={t('saleConsideration')} error={errors.salePrice?.message} />
         <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
+        {is112AEligible ? (
+          <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
+        ) : null}
         <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
         <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
         <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />

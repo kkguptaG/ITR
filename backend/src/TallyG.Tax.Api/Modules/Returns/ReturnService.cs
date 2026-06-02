@@ -556,7 +556,8 @@ public sealed class ReturnService : IReturnService
             ExemptionSection = request.ExemptionSection?.Trim(),
             ExemptionAmount = request.ExemptionAmount,
             ReinvestmentAmount = request.ReinvestmentAmount,
-            Isin = request.Isin?.Trim()
+            Isin = request.Isin?.Trim(),
+            FairMarketValue31Jan2018 = request.FairMarketValue31Jan2018
         };
 
         ApplyCapitalGainDerived(entity);
@@ -586,6 +587,7 @@ public sealed class ReturnService : IReturnService
         entity.ExemptionAmount = request.ExemptionAmount;
         entity.ReinvestmentAmount = request.ReinvestmentAmount;
         entity.Isin = request.Isin?.Trim();
+        entity.FairMarketValue31Jan2018 = request.FairMarketValue31Jan2018;
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1255,6 +1257,18 @@ public sealed class ReturnService : IReturnService
     {
         // Use indexed cost when supplied (engine may refine it); fall back to actual cost.
         var costBase = c.IndexedCost > 0 ? c.IndexedCost : c.CostOfAcquisition;
+
+        // s.112A grandfathering (s.55(2)(ac)): listed equity / equity MF acquired on/before 31-Jan-2018 uses
+        // the higher of actual cost and (lower of the 31-Jan-2018 FMV and the sale value) — keeps the shown
+        // gain consistent with the engine's grandfathered LTCG.
+        if (c.Term == CapitalGainTerm.Long
+            && (c.TaxSection ?? string.Empty).Contains("112A")
+            && c.AcquisitionDate is { } ad && ad < new DateOnly(2018, 2, 1)
+            && c.FairMarketValue31Jan2018 > 0m)
+        {
+            costBase = Math.Max(c.CostOfAcquisition, Math.Min(c.FairMarketValue31Jan2018, c.SalePrice));
+        }
+
         var gross = c.SalePrice - costBase - c.CostOfImprovement - c.ExpensesOnTransfer;
         c.Gain = gross - c.ExemptionAmount;
     }
@@ -1326,7 +1340,7 @@ public sealed class ReturnService : IReturnService
     private static CapitalGainDto ToCapitalGainDto(CapitalGain c) => new(
         c.Id, c.AssetType, c.Term, c.TaxSection, c.AcquisitionDate, c.TransferDate, c.SalePrice,
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
-        c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin);
+        c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018);
 
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,

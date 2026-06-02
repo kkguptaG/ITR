@@ -43,7 +43,7 @@ internal static class TaxComputationInputFactory
             CapitalGains = gains.Select(c => new CapitalGainInput(
                 c.AssetType, c.Term, c.TaxSection, c.SalePrice, c.CostOfAcquisition, c.CostOfImprovement,
                 c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate,
-                FairMarketValueOnGrandfatherDate: null,
+                FairMarketValueOnGrandfatherDate: c.FairMarketValue31Jan2018 > 0m ? c.FairMarketValue31Jan2018 : null,
                 IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null,
                 ExemptionSection: c.ExemptionSection,
                 ReinvestmentAmount: c.ReinvestmentAmount)).ToList(),

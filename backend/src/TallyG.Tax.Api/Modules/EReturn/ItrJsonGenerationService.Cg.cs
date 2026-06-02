@@ -119,38 +119,41 @@ public sealed partial class ItrJsonGenerationService
 
     // Schedule 112A — the scrip-wise breakup of LTCG on STT-paid listed equity / equity MF (s.112A). Each
     // captured 112A gain becomes a row (ISIN + sale value + cost + the LTCG), and the aggregate Balance ties
-    // to the engine's 112A LTCG. Grandfathering under s.55(2)(ac) (shares acquired on/before 31-Jan-2018)
-    // needs the 31-Jan-2018 FMV and matching engine support, so every row is reported as acquired after that
-    // date ("AE") with cost = actual cost — that remains a future refinement. Returns null when there are no
-    // positive 112A gains (the minItems:1 Schedule112ADtls array must not be empty).
+    // to the engine's 112A LTCG. Shares acquired on/before 31-Jan-2018 with a captured FMV are grandfathered
+    // (s.55(2)(ac), ShareOnOrBefore "BE": cost = higher of actual and lower-of-FMV-and-sale); the rest are
+    // "AE" at actual cost. Returns null when there are no positive 112A gains (Schedule112ADtls is minItems:1).
     private static Dictionary<string, object?>? BuildSchedule112A(ItrFilingContext ctx)
     {
         var rows = new List<Dictionary<string, object?>>();
         var isItr3 = ctx.ItrType == ItrType.ITR3;
-        long saleTot = 0, costTot = 0, expTot = 0, balTot = 0;
+        long saleTot = 0, costUsedTot = 0, actualCostTot = 0, fmvTot = 0, expTot = 0, balTot = 0, beBalTot = 0, aeBalTot = 0;
 
         foreach (var g in ctx.Gains.Where(x => x.Term == CapitalGainTerm.Long && (x.TaxSection ?? string.Empty).Contains("112A")))
         {
             var sale = R(Math.Max(0m, g.SalePrice));
-            var cost = R(Math.Max(0m, g.CostOfAcquisition + g.CostOfImprovement));
-            var exp = R(Math.Max(0m, g.ExpensesOnTransfer));
-            var deductions = cost + exp;
-            var balance = Math.Max(0L, sale - deductions);
             if (sale <= 0L)
             {
                 continue;
             }
 
+            var grandfathered = IsGrandfathered112A(g);
+            var actualCost = R(Math.Max(0m, g.CostOfAcquisition + g.CostOfImprovement));
+            var costUsed = R(Math.Max(0m, GrandfatheredCost(g) + g.CostOfImprovement));
+            var fmv = grandfathered ? R(g.FairMarketValue31Jan2018) : 0L;
+            var exp = R(Math.Max(0m, g.ExpensesOnTransfer));
+            var deductions = costUsed + exp;
+            var balance = Math.Max(0L, sale - deductions);
+
             var row = new Dictionary<string, object?>
             {
-                ["ShareOnOrBefore"] = "AE",
+                ["ShareOnOrBefore"] = grandfathered ? "BE" : "AE",
                 ["ISINCode"] = ValidIsin(g.Isin),
                 ["ShareUnitName"] = "Listed equity / equity MF (STT paid)",
                 ["TotSaleValue"] = sale,
-                ["CostAcqWithoutIndx"] = cost,
-                ["AcquisitionCost"] = cost,
+                ["CostAcqWithoutIndx"] = costUsed,
+                ["AcquisitionCost"] = actualCost,
                 ["FairMktValuePerShareunit"] = 0,
-                ["TotFairMktValueCapAst"] = 0L,
+                ["TotFairMktValueCapAst"] = fmv,
                 ["ExpExclCnctTransfer"] = exp,
                 ["TotalDeductions"] = deductions,
                 ["Balance"] = balance,
@@ -170,9 +173,19 @@ public sealed partial class ItrJsonGenerationService
 
             rows.Add(row);
             saleTot += sale;
-            costTot += cost;
+            costUsedTot += costUsed;
+            actualCostTot += actualCost;
+            fmvTot += fmv;
             expTot += exp;
             balTot += balance;
+            if (grandfathered)
+            {
+                beBalTot += balance;
+            }
+            else
+            {
+                aeBalTot += balance;
+            }
         }
 
         if (rows.Count == 0)
@@ -184,15 +197,15 @@ public sealed partial class ItrJsonGenerationService
         {
             ["Schedule112ADtls"] = rows,
             ["SaleValue112A"] = saleTot,
-            ["CostAcqWithoutIndx112A"] = costTot,
-            ["AcquisitionCost112A"] = costTot,
+            ["CostAcqWithoutIndx112A"] = costUsedTot,
+            ["AcquisitionCost112A"] = actualCostTot,
             ["LTCGBeforelowerB1B2112A"] = balTot,
-            ["FairMktValueCapAst112A"] = 0L,
+            ["FairMktValueCapAst112A"] = fmvTot,
             ["ExpExclCnctTransfer112A"] = expTot,
-            ["Deductions112A"] = costTot + expTot,
+            ["Deductions112A"] = costUsedTot + expTot,
             ["Balance112A"] = balTot,
-            ["Balance112ABE"] = 0L,        // none reported as acquired before 01-Feb-2018 (grandfathering deferred)
-            ["Balance112AAE"] = balTot,
+            ["Balance112ABE"] = beBalTot,   // gains on shares acquired on/before 31-Jan-2018 (grandfathered)
+            ["Balance112AAE"] = aeBalTot,   // gains on shares acquired after 31-Jan-2018
             ["TotalBalance112A"] = balTot,
         };
     }

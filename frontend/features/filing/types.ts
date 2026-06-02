@@ -154,6 +154,7 @@ export interface CapitalGainDto {
   reinvestmentAmount: number;
   gain: number;
   isin: string | null;
+  fairMarketValue31Jan2018: number;
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
@@ -169,6 +170,7 @@ export interface UpsertCapitalGainRequest {
   exemptionAmount: number;
   reinvestmentAmount?: number;
   isin?: string | null;
+  fairMarketValue31Jan2018?: number;
 }
 
 export interface BusinessIncomeDto {

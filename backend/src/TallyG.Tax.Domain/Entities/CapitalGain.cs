@@ -33,6 +33,10 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     public decimal Gain { get; set; }
     public string? Isin { get; set; }
 
+    /// <summary>Fair market value on 31-Jan-2018 (per unit × units / total) for s.112A grandfathering
+    /// (s.55(2)(ac)) of listed equity / equity-MF acquired on or before that date. 0 ⇒ not applicable.</summary>
+    public decimal FairMarketValue31Jan2018 { get; set; }
+
     public DateTimeOffset? DeletedAt { get; set; }
 
     public TaxReturn? TaxReturn { get; set; }

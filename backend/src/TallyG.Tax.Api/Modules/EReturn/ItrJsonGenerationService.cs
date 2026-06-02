@@ -1759,7 +1759,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         decimal shortTerm = 0m, longTerm = 0m;
         foreach (var g in gains)
         {
-            var gain = Math.Max(0m, g.SalePrice - g.CostOfAcquisition - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount);
+            // 112A equity LTCG acquired on/before 31-Jan-2018 uses the grandfathered cost (s.55(2)(ac));
+            // this matches the tax engine so the generated CG figures reconcile with the computation.
+            var gain = Math.Max(0m, g.SalePrice - GrandfatheredCost(g) - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount);
             if (g.Term == CapitalGainTerm.Short)
             {
                 shortTerm += gain;
@@ -1771,6 +1773,22 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         }
         return (shortTerm, longTerm);
     }
+
+    /// <summary>s.112A grandfathering cutoff — shares acquired before this date qualify (i.e. on/before 31-Jan-2018).</summary>
+    private static readonly DateOnly GrandfatherCutoff = new(2018, 2, 1);
+
+    /// <summary>True when a gain is s.112A equity LTCG acquired pre-cutoff with a 31-Jan-2018 FMV captured.</summary>
+    private static bool IsGrandfathered112A(CapitalGain g)
+        => g.Term == CapitalGainTerm.Long
+           && (g.TaxSection ?? string.Empty).Contains("112A")
+           && g.AcquisitionDate is { } ad && ad < GrandfatherCutoff
+           && g.FairMarketValue31Jan2018 > 0m;
+
+    /// <summary>Cost of acquisition used in the gain math: grandfathered cost for eligible 112A shares, else actual.</summary>
+    private static decimal GrandfatheredCost(CapitalGain g)
+        => IsGrandfathered112A(g)
+            ? Math.Max(g.CostOfAcquisition, Math.Min(g.FairMarketValue31Jan2018, g.SalePrice))
+            : g.CostOfAcquisition;
 
     private static List<Dictionary<string, object?>> CapitalGainItems(IReadOnlyList<CapitalGain> gains)
         => gains.Select(g => new Dictionary<string, object?>

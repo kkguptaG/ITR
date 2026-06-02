@@ -245,6 +245,7 @@ export function IncomeStep() {
                           exemptionAmount: item.exemptionAmount,
                           exemptionSection: item.exemptionSection ?? '',
                           reinvestmentAmount: item.reinvestmentAmount,
+                          fairMarketValue31Jan2018: item.fairMarketValue31Jan2018,
                         }
                       : undefined
                   }

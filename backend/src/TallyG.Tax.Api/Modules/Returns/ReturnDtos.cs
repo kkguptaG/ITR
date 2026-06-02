@@ -179,7 +179,8 @@ public sealed record UpsertCapitalGainRequest(
     string? ExemptionSection,
     decimal ExemptionAmount,
     decimal ReinvestmentAmount,
-    string? Isin);
+    string? Isin,
+    decimal FairMarketValue31Jan2018 = 0m);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -197,7 +198,8 @@ public sealed record CapitalGainDto(
     decimal ExemptionAmount,
     decimal ReinvestmentAmount,
     decimal Gain,
-    string? Isin);
+    string? Isin,
+    decimal FairMarketValue31Jan2018);
 
 // ----------------------------------------------------------------- business income
 

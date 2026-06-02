@@ -103,6 +103,8 @@ export const capitalGainSchema = z.object({
   exemptionAmount: optionalMoney,
   exemptionSection: z.string().optional().or(z.literal('')),
   reinvestmentAmount: optionalMoney,
+  // FMV on 31-Jan-2018 for s.112A grandfathering of pre-2018 listed equity / equity MF.
+  fairMarketValue31Jan2018: optionalMoney,
 });
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 
