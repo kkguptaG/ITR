@@ -56,7 +56,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
         var us16 = Math.Max(0m, grossSalary - salExempt - salaryNet);
 
-        return new Dictionary<string, object?>
+        var root = new Dictionary<string, object?>
         {
             ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR1"] = FormHeader("ITR1", "For Indls having Income from Salaries, one house property, other sources (Interest etc.) and LTCG u/s 112A upto 1.25 lakh", ctx),
@@ -81,6 +81,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["Refund"] = RefundConformant(ctx),
             ["Verification"] = Verification(ctx)
         };
+        AddTaxesPaidSchedulesItr1(root, ctx);
+        return root;
     }
 
     // ----------------------------------------------------------------- ITR-4 (Sugam, presumptive)
@@ -96,7 +98,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
         var us16 = Math.Max(0m, grossSalary - salExempt - salaryNet);
 
-        return new Dictionary<string, object?>
+        var root = new Dictionary<string, object?>
         {
             ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR4"] = FormHeader("ITR4", "For presumptive income from Business & Profession (44AD/44ADA/44AE)", ctx),
@@ -122,6 +124,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["Refund"] = RefundConformant(ctx),
             ["Verification"] = Verification(ctx)
         };
+        AddTaxesPaidSchedulesItr4(root, ctx);
+        return root;
     }
 
     // ----------------------------------------------------------------- ITR-2 (no business) — schema-conformant
@@ -135,7 +139,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = TaxMath0(gti - hp - cgTotal - other);   // anchored to the engine's GTI
 
-        return new Dictionary<string, object?>
+        var root = new Dictionary<string, object?>
         {
             ["CreationInfo"] = CreationInfo(ctx),
             ["Form_ITR2"] = FormHeader("ITR2", "For Individuals and HUFs not having income from profits and gains of business or profession", ctx),
@@ -150,6 +154,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["PartB_TTI"] = PartBTtiNode(ctx, c),
             ["Verification"] = VerificationNonItr1(ctx),
         };
+        AddTaxesPaidSchedulesDetailed(root, ctx);
+        return root;
     }
 
     // ----------------------------------------------------------------- ITR-3 (business/profession incl. F&O)
@@ -170,6 +176,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         skel["Verification"] = VerificationNonItr1(ctx, includeDate: true);
 
         OverlayItr3Figures(skel, ctx);
+        AddTaxesPaidSchedulesDetailed(skel, ctx);
         return skel;
     }
 
@@ -1131,4 +1138,158 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     }
 
     private static long R(decimal d) => (long)Math.Round(d, MidpointRounding.AwayFromZero);
+
+    // ====================== TDS schedules + self-paid challans ======================
+    // Deductor-wise TDS (salary → Schedule TDS1; other → Schedule TDS2) + advance/SAT challans
+    // (Schedule IT). All these schedules are OPTIONAL in every form, so a wrapper is emitted only
+    // when there are rows (the item arrays are minItems:1). The salary-TDS and challan item shapes
+    // are shared across all four forms; the other-than-salary item differs (ITR-1/4 use a flat
+    // TDSonOthThanSal, ITR-2/3 use the richer TDSOthThanSalaryDtls).
+
+    /// <summary>The TDS deduction year code (FY in which tax was deducted = AY start year − 1).</summary>
+    private static string DeductedYr(ItrFilingContext ctx)
+        => int.TryParse(AyStartYear(ctx.AyCode), out var y) ? (y - 1).ToString() : "2025";
+
+    private static Dictionary<string, object?> DeductorDetl(TdsEntry t) => new()
+    {
+        ["TAN"] = t.DeductorTan,
+        ["EmployerOrDeductorOrCollecterName"] = t.DeductorName,
+    };
+
+    private static Dictionary<string, object?> TdsSalaryItem(TdsEntry t) => new()
+    {
+        ["EmployerOrDeductorOrCollectDetl"] = DeductorDetl(t),
+        ["IncChrgSal"] = R(t.IncomeOffered),
+        ["TotalTDSSal"] = R(t.TaxDeducted),
+    };
+
+    // ITR-1 / ITR-4 flat other-than-salary item.
+    private static Dictionary<string, object?> TdsOtherItemSimple(TdsEntry t, string deductedYr) => new()
+    {
+        ["EmployerOrDeductorOrCollectDetl"] = DeductorDetl(t),
+        ["TDSSection"] = t.TdsSection ?? "94A",
+        ["AmtForTaxDeduct"] = R(t.IncomeOffered),
+        ["DeductedYr"] = deductedYr,
+        ["TotTDSOnAmtPaid"] = R(t.TaxDeducted),
+        ["ClaimOutOfTotTDSOnAmtPaid"] = R(t.TaxDeducted),
+    };
+
+    // ITR-2 / ITR-3 detailed other-than-salary item (TDSOthThanSalaryDtls).
+    private static Dictionary<string, object?> TdsOtherItemDetailed(TdsEntry t) => new()
+    {
+        ["TDSCreditName"] = "S",
+        ["TANOfDeductor"] = t.DeductorTan,
+        ["TDSSection"] = t.TdsSection ?? "94A",
+        ["TaxDeductCreditDtls"] = new Dictionary<string, object?>
+        {
+            ["TaxDeductedOwnHands"] = R(t.TaxDeducted),
+            ["TaxDeductedIncome"] = R(t.IncomeOffered),
+            ["TaxDeductedTDS"] = R(t.TaxDeducted),
+            ["TaxClaimedOwnHands"] = R(t.TaxDeducted),
+            ["TaxClaimedIncome"] = R(t.IncomeOffered),
+            ["TaxClaimedTDS"] = R(t.TaxDeducted),
+        },
+        ["HeadOfIncome"] = "OS",
+        ["AmtCarriedFwd"] = 0L,
+    };
+
+    private static Dictionary<string, object?> ChallanItem(TaxPaymentChallan c) => new()
+    {
+        ["BSRCode"] = c.BsrCode,
+        ["DateDep"] = c.DepositDate.ToString("yyyy-MM-dd"),
+        ["SrlNoOfChaln"] = c.ChallanSerial,
+        ["Amt"] = R(c.Amount),
+    };
+
+    // ITR-4 detailed other-than-salary item (TDSonOthThanSalDtls — different key + shape again, and a
+    // DeductedYr enum that omits the current FY, so we leave that optional field out).
+    private static Dictionary<string, object?> TdsOtherItemItr4(TdsEntry t) => new()
+    {
+        ["TANOfDeductor"] = t.DeductorTan,
+        ["TDSSection"] = t.TdsSection ?? "94A",
+        ["GrossAmount"] = R(t.IncomeOffered),
+        ["TDSDeducted"] = R(t.TaxDeducted),
+        ["TDSClaimed"] = R(t.TaxDeducted),
+        ["TDSCreditCarriedFwd"] = 0L,
+        ["HeadOfIncome"] = "OS",
+    };
+
+    private static List<TdsEntry> SalaryTds(ItrFilingContext ctx)
+        => ctx.TdsEntries.Where(t => t.Head == TdsHead.Salary).ToList();
+
+    private static List<TdsEntry> OtherTds(ItrFilingContext ctx)
+        => ctx.TdsEntries.Where(t => t.Head == TdsHead.OtherThanSalary).ToList();
+
+    private static void AddSalaryTdsSchedule(Dictionary<string, object?> form, ItrFilingContext ctx, string key)
+    {
+        var sal = SalaryTds(ctx);
+        if (sal.Count == 0) return;
+        form[key] = new Dictionary<string, object?>
+        {
+            ["TDSonSalary"] = sal.Select(TdsSalaryItem).ToList(),
+            ["TotalTDSonSalaries"] = R(sal.Sum(t => t.TaxDeducted)),
+        };
+    }
+
+    private static void AddChallanSchedule(Dictionary<string, object?> form, ItrFilingContext ctx, string key)
+    {
+        if (ctx.Challans.Count == 0) return;
+        form[key] = new Dictionary<string, object?>
+        {
+            ["TaxPayment"] = ctx.Challans.Select(ChallanItem).ToList(),
+            ["TotalTaxPayments"] = R(ctx.Challans.Sum(c => c.Amount)),
+        };
+    }
+
+    /// <summary>ITR-1: TDSonSalaries + TDSonOthThanSals (flat TDSonOthThanSal item) + TaxPayments.</summary>
+    private static void AddTaxesPaidSchedulesItr1(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        AddSalaryTdsSchedule(form, ctx, "TDSonSalaries");
+        var oth = OtherTds(ctx);
+        if (oth.Count > 0)
+        {
+            var dy = DeductedYr(ctx);
+            form["TDSonOthThanSals"] = new Dictionary<string, object?>
+            {
+                ["TDSonOthThanSal"] = oth.Select(t => TdsOtherItemSimple(t, dy)).ToList(),
+                ["TotalTDSonOthThanSals"] = R(oth.Sum(t => t.TaxDeducted)),
+            };
+        }
+
+        AddChallanSchedule(form, ctx, "TaxPayments");
+    }
+
+    /// <summary>ITR-4: TDSonSalaries + TDSonOthThanSals (TDSonOthThanSalDtls item) + ScheduleIT.</summary>
+    private static void AddTaxesPaidSchedulesItr4(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        AddSalaryTdsSchedule(form, ctx, "TDSonSalaries");
+        var oth = OtherTds(ctx);
+        if (oth.Count > 0)
+        {
+            form["TDSonOthThanSals"] = new Dictionary<string, object?>
+            {
+                ["TDSonOthThanSalDtls"] = oth.Select(TdsOtherItemItr4).ToList(),
+                ["TotalTDSonOthThanSals"] = R(oth.Sum(t => t.TaxDeducted)),
+            };
+        }
+
+        AddChallanSchedule(form, ctx, "ScheduleIT");
+    }
+
+    /// <summary>ITR-2/ITR-3: ScheduleTDS1 + ScheduleTDS2 (detailed TDSOthThanSalaryDtls) + ScheduleIT.</summary>
+    private static void AddTaxesPaidSchedulesDetailed(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        AddSalaryTdsSchedule(form, ctx, "ScheduleTDS1");
+        var oth = OtherTds(ctx);
+        if (oth.Count > 0)
+        {
+            form["ScheduleTDS2"] = new Dictionary<string, object?>
+            {
+                ["TDSOthThanSalaryDtls"] = oth.Select(TdsOtherItemDetailed).ToList(),
+                ["TotalTDSonOthThanSals"] = R(oth.Sum(t => t.TaxDeducted)),
+            };
+        }
+
+        AddChallanSchedule(form, ctx, "ScheduleIT");
+    }
 }

@@ -89,6 +89,40 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr1_emits_deductor_wise_tds_and_challan_schedules()
+    {
+        var ctx = BuildContext(ItrType.ITR1);
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var itr1 = doc.RootElement.GetProperty("ITR").GetProperty("ITR1");
+
+        var sal = itr1.GetProperty("TDSonSalaries");
+        sal.GetProperty("TotalTDSonSalaries").GetInt64().Should().Be(50_000);
+        sal.GetProperty("TDSonSalary")[0].GetProperty("EmployerOrDeductorOrCollectDetl")
+            .GetProperty("TAN").GetString().Should().Be("DELH12345A");
+
+        itr1.GetProperty("TDSonOthThanSals").GetProperty("TotalTDSonOthThanSals").GetInt64().Should().Be(8_000);
+        // ITR-1 puts the advance/SAT challans under "TaxPayments".
+        itr1.GetProperty("TaxPayments").GetProperty("TotalTaxPayments").GetInt64().Should().Be(20_000);
+    }
+
+    [Fact]
+    public void Itr2_emits_scheduleTds_and_scheduleIt()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        itr2.GetProperty("ScheduleTDS1").GetProperty("TotalTDSonSalaries").GetInt64().Should().Be(50_000);
+        itr2.GetProperty("ScheduleTDS2").GetProperty("TotalTDSonOthThanSals").GetInt64().Should().Be(8_000);
+        // ITR-2/3 put the challans under "ScheduleIT".
+        itr2.GetProperty("ScheduleIT").GetProperty("TotalTaxPayments").GetInt64().Should().Be(20_000);
+    }
+
+    [Fact]
     public void Itr3_overlays_books_financials_into_partA_bs_and_pl()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26");
@@ -176,6 +210,17 @@ public class ItrSchemaConformanceTests
             {
                 new BankAccountDetail { BankName = "HDFC Bank", AccountNumber = "50100123456789", AccountType = "SB", Ifsc = "HDFC0001234", UseForRefund = true },
                 new BankAccountDetail { BankName = "State Bank of India", AccountNumber = "30200999888", AccountType = "CA", Ifsc = "SBIN0000456", UseForRefund = false },
+            },
+            // Deductor-wise TDS + self-paid challans so the gate exercises the TDS schedules + Schedule IT.
+            TdsEntries = new[]
+            {
+                new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", DeductorName = "Acme Corp", IncomeOffered = 1_000_000m, TaxDeducted = 50_000m },
+                new TdsEntry { Head = TdsHead.OtherThanSalary, DeductorTan = "MUMB54321Z", DeductorName = "HDFC Bank", TdsSection = "94A", IncomeOffered = 80_000m, TaxDeducted = 8_000m },
+            },
+            Challans = new[]
+            {
+                new TaxPaymentChallan { Kind = ChallanKind.Advance, BsrCode = "1234567", DepositDate = new DateOnly(2025, 12, 15), ChallanSerial = 12345, Amount = 15_000m },
+                new TaxPaymentChallan { Kind = ChallanKind.SelfAssessment, BsrCode = "0011223", DepositDate = new DateOnly(2026, 3, 25), ChallanSerial = 678, Amount = 5_000m },
             },
         };
     }

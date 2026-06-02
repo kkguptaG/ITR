@@ -70,6 +70,10 @@ public sealed class ItrFilingContext
     public IReadOnlyList<Deduction> Deductions { get; init; } = Array.Empty<Deduction>();
     public IReadOnlyList<BankAccountDetail> BankAccounts { get; init; } = Array.Empty<BankAccountDetail>();
 
+    /// <summary>Deductor-wise TDS (Schedule TDS1/TDS2 source) + self-paid challans (Schedule IT source).</summary>
+    public IReadOnlyList<TdsEntry> TdsEntries { get; init; } = Array.Empty<TdsEntry>();
+    public IReadOnlyList<TaxPaymentChallan> Challans { get; init; } = Array.Empty<TaxPaymentChallan>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }
