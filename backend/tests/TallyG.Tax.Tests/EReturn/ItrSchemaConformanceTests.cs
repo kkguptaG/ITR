@@ -435,6 +435,12 @@ public class ItrSchemaConformanceTests
         tr1.GetProperty("TaxReliefOutsideIndiaDTAA").GetInt64().Should().Be(15_000); // USA s.90
         tr1.GetProperty("TaxReliefOutsideIndiaNotDTAA").GetInt64().Should().BeGreaterThan(0); // UK s.91 (capped at Indian tax)
         tr1.GetProperty("TaxPaidOutsideIndFlg").GetString().Should().Be("YES");
+
+        // The engine's foreign tax credit is disclosed in PartB-TTI TaxRelief (so net < gross is explained).
+        var taxRelief = itr2.GetProperty("PartB_TTI").GetProperty("ComputationOfTaxLiability").GetProperty("TaxRelief");
+        taxRelief.GetProperty("TotTaxRelief").GetInt64().Should().Be(15_000);
+        // Both USA (s.90) and UK (s.91) foreign tax exist → the relief splits across Section90 + Section91.
+        (taxRelief.GetProperty("Section90").GetInt64() + taxRelief.GetProperty("Section91").GetInt64()).Should().Be(15_000);
     }
 
     [Fact]
@@ -858,6 +864,8 @@ public class ItrSchemaConformanceTests
             Cess = 1_600m,
             Rebate87A = 0m,
             Surcharge = 0m,
+            // A foreign tax credit when the FSI scenario is exercised, so the PartB-TTI TaxRelief node is emitted.
+            Relief90And91 = withForeignSourceIncome ? 15_000m : 0m,
             TotalTax = 41_600m,
             TdsPaid = 50_000m,
             AdvanceTax = 0m,

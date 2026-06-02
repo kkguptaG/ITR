@@ -1086,9 +1086,10 @@ public sealed class ReturnService : IReturnService
         var deductions = await _db.Deductions.Where(d => d.TaxReturnId == ret.Id).ToListAsync(ct);
         var donations80G = await _db.Donations80G.Where(d => d.TaxReturnId == ret.Id).ToListAsync(ct);
         var exemptIncomes = await _db.ExemptIncomes.Where(e => e.TaxReturnId == ret.Id).ToListAsync(ct);
+        var foreignSourceIncomes = await _db.ForeignSourceIncomes.Where(f => f.TaxReturnId == ret.Id).ToListAsync(ct);
 
         // Ensure a computation exists for the chosen regime; persist one if the engine can produce it.
-        var computation = await EnsureComputationAsync(ret, ayCode, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, ct);
+        var computation = await EnsureComputationAsync(ret, ayCode, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, ct);
 
         return new
         {
@@ -1134,6 +1135,7 @@ public sealed class ReturnService : IReturnService
         IReadOnlyList<Deduction> deductions,
         IReadOnlyList<Donation80G> donations80G,
         IReadOnlyList<ExemptIncome> exemptIncomes,
+        IReadOnlyList<ForeignSourceIncome> foreignSourceIncomes,
         CancellationToken ct)
     {
         var regime = ret.Regime ?? Regime.New;
@@ -1161,7 +1163,7 @@ public sealed class ReturnService : IReturnService
             return null;
         }
 
-        var input = BuildComputationInput(ret, ayCode, rulesJson, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes);
+        var input = BuildComputationInput(ret, ayCode, rulesJson, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes);
 
         ComputationResult result;
         try
@@ -1227,11 +1229,12 @@ public sealed class ReturnService : IReturnService
         IReadOnlyList<IncomeSource> incomeSources,
         IReadOnlyList<Deduction> deductions,
         IReadOnlyList<Donation80G> donations80G,
-        IReadOnlyList<ExemptIncome> exemptIncomes)
+        IReadOnlyList<ExemptIncome> exemptIncomes,
+        IReadOnlyList<ForeignSourceIncome> foreignSourceIncomes)
         => TaxComputationInputFactory.FromReturn(
             // Age defaults to an adult slab on this snapshot path (resolved from UserProfile on /tax/compute).
             ret, ayCode, rulesJson, 30, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
-            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes);
+            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes);
 
     private async Task<int> NextVersionNoAsync(Guid taxReturnId, CancellationToken ct)
     {

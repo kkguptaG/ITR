@@ -1918,14 +1918,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var tcs = ctx.Return.TcsPaid;
         var adv = ctx.Return.AdvanceTaxPaid;
         var sa = ctx.Return.SelfAssessmentTaxPaid;
-        return new Dictionary<string, object?>
+        var col = new Dictionary<string, object?>
         {
-            ["TaxPayDeemedTotIncUs115JC"] = R(amt),
-            ["Surcharge"] = R(0m),
-            ["HealthEduCess"] = R(0m),
-            ["TotalTaxPayablDeemedTotInc"] = R(amt),
-            ["ComputationOfTaxLiability"] = new Dictionary<string, object?>
-            {
                 ["TaxPayableOnTI"] = new Dictionary<string, object?>
                 {
                     ["TaxAtNormalRatesOnAggrInc"] = R(slabTax),
@@ -1955,7 +1949,22 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     ["TotalIntrstPay"] = R(interest),
                 },
                 ["AggregateTaxInterestLiability"] = R(net + interest),
-            },
+        };
+        // Reliefs u/s 89 (arrears) + 90/90A/91 (foreign tax credit) — disclosed when the engine credited any,
+        // explaining why the net liability is below the gross. Inserted before IntrstPay's sibling totals.
+        var taxRelief = TaxReliefNode(c, ctx);
+        if (taxRelief is not null)
+        {
+            col["TaxRelief"] = taxRelief;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["TaxPayDeemedTotIncUs115JC"] = R(amt),
+            ["Surcharge"] = R(0m),
+            ["HealthEduCess"] = R(0m),
+            ["TotalTaxPayablDeemedTotInc"] = R(amt),
+            ["ComputationOfTaxLiability"] = col,
             ["TaxPaid"] = new Dictionary<string, object?>
             {
                 ["TaxesPaid"] = new Dictionary<string, object?>
@@ -1970,6 +1979,34 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["Refund"] = RefundWithFlag(ctx),
             ["AssetOutIndiaFlag"] = "NO",
         };
+    }
+
+    /// <summary>
+    /// Builds the ITR-2/3 ComputationOfTaxLiability.TaxRelief node (s.89 arrears + s.90/90A/91 foreign tax
+    /// credit) from the engine's computed reliefs, or null when none. The s.90/90A vs s.91 split is taken
+    /// from the foreign-source-income rows' relief sections (proportional to foreign tax paid).
+    /// </summary>
+    private static Dictionary<string, object?>? TaxReliefNode(TaxComputation? c, ItrFilingContext ctx)
+    {
+        var relief89 = TaxMath0(c?.Relief89 ?? 0m);
+        var relief9091 = TaxMath0(c?.Relief90And91 ?? 0m);
+        if (relief89 + relief9091 <= 0m)
+        {
+            return null;
+        }
+
+        var fsi = ctx.ForeignSourceIncomes;
+        var totalForeignTax = fsi.Sum(f => f.TaxPaidOutsideIndia);
+        var dtaaForeignTax = fsi.Where(f => f.ReliefSection != ForeignTaxReliefSection.Section91).Sum(f => f.TaxPaidOutsideIndia);
+        var dtaaFraction = totalForeignTax > 0m ? dtaaForeignTax / totalForeignTax : 1m;   // default to treaty (s.90)
+        var section90 = Math.Round(relief9091 * dtaaFraction, MidpointRounding.AwayFromZero);
+        var section91 = TaxMath0(relief9091 - section90);
+
+        var node = new Dictionary<string, object?> { ["TotTaxRelief"] = R(relief89 + relief9091) };
+        if (relief89 > 0m) node["Section89"] = R(relief89);
+        if (section90 > 0m) node["Section90"] = R(section90);
+        if (section91 > 0m) node["Section91"] = R(section91);
+        return node;
     }
 
     private static Dictionary<string, object?> VerificationNonItr1(ItrFilingContext ctx, bool includeDate = false)
@@ -2028,6 +2065,12 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 SetIfInt(col, "TaxPayAfterCreditUs115JD", net);
                 SetIfInt(col, "NetTaxLiability", net);
                 SetIfInt(col, "AggregateTaxInterestLiability", R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m)));
+                // Reliefs u/s 89 + 90/90A/91 (foreign tax credit) — disclosed when the engine credited any.
+                var taxRelief = TaxReliefNode(c, ctx);
+                if (taxRelief is not null)
+                {
+                    col["TaxRelief"] = taxRelief;
+                }
                 if (col["IntrstPay"] is Dictionary<string, object?> ip)
                 {
                     SetIfInt(ip, "IntrstPayUs234A", R(c?.Interest234A ?? 0m));

@@ -469,8 +469,11 @@ public static class DbInitializer
         {
             TenantId = RetailTenantId, TaxReturnId = returnId, Regime = Regime.Old, IsRecommended = true,
             GrossTotalIncome = 6_371_000m, TotalDeductions = 196_000m, TaxableIncome = 6_175_000m,
-            TaxBeforeCess = 1_620_000m, Surcharge = 0m, Cess = 64_800m, TotalTax = 1_684_800m,
-            TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 15_200m,
+            TaxBeforeCess = 1_620_000m, Surcharge = 0m, Cess = 64_800m,
+            // s.90 foreign tax credit on the US consultancy income (Schedule FSI/TR) — ₹75k, capped at the
+            // Indian tax on that income — reduces the net liability below the ₹16,84,800 gross.
+            Relief90And91 = 75_000m, TotalTax = 1_609_800m,
+            TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 90_200m,
         });
     }
 

@@ -27,9 +27,16 @@ internal static class TaxComputationInputFactory
         IReadOnlyList<IncomeSource> incomeSources,
         IReadOnlyList<Deduction> deductions,
         IReadOnlyList<Donation80G>? donations80G = null,
-        IReadOnlyList<ExemptIncome>? exemptIncomes = null)
+        IReadOnlyList<ExemptIncome>? exemptIncomes = null,
+        IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null)
     {
         var ay = ret.AssessmentYear;
+
+        // Foreign-source income (Schedule FSI/TR) is the canonical source of the doubly-taxed income +
+        // foreign tax paid that drive the s.90/91 foreign-tax-credit; when present it overrides the
+        // return's manual fields so the engine credits the relief (and the credit reconciles with TR1).
+        var fsi = foreignSourceIncomes ?? Array.Empty<ForeignSourceIncome>();
+        var hasFsi = fsi.Count > 0;
         return new TaxComputationInput
         {
             AssessmentYearCode = ayCode,
@@ -75,9 +82,9 @@ internal static class TaxComputationInputFactory
             // AMT credit (s.115JD) + reliefs (s.89/90/91).
             BroughtForwardAmtCredit = ret.BroughtForwardAmtCredit,
             Relief89 = ret.Relief89,
-            ForeignIncomeDoublyTaxed = ret.ForeignIncomeDoublyTaxed,
-            ForeignTaxPaid = ret.ForeignTaxPaid,
-            ForeignDtaaApplies = ret.ForeignDtaaApplies,
+            ForeignIncomeDoublyTaxed = hasFsi ? fsi.Sum(f => f.IncomeFromOutsideIndia) : ret.ForeignIncomeDoublyTaxed,
+            ForeignTaxPaid = hasFsi ? fsi.Sum(f => f.TaxPaidOutsideIndia) : ret.ForeignTaxPaid,
+            ForeignDtaaApplies = hasFsi ? fsi.Any(f => f.ReliefSection != ForeignTaxReliefSection.Section91) : ret.ForeignDtaaApplies,
             // s.234A/B/C interest context: dates from the AY; "as of" = submitted date or today (draft).
             FilingDueDate = ay?.DueDateNonAudit,
             ActualFilingDate = ret.SubmittedAt is { } sub ? DateOnly.FromDateTime(sub.UtcDateTime) : asOf,
