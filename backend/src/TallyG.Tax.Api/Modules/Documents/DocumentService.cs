@@ -418,8 +418,8 @@ public sealed class DocumentService : IDocumentService
 
             switch (key)
             {
-                // ---- salary head ----
-                case "form16.part_b.gross_salary_17_1":
+                // ---- salary head (AIS/TIS only: gross-only line). Form 16 is handled separately below,
+                // where its full breakup + TDS map onto a SalaryDetail the engine/generator consume. ----
                 case "ais.salary_gross":
                 case "tis.salary_processed_value":
                     Accumulate(incomeByType, IncomeType.Salary, amount, "Salary");
@@ -462,7 +462,81 @@ public sealed class DocumentService : IDocumentService
 
         var income = await UpsertIncomeSourcesAsync(taxReturn, document, incomeByType, ct);
         var deductions = await UpsertDeductionsAsync(taxReturn, document, deductionBySection, ct);
+
+        // Form 16 carries a full salary breakup + salary TDS — map it onto a SalaryDetail (+ a deductor-wise
+        // TdsEntry), the entities the engine, ITR generator and Schedule S actually read.
+        if (document.Kind == DocumentKind.Form16)
+        {
+            income += await MapForm16SalaryAndTdsAsync(taxReturn, document, fields, ct);
+        }
+
         return (income, deductions);
+    }
+
+    /// <summary>
+    /// Form 16 → a SalaryDetail (gross 17(1), HRA exemption, standard deduction, professional tax,
+    /// employer + TAN) and, when TDS was deducted, a salary <see cref="TdsEntry"/> that feeds Schedule
+    /// TDS1 and the refund credit. Idempotent: the SalaryDetail is matched by <c>Form16DocumentId</c> and
+    /// the TDS entry by (return, salary head, deductor TAN). Returns 1 when a salary row was upserted.
+    /// </summary>
+    private async Task<int> MapForm16SalaryAndTdsAsync(
+        TaxReturn taxReturn, Document document, IReadOnlyDictionary<string, StoredField> fields, CancellationToken ct)
+    {
+        decimal Money(string key) => fields.TryGetValue(key, out var f) && TryParseMoney(f.Value, out var amt) ? Math.Max(0m, amt) : 0m;
+        string? Text(string key) => fields.TryGetValue(key, out var f) && !string.IsNullOrWhiteSpace(f.Value) ? f.Value.Trim() : null;
+
+        var gross = Money("form16.part_b.gross_salary_17_1");
+        if (gross <= 0m)
+        {
+            return 0;   // nothing salary-like was extracted
+        }
+
+        var employer = Text("form16.part_a.employer_name") ?? "Employer (Form 16)";
+        var tan = Text("form16.part_a.employer_tan");
+        var tds = Money("form16.part_b.tds_total");
+
+        var salary = await _db.SalaryDetails.FirstOrDefaultAsync(
+            s => s.TaxReturnId == taxReturn.Id && s.Form16DocumentId == document.Id, ct);
+        if (salary is null)
+        {
+            salary = new SalaryDetail { TenantId = taxReturn.TenantId, TaxReturnId = taxReturn.Id, Form16DocumentId = document.Id };
+            _db.SalaryDetails.Add(salary);
+        }
+
+        salary.Employer = employer;
+        salary.Tan = tan;
+        salary.Gross = gross;
+        salary.HraExemption = Money("form16.part_b.hra_exempt_10_13a");
+        salary.StdDeduction = Money("form16.part_b.std_deduction_16ia");
+        salary.ProfessionalTax = Money("form16.part_b.professional_tax_16iii");
+
+        if (tds > 0m && !string.IsNullOrWhiteSpace(tan))
+        {
+            var entry = await _db.TdsEntries.FirstOrDefaultAsync(
+                t => t.TaxReturnId == taxReturn.Id && t.Head == TdsHead.Salary && t.DeductorTan == tan, ct);
+            if (entry is null)
+            {
+                entry = new TdsEntry
+                {
+                    TenantId = taxReturn.TenantId, UserId = taxReturn.UserId, TaxReturnId = taxReturn.Id,
+                    Head = TdsHead.Salary, DeductorTan = tan,
+                };
+                _db.TdsEntries.Add(entry);
+            }
+
+            entry.DeductorName = employer;
+            entry.IncomeOffered = gross;
+            entry.TaxDeducted = tds;
+
+            // Keep the return's TDS-credit rollup consistent (computed in-memory: existing entries that
+            // aren't this one, plus this one's amount), so the refund/payable reflects the Form 16 TDS.
+            var others = await _db.TdsEntries
+                .Where(t => t.TaxReturnId == taxReturn.Id && t.Id != entry.Id)
+                .SumAsync(t => t.TaxDeducted, ct);
+            taxReturn.TdsPaid = others + entry.TaxDeducted;
+        }
+
+        return 1;
     }
 
     private async Task<int> UpsertIncomeSourcesAsync(
