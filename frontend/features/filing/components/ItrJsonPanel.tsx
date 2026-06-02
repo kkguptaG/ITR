@@ -19,6 +19,7 @@ import {
   XCircle,
   AlertTriangle,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
 } from 'lucide-react';
 import { Button, Card, Spinner } from '@/components/ui';
@@ -145,6 +146,7 @@ export function ItrJsonPanel({ returnId }: { returnId: string }) {
         {/* Validation report — every issue carries a suggested fix */}
         {report && (
           <div className="space-y-3">
+            <SchemaConformanceBadge report={report} form={artifact?.itrType} />
             <div
               className={
                 report.isValid
@@ -222,6 +224,44 @@ export function ItrJsonPanel({ returnId }: { returnId: string }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// Schema-conformance state derived from the report's issue codes (set by the backend validator):
+//   • SCHEMA.RECONCILE warning  → no official schema bundled for this form yet ("unverified")
+//   • SCHEMA.NONCONFORMANT errors → validated and FAILED ("fail", with the field-issue count)
+//   • neither                    → validated against the official schema and PASSED ("ok")
+function SchemaConformanceBadge({ report, form }: { report: ValidationReport; form?: string }) {
+  const schemaErrors = report.issues.filter((i) => i.code === 'SCHEMA.NONCONFORMANT').length;
+  const unverified = report.issues.some((i) => i.code === 'SCHEMA.RECONCILE');
+  const formName = form ?? 'ITR';
+
+  if (unverified) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+        <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
+        <span>Official ITD schema not yet bundled for {formName} — verify in the ITD offline utility before upload.</span>
+      </div>
+    );
+  }
+
+  if (schemaErrors > 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
+        <span>
+          Does not match the official ITD {formName} schema — {schemaErrors} field{schemaErrors === 1 ? '' : 's'} to fix
+          before upload.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-money-200 bg-money-50 px-4 py-3 text-sm font-medium text-money-700">
+      <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <span>Validated against the official ITD {formName} schema (draft-04) — conformant.</span>
+    </div>
   );
 }
 
