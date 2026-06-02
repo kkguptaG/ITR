@@ -25,7 +25,8 @@ internal static class TaxComputationInputFactory
         IReadOnlyList<CapitalGain> gains,
         IReadOnlyList<BusinessIncome> businesses,
         IReadOnlyList<IncomeSource> incomeSources,
-        IReadOnlyList<Deduction> deductions)
+        IReadOnlyList<Deduction> deductions,
+        IReadOnlyList<Donation80G>? donations80G = null)
     {
         var ay = ret.AssessmentYear;
         return new TaxComputationInput
@@ -52,7 +53,7 @@ internal static class TaxComputationInputFactory
             OtherIncomes = incomeSources
                 .Where(s => s.Type == IncomeType.OtherSources)
                 .Select(s => new OtherIncomeInput(s.Label ?? "Other", s.Amount, ExtractNature(s.SourceMetaJson))).ToList(),
-            Deductions = deductions.Select(d => new DeductionInput(d.Section, d.Amount, d.SubType)).ToList(),
+            Deductions = BuildDeductionInputs(deductions, donations80G ?? Array.Empty<Donation80G>()),
             // Prepaid taxes + brought-forward losses captured on the return.
             TdsPaid = ret.TdsPaid,
             TcsPaid = ret.TcsPaid,
@@ -76,6 +77,51 @@ internal static class TaxComputationInputFactory
             PresumptiveAdvanceTax = businesses.Any(b => b.IsPresumptive),
         };
     }
+
+    /// <summary>
+    /// Maps the return's deductions to engine inputs. When 80G donations were captured donee-wise (each
+    /// with an explicit 100%/50% + with/without-qualifying-limit category), those drive the engine's 80G
+    /// categorisation and 10%-of-adjusted-GTI cap — replacing the category-less generic 80G deduction line,
+    /// which would otherwise fall to the engine's conservative 50%-with-limit default and under-deduct.
+    /// </summary>
+    private static List<DeductionInput> BuildDeductionInputs(
+        IReadOnlyList<Deduction> deductions, IReadOnlyList<Donation80G> donations80G)
+    {
+        if (donations80G.Count == 0)
+        {
+            return deductions.Select(d => new DeductionInput(d.Section, d.Amount, d.SubType)).ToList();
+        }
+
+        var list = deductions
+            .Where(d => !IsSection80G(d.Section))
+            .Select(d => new DeductionInput(d.Section, d.Amount, d.SubType))
+            .ToList();
+
+        foreach (var g in donations80G)
+        {
+            // A cash donation over ₹2,000 is disallowed; the engine then applies the 100%/50% factor + the
+            // qualifying-limit cap to the amount we pass.
+            var eligibleBase = g.OtherModeAmount + (g.CashAmount <= 2_000m ? g.CashAmount : 0m);
+            if (eligibleBase > 0m)
+            {
+                list.Add(new DeductionInput("80G", eligibleBase, Donation80GSubType(g.Category)));
+            }
+        }
+
+        return list;
+    }
+
+    private static bool IsSection80G(string? section)
+        => new string((section ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant() == "80G";
+
+    // The SubType strings the engine's 80G categoriser recognises ("100" ⇒ 100%, "no_limit" ⇒ no qualifying limit).
+    private static string Donation80GSubType(Donation80GCategory category) => category switch
+    {
+        Donation80GCategory.HundredPercentNoLimit => "100_no_limit",
+        Donation80GCategory.FiftyPercentNoLimit => "50_no_limit",
+        Donation80GCategory.HundredPercentWithLimit => "100_limit",
+        _ => "50_limit",
+    };
 
     /// <summary>Reads the optional {"nature":"..."} tag from an income source's SourceMetaJson.</summary>
     public static string? ExtractNature(string? metaJson)

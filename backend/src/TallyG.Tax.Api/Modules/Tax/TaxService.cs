@@ -216,12 +216,13 @@ public sealed class TaxService : ITaxService
         var businesses = await _db.BusinessIncomes.Where(b => b.TaxReturnId == ret.Id).ToListAsync(ct);
         var incomeSources = await _db.IncomeSources.Where(s => s.TaxReturnId == ret.Id).ToListAsync(ct);
         var deductions = await _db.Deductions.Where(d => d.TaxReturnId == ret.Id).ToListAsync(ct);
+        var donations80G = await _db.Donations80G.Where(d => d.TaxReturnId == ret.Id).ToListAsync(ct);
 
         var age = await ResolveAgeAsync(ret, ct);
 
         return TaxComputationInputFactory.FromReturn(
             ret, ayCode, rulesJson, age, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
-            salaries, houses, gains, businesses, incomeSources, deductions);
+            salaries, houses, gains, businesses, incomeSources, deductions, donations80G);
     }
 
     private static TaxComputationInput BuildInputFromAdHoc(
