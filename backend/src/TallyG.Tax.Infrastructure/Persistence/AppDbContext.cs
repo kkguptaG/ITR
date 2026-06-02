@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<BankAccountDetail> BankAccountDetails => Set<BankAccountDetail>();
     public DbSet<OtpToken> OtpTokens => Set<OtpToken>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Role> Roles => Set<Role>();

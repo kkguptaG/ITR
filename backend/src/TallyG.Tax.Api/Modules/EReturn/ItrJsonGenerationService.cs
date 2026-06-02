@@ -78,7 +78,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             },
             ["ITR1_TaxComputation"] = TaxComputationItr1(c),
             ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundConformant(c),
+            ["Refund"] = RefundConformant(ctx),
             ["Verification"] = Verification(ctx)
         };
     }
@@ -119,7 +119,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             },
             ["TaxComputation"] = TaxComputationItr4(c),
             ["TaxPaid"] = TaxPaidNode(ctx, c),
-            ["Refund"] = RefundConformant(c),
+            ["Refund"] = RefundConformant(ctx),
             ["Verification"] = Verification(ctx)
         };
     }
@@ -457,13 +457,48 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["LateFilingFee234F"] = R(0m),
     };
 
-    private static Dictionary<string, object?> RefundConformant(TaxComputation? c) => new()
+    // Refund node for ITR-1/ITR-4: BankAccountDtls = { AddtnlBankDetails: [...] } (empty when no accounts).
+    private static Dictionary<string, object?> RefundConformant(ItrFilingContext ctx)
     {
-        ["RefundDue"] = R(Math.Max(0m, c?.RefundOrPayable ?? 0m)),
-        // AddtnlBankDetails is optional; an empty object is schema-valid. Bank detail (with decrypted
-        // account no.) is populated before the real upload — see the rules-validator's refund check.
-        ["BankAccountDtls"] = new Dictionary<string, object?>(),
-    };
+        var bank = new Dictionary<string, object?>();
+        if (ctx.BankAccounts.Count > 0)
+        {
+            bank["AddtnlBankDetails"] = AddtnlBankDetails(ctx.BankAccounts);
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["RefundDue"] = R(Math.Max(0m, ctx.Computation?.RefundOrPayable ?? 0m)),
+            ["BankAccountDtls"] = bank,
+        };
+    }
+
+    // Refund node for ITR-2/ITR-3: BankAccountDtls additionally carries the BankDtlsFlag (Y/N).
+    private static Dictionary<string, object?> RefundWithFlag(ItrFilingContext ctx)
+    {
+        var bank = new Dictionary<string, object?> { ["BankDtlsFlag"] = ctx.BankAccounts.Count > 0 ? "Y" : "N" };
+        if (ctx.BankAccounts.Count > 0)
+        {
+            bank["AddtnlBankDetails"] = AddtnlBankDetails(ctx.BankAccounts);
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["RefundDue"] = R(Math.Max(0m, ctx.Computation?.RefundOrPayable ?? 0m)),
+            ["BankAccountDtls"] = bank,
+        };
+    }
+
+    // One BankDetailType per fed account; the refund account carries UseForRefund = "true" (string enum).
+    private static List<object?> AddtnlBankDetails(IReadOnlyList<BankAccountDetail> accounts)
+        => accounts.Select(a => (object?)new Dictionary<string, object?>
+        {
+            ["IFSCCode"] = a.Ifsc,
+            ["BankName"] = a.BankName,
+            ["BankAccountNo"] = a.AccountNumber,
+            ["AccountType"] = a.AccountType,
+            ["UseForRefund"] = a.UseForRefund ? "true" : "false",
+        }).ToList();
 
     // Chapter VI-A objects: exactly the section keys the form allows, each an integer (0 when unclaimed),
     // with anything outside the form's set folded into AnyOthSec80CCH so the per-section sum reconciles.
@@ -759,7 +794,6 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var net = c?.TotalTax ?? 0m;
         var interest = c?.InterestPenalty ?? 0m;
         var amt = c?.AlternativeMinimumTax ?? 0m;
-        var refund = TaxMath0(c?.RefundOrPayable ?? 0m);
         var tds = ctx.Return.TdsPaid;
         var tcs = ctx.Return.TcsPaid;
         var adv = ctx.Return.AdvanceTaxPaid;
@@ -813,14 +847,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     ["TotalTaxesPaid"] = R(adv + tds + tcs + sa),
                 },
             },
-            ["Refund"] = new Dictionary<string, object?>
-            {
-                ["RefundDue"] = R(refund),
-                ["BankAccountDtls"] = new Dictionary<string, object?>
-                {
-                    ["BankDtlsFlag"] = string.IsNullOrWhiteSpace(ctx.Profile?.BankIfsc) ? "N" : "Y",
-                },
-            },
+            ["Refund"] = RefundWithFlag(ctx),
             ["AssetOutIndiaFlag"] = "NO",
         };
     }
@@ -897,6 +924,14 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             if (tti["Refund"] is Dictionary<string, object?> rf)
             {
                 SetIfInt(rf, "RefundDue", R(Math.Max(0m, c?.RefundOrPayable ?? 0m)));
+                if (rf["BankAccountDtls"] is Dictionary<string, object?> bad)
+                {
+                    bad["BankDtlsFlag"] = ctx.BankAccounts.Count > 0 ? "Y" : "N";
+                    if (ctx.BankAccounts.Count > 0)
+                    {
+                        bad["AddtnlBankDetails"] = AddtnlBankDetails(ctx.BankAccounts);
+                    }
+                }
             }
         }
 

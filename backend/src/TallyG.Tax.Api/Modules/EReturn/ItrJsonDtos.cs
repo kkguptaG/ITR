@@ -68,6 +68,7 @@ public sealed class ItrFilingContext
     public IReadOnlyList<BusinessIncome> Businesses { get; init; } = Array.Empty<BusinessIncome>();
     public IReadOnlyList<IncomeSource> OtherIncomes { get; init; } = Array.Empty<IncomeSource>();
     public IReadOnlyList<Deduction> Deductions { get; init; } = Array.Empty<Deduction>();
+    public IReadOnlyList<BankAccountDetail> BankAccounts { get; init; } = Array.Empty<BankAccountDetail>();
 
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;

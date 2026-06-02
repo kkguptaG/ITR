@@ -72,6 +72,23 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr1_emits_fed_bank_accounts_with_the_refund_account_flagged()
+    {
+        var ctx = BuildContext(ItrType.ITR1);
+        var json = _gen.Generate(ctx).Json;
+
+        using var doc = JsonDocument.Parse(json);
+        var banks = doc.RootElement.GetProperty("ITR").GetProperty("ITR1").GetProperty("Refund")
+            .GetProperty("BankAccountDtls").GetProperty("AddtnlBankDetails");
+
+        banks.GetArrayLength().Should().Be(2);
+        var refund = banks.EnumerateArray().Single(b => b.GetProperty("UseForRefund").GetString() == "true");
+        refund.GetProperty("IFSCCode").GetString().Should().Be("HDFC0001234");
+        refund.GetProperty("AccountType").GetString().Should().Be("SB");
+        refund.GetProperty("BankAccountNo").GetString().Should().Be("50100123456789");
+    }
+
+    [Fact]
     public void Itr3_overlays_books_financials_into_partA_bs_and_pl()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26");
@@ -154,6 +171,12 @@ public class ItrSchemaConformanceTests
             Businesses = businesses,
             // ITR-3 carries books-derived financials so the gate exercises the PARTA_BS/PARTA_PL overlay.
             FinancialStatements = itrType == ItrType.ITR3 ? SampleFinancials() : null,
+            // Fed bank accounts so the gate exercises BankAccountDtls/AddtnlBankDetails on every form.
+            BankAccounts = new[]
+            {
+                new BankAccountDetail { BankName = "HDFC Bank", AccountNumber = "50100123456789", AccountType = "SB", Ifsc = "HDFC0001234", UseForRefund = true },
+                new BankAccountDetail { BankName = "State Bank of India", AccountNumber = "30200999888", AccountType = "CA", Ifsc = "SBIN0000456", UseForRefund = false },
+            },
         };
     }
 

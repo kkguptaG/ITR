@@ -42,6 +42,7 @@ public static class DbInitializer
         await SeedTenantAsync(db, ct);
         await SeedRolesAndPermissionsAsync(db, ct);
         await SeedUsersAsync(db, ct);
+        await SeedBankAccountsAsync(db, ct);
         await SeedAssessmentYearAndRulesAsync(db, ct);
         await SeedPlansAndCouponAsync(db, ct);
 
@@ -149,6 +150,40 @@ public static class DbInitializer
             !await db.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == role.Id && ur.ScopeTenantId == Guid.Empty, ct))
         {
             db.UserRoles.Add(new UserRole { UserId = userId, RoleId = role.Id, ScopeTenantId = Guid.Empty });
+        }
+    }
+
+    /// <summary>
+    /// Two dummy bank accounts for the demo taxpayer (the refund flow needs a fed account). The HDFC SB
+    /// account is the refund account; the SBI current account is a second, non-refund account so the
+    /// "feed many, pick one" UX has something to show. Keyed by a stable Guid → idempotent.
+    /// </summary>
+    private static async Task SeedBankAccountsAsync(AppDbContext db, CancellationToken ct)
+    {
+        var seeds = new[]
+        {
+            new BankAccountDetail
+            {
+                Id = StableId("bank:demo:HDFC0001234:50100123456789"),
+                TenantId = RetailTenantId, UserId = DemoUserId,
+                BankName = "HDFC Bank", AccountNumber = "50100123456789",
+                AccountType = "SB", Ifsc = "HDFC0001234", UseForRefund = true
+            },
+            new BankAccountDetail
+            {
+                Id = StableId("bank:demo:SBIN0000456:30200999888"),
+                TenantId = RetailTenantId, UserId = DemoUserId,
+                BankName = "State Bank of India", AccountNumber = "30200999888",
+                AccountType = "CA", Ifsc = "SBIN0000456", UseForRefund = false
+            }
+        };
+
+        foreach (var account in seeds)
+        {
+            if (!await db.BankAccountDetails.AnyAsync(b => b.Id == account.Id, ct))
+            {
+                db.BankAccountDetails.Add(account);
+            }
         }
     }
 
