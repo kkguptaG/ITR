@@ -102,3 +102,114 @@ public sealed class UpsertForeignEquityDebtInterestRequestValidator : AbstractVa
         RuleFor(r => r.GrossProceeds).InclusiveBetween(0m, max);
     }
 }
+
+/// <summary>Immovable property held abroad (Schedule FA DetailsImmovableProperty).</summary>
+public sealed record ForeignImmovablePropertyFaDto(
+    Guid Id,
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string AddressOfProperty,
+    string Ownership,
+    DateOnly? AcquisitionDate,
+    decimal TotalInvestment,
+    decimal IncomeDerived,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+public sealed record UpsertForeignImmovablePropertyFaRequest(
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string AddressOfProperty,
+    string Ownership,
+    DateOnly? AcquisitionDate,
+    decimal TotalInvestment,
+    decimal IncomeDerived,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+/// <summary>Financial interest in any foreign entity (Schedule FA DetailsFinancialInterest).</summary>
+public sealed record ForeignFinancialInterestDto(
+    Guid Id,
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string NatureOfEntity,
+    string EntityName,
+    string EntityAddress,
+    string NatureOfInterest,
+    DateOnly? DateHeld,
+    decimal TotalInvestment,
+    decimal IncomeFromInterest,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+public sealed record UpsertForeignFinancialInterestRequest(
+    string CountryCode,
+    string CountryName,
+    string ZipCode,
+    string NatureOfEntity,
+    string EntityName,
+    string EntityAddress,
+    string NatureOfInterest,
+    DateOnly? DateHeld,
+    decimal TotalInvestment,
+    decimal IncomeFromInterest,
+    string NatureOfIncome,
+    decimal TaxableIncomeAmount,
+    string IncomeTaxSchedule,
+    string IncomeTaxScheduleItem);
+
+/// <summary>Shared enum value sets for the Schedule FA ownership + income-schedule fields.</summary>
+internal static class ForeignFaEnums
+{
+    public static readonly string[] Ownership = { "DIRECT", "BENEFICIAL_OWNER", "BENIFICIARY" };
+    public static readonly string[] IncomeSchedule = { "SA", "HP", "CG", "OS", "EI", "NI" };
+}
+
+public sealed class UpsertForeignImmovablePropertyFaRequestValidator : AbstractValidator<UpsertForeignImmovablePropertyFaRequest>
+{
+    public UpsertForeignImmovablePropertyFaRequestValidator()
+    {
+        const decimal max = 99_999_999_999_999m;
+        RuleFor(r => r.CountryCode).NotEmpty().MaximumLength(6);
+        RuleFor(r => r.CountryName).NotEmpty().MaximumLength(55);
+        RuleFor(r => r.ZipCode).NotEmpty().MaximumLength(8);
+        RuleFor(r => r.AddressOfProperty).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.Ownership).Must(s => ForeignFaEnums.Ownership.Contains(s)).WithMessage("Ownership must be DIRECT, BENEFICIAL_OWNER or BENIFICIARY.");
+        RuleFor(r => r.NatureOfIncome).NotEmpty().MaximumLength(100);
+        RuleFor(r => r.IncomeTaxSchedule).Must(s => ForeignFaEnums.IncomeSchedule.Contains(s)).WithMessage("Income schedule must be SA, HP, CG, OS, EI or NI.");
+        RuleFor(r => r.IncomeTaxScheduleItem).NotEmpty().MaximumLength(50);
+        RuleFor(r => r.TotalInvestment).InclusiveBetween(0m, max);
+        RuleFor(r => r.IncomeDerived).InclusiveBetween(0m, max);
+        RuleFor(r => r.TaxableIncomeAmount).InclusiveBetween(0m, max);
+    }
+}
+
+public sealed class UpsertForeignFinancialInterestRequestValidator : AbstractValidator<UpsertForeignFinancialInterestRequest>
+{
+    public UpsertForeignFinancialInterestRequestValidator()
+    {
+        const decimal max = 99_999_999_999_999m;
+        RuleFor(r => r.CountryCode).NotEmpty().MaximumLength(6);
+        RuleFor(r => r.CountryName).NotEmpty().MaximumLength(55);
+        RuleFor(r => r.ZipCode).NotEmpty().MaximumLength(8);
+        RuleFor(r => r.NatureOfEntity).MaximumLength(100);
+        RuleFor(r => r.EntityName).NotEmpty().MaximumLength(125);
+        RuleFor(r => r.EntityAddress).NotEmpty().MaximumLength(200);
+        RuleFor(r => r.NatureOfInterest).Must(s => ForeignFaEnums.Ownership.Contains(s)).WithMessage("Nature of interest must be DIRECT, BENEFICIAL_OWNER or BENIFICIARY.");
+        RuleFor(r => r.NatureOfIncome).NotEmpty().MaximumLength(100);
+        RuleFor(r => r.IncomeTaxSchedule).Must(s => ForeignFaEnums.IncomeSchedule.Contains(s)).WithMessage("Income schedule must be SA, HP, CG, OS, EI or NI.");
+        RuleFor(r => r.IncomeTaxScheduleItem).NotEmpty().MaximumLength(50);
+        RuleFor(r => r.TotalInvestment).InclusiveBetween(0m, max);
+        RuleFor(r => r.IncomeFromInterest).InclusiveBetween(0m, max);
+        RuleFor(r => r.TaxableIncomeAmount).InclusiveBetween(0m, max);
+    }
+}

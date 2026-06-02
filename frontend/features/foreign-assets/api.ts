@@ -6,6 +6,8 @@ import type {
   ForeignBankAccountDto, UpsertForeignBankAccountBody,
   ForeignCustodialAccountDto, UpsertForeignCustodialAccountBody,
   ForeignEquityDebtInterestDto, UpsertForeignEquityDebtInterestBody,
+  ForeignImmovablePropertyFaDto, UpsertForeignImmovablePropertyFaBody,
+  ForeignFinancialInterestDto, UpsertForeignFinancialInterestBody,
 } from './types';
 
 export const foreignAssetsKeys = {
@@ -23,9 +25,21 @@ export const foreignEquityDebtKeys = {
   forReturn: (returnId: string) => [...foreignEquityDebtKeys.all, returnId] as const,
 };
 
+export const foreignImmovableKeys = {
+  all: ['foreign-immovable'] as const,
+  forReturn: (returnId: string) => [...foreignImmovableKeys.all, returnId] as const,
+};
+
+export const foreignFinancialKeys = {
+  all: ['foreign-financial-interest'] as const,
+  forReturn: (returnId: string) => [...foreignFinancialKeys.all, returnId] as const,
+};
+
 const base = (returnId: string) => `/returns/${returnId}/foreign-bank-accounts`;
 const custBase = (returnId: string) => `/returns/${returnId}/foreign-custodial-accounts`;
 const eqBase = (returnId: string) => `/returns/${returnId}/foreign-equity-debt`;
+const immBase = (returnId: string) => `/returns/${returnId}/foreign-immovable`;
+const finBase = (returnId: string) => `/returns/${returnId}/foreign-financial-interest`;
 
 export function listForeignBankAccounts(returnId: string): Promise<ForeignBankAccountDto[]> {
   return apiGet<ForeignBankAccountDto[]>(base(returnId));
@@ -61,4 +75,28 @@ export function addForeignEquityDebt(returnId: string, body: UpsertForeignEquity
 
 export function deleteForeignEquityDebt(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${eqBase(returnId)}/${id}`);
+}
+
+export function listForeignImmovable(returnId: string): Promise<ForeignImmovablePropertyFaDto[]> {
+  return apiGet<ForeignImmovablePropertyFaDto[]>(immBase(returnId));
+}
+
+export function addForeignImmovable(returnId: string, body: UpsertForeignImmovablePropertyFaBody): Promise<ForeignImmovablePropertyFaDto> {
+  return apiPost<ForeignImmovablePropertyFaDto>(immBase(returnId), body);
+}
+
+export function deleteForeignImmovable(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${immBase(returnId)}/${id}`);
+}
+
+export function listForeignFinancialInterest(returnId: string): Promise<ForeignFinancialInterestDto[]> {
+  return apiGet<ForeignFinancialInterestDto[]>(finBase(returnId));
+}
+
+export function addForeignFinancialInterest(returnId: string, body: UpsertForeignFinancialInterestBody): Promise<ForeignFinancialInterestDto> {
+  return apiPost<ForeignFinancialInterestDto>(finBase(returnId), body);
+}
+
+export function deleteForeignFinancialInterest(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${finBase(returnId)}/${id}`);
 }

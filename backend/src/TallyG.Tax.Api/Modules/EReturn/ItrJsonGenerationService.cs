@@ -1012,7 +1012,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     {
         if (ctx.ForeignBankAccounts.Count == 0
             && ctx.ForeignCustodialAccounts.Count == 0
-            && ctx.ForeignEquityDebtInterests.Count == 0)
+            && ctx.ForeignEquityDebtInterests.Count == 0
+            && ctx.ForeignImmovableProperties.Count == 0
+            && ctx.ForeignFinancialInterests.Count == 0)
         {
             return;
         }
@@ -1033,7 +1035,64 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             fa["DtlsForeignEquityDebtInterest"] = ctx.ForeignEquityDebtInterests.Select(EquityDebtItem).ToList();
         }
 
+        if (ctx.ForeignImmovableProperties.Count > 0)
+        {
+            fa["DetailsImmovableProperty"] = ctx.ForeignImmovableProperties.Select(ImmovableFaItem).ToList();
+        }
+
+        if (ctx.ForeignFinancialInterests.Count > 0)
+        {
+            fa["DetailsFinancialInterest"] = ctx.ForeignFinancialInterests.Select(FinancialInterestItem).ToList();
+        }
+
         form["ScheduleFA"] = fa;
+    }
+
+    private static Dictionary<string, object?> ImmovableFaItem(ForeignImmovablePropertyFA p) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(p.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(p.CountryCode) ? "2" : p.CountryCode.Trim(),
+        ["ZipCode"] = Trunc(NonEmpty(p.ZipCode, "NA"), 8),
+        ["AddressOfProperty"] = Trunc(NonEmpty(p.AddressOfProperty, "NA"), 200),
+        ["Ownership"] = ForeignOwnershipKind(p.Ownership),
+        ["DateOfAcq"] = (p.AcquisitionDate ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["TotalInvestment"] = R(p.TotalInvestment),
+        ["IncDrvProperty"] = R(p.IncomeDerived),
+        ["NatureOfInc"] = Trunc(NonEmpty(p.NatureOfIncome, "Rent"), 100),
+        ["IncTaxAmt"] = R(p.TaxableIncomeAmount),
+        ["IncTaxSch"] = IncomeOfferedSchedule(p.IncomeTaxSchedule),
+        ["IncTaxSchNo"] = Trunc(NonEmpty(p.IncomeTaxScheduleItem, "1"), 50),
+    };
+
+    private static Dictionary<string, object?> FinancialInterestItem(ForeignFinancialInterest f) => new()
+    {
+        ["CountryName"] = Trunc(NonEmpty(f.CountryName, "NA"), 55),
+        ["CountryCodeExcludingIndia"] = string.IsNullOrWhiteSpace(f.CountryCode) ? "2" : f.CountryCode.Trim(),
+        ["ZipCode"] = Trunc(NonEmpty(f.ZipCode, "NA"), 8),
+        ["NameOfEntity"] = Trunc(NonEmpty(f.EntityName, "NA"), 125),
+        ["AddressOfEntity"] = Trunc(NonEmpty(f.EntityAddress, "NA"), 200),
+        ["NatureOfInt"] = ForeignOwnershipKind(f.NatureOfInterest),
+        ["DateHeld"] = (f.DateHeld ?? new DateOnly(2020, 1, 1)).ToString("yyyy-MM-dd"),
+        ["TotalInvestment"] = R(f.TotalInvestment),
+        ["IncFromInt"] = R(f.IncomeFromInterest),
+        ["NatureOfInc"] = Trunc(NonEmpty(f.NatureOfIncome, "Dividend"), 100),
+        ["IncTaxAmt"] = R(f.TaxableIncomeAmount),
+        ["IncTaxSch"] = IncomeOfferedSchedule(f.IncomeTaxSchedule),
+        ["IncTaxSchNo"] = Trunc(NonEmpty(f.IncomeTaxScheduleItem, "1"), 50),
+    };
+
+    // Schedule FA ownership enum (immovable / financial-interest): DIRECT / BENEFICIAL_OWNER / BENIFICIARY.
+    private static string ForeignOwnershipKind(string? s)
+    {
+        var v = (s ?? string.Empty).Trim().ToUpperInvariant();
+        return v is "DIRECT" or "BENEFICIAL_OWNER" or "BENIFICIARY" ? v : "DIRECT";
+    }
+
+    // Schedule FA "income offered in schedule" enum: SA / HP / CG / OS / EI / NI (default OS).
+    private static string IncomeOfferedSchedule(string? s)
+    {
+        var v = (s ?? string.Empty).Trim().ToUpperInvariant();
+        return v is "SA" or "HP" or "CG" or "OS" or "EI" or "NI" ? v : "OS";
     }
 
     private static Dictionary<string, object?> CustodialItem(ForeignCustodialAccount c) => new()

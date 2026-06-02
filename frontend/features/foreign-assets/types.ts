@@ -92,3 +92,71 @@ export interface UpsertForeignEquityDebtInterestBody {
   grossAmountCredited: number;
   grossProceeds: number;
 }
+
+// Schedule FA — immovable property held abroad (DetailsImmovableProperty).
+export interface ForeignImmovablePropertyFaDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  addressOfProperty: string;
+  ownership: string;
+  acquisitionDate: string | null;
+  totalInvestment: number;
+  incomeDerived: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignImmovablePropertyFaBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  addressOfProperty: string;
+  ownership: string;
+  acquisitionDate: string | null;
+  totalInvestment: number;
+  incomeDerived: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+// Schedule FA — financial interest in any foreign entity (DetailsFinancialInterest).
+export interface ForeignFinancialInterestDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  natureOfEntity: string;
+  entityName: string;
+  entityAddress: string;
+  natureOfInterest: string;
+  dateHeld: string | null;
+  totalInvestment: number;
+  incomeFromInterest: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}
+
+export interface UpsertForeignFinancialInterestBody {
+  countryCode: string;
+  countryName: string;
+  zipCode: string;
+  natureOfEntity: string;
+  entityName: string;
+  entityAddress: string;
+  natureOfInterest: string;
+  dateHeld: string | null;
+  totalInvestment: number;
+  incomeFromInterest: number;
+  natureOfIncome: string;
+  taxableIncomeAmount: number;
+  incomeTaxSchedule: string;
+  incomeTaxScheduleItem: string;
+}

@@ -166,6 +166,17 @@ public class ItrSchemaConformanceTests
         eq.GetProperty("NatureOfEntity").GetString().Should().Be("Equity");
         eq.GetProperty("InitialValOfInvstmnt").GetInt64().Should().Be(1_000_000);
         eq.GetProperty("ClosingBalance").GetInt64().Should().Be(1_600_000);
+
+        var prop = fa.GetProperty("DetailsImmovableProperty")[0];
+        prop.GetProperty("Ownership").GetString().Should().Be("DIRECT");
+        prop.GetProperty("TotalInvestment").GetInt64().Should().Be(18_000_000);
+        prop.GetProperty("IncTaxSch").GetString().Should().Be("HP");
+
+        var fin = fa.GetProperty("DetailsFinancialInterest")[0];
+        fin.GetProperty("NameOfEntity").GetString().Should().Be("Initech LLC");
+        fin.GetProperty("NatureOfInt").GetString().Should().Be("DIRECT");
+        fin.GetProperty("IncFromInt").GetInt64().Should().Be(120_000);
+        fin.GetProperty("IncTaxSch").GetString().Should().Be("OS");
     }
 
     [Fact]
@@ -590,6 +601,12 @@ public class ItrSchemaConformanceTests
             ForeignEquityDebtInterests = withForeignInvestments
                 ? new[] { new ForeignEquityDebtInterest { CountryCode = "2", CountryName = "United States", EntityName = "Globex Corporation Inc", EntityAddress = "1 Globex Plaza, Seattle", ZipCode = "98101", NatureOfEntity = "Equity", AcquisitionDate = new DateOnly(2022, 7, 1), InitialValue = 1_000_000m, PeakBalance = 1_800_000m, ClosingBalance = 1_600_000m, GrossAmountCredited = 20_000m, GrossProceeds = 0m } }
                 : Array.Empty<ForeignEquityDebtInterest>(),
+            ForeignImmovableProperties = withForeignInvestments
+                ? new[] { new ForeignImmovablePropertyFA { CountryCode = "2", CountryName = "United States", ZipCode = "98052", AddressOfProperty = "5 Lakeview Drive, Redmond", Ownership = "DIRECT", AcquisitionDate = new DateOnly(2020, 9, 1), TotalInvestment = 18_000_000m, IncomeDerived = 600_000m, NatureOfIncome = "Rental income", TaxableIncomeAmount = 600_000m, IncomeTaxSchedule = "HP", IncomeTaxScheduleItem = "1" } }
+                : Array.Empty<ForeignImmovablePropertyFA>(),
+            ForeignFinancialInterests = withForeignInvestments
+                ? new[] { new ForeignFinancialInterest { CountryCode = "2", CountryName = "United States", ZipCode = "94043", NatureOfEntity = "Private company", EntityName = "Initech LLC", EntityAddress = "500 Tech Park, Mountain View", NatureOfInterest = "DIRECT", DateHeld = new DateOnly(2021, 1, 15), TotalInvestment = 5_000_000m, IncomeFromInterest = 120_000m, NatureOfIncome = "Dividend", TaxableIncomeAmount = 120_000m, IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1" } }
+                : Array.Empty<ForeignFinancialInterest>(),
             // Donee-wise 80G donations so the ITR-2/3 gate exercises the itemised Schedule 80G tables:
             // a 100%-no-limit donee (full eligible) + a 50%-with-limit donee (half eligible).
             Donations80G = withDonees

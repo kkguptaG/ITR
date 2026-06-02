@@ -15,6 +15,14 @@ public interface IForeignInvestmentsService
     Task<IReadOnlyList<ForeignEquityDebtInterestDto>> ListEquityDebtAsync(Guid returnId, CancellationToken ct = default);
     Task<ForeignEquityDebtInterestDto> AddEquityDebtAsync(Guid returnId, UpsertForeignEquityDebtInterestRequest request, CancellationToken ct = default);
     Task DeleteEquityDebtAsync(Guid returnId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ForeignImmovablePropertyFaDto>> ListImmovableAsync(Guid returnId, CancellationToken ct = default);
+    Task<ForeignImmovablePropertyFaDto> AddImmovableAsync(Guid returnId, UpsertForeignImmovablePropertyFaRequest request, CancellationToken ct = default);
+    Task DeleteImmovableAsync(Guid returnId, Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ForeignFinancialInterestDto>> ListFinancialInterestAsync(Guid returnId, CancellationToken ct = default);
+    Task<ForeignFinancialInterestDto> AddFinancialInterestAsync(Guid returnId, UpsertForeignFinancialInterestRequest request, CancellationToken ct = default);
+    Task DeleteFinancialInterestAsync(Guid returnId, Guid id, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -114,7 +122,94 @@ public sealed class ForeignInvestmentsService : IForeignInvestmentsService
         await _db.SaveChangesAsync(ct);
     }
 
+    // ----------------------------------------------------------------- immovable property (abroad)
+    public async Task<IReadOnlyList<ForeignImmovablePropertyFaDto>> ListImmovableAsync(Guid returnId, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var rows = await ImmovableQuery(returnId).OrderBy(p => p.CountryName).ToListAsync(ct);
+        return rows.Select(ToDto).ToList();
+    }
+
+    public async Task<ForeignImmovablePropertyFaDto> AddImmovableAsync(Guid returnId, UpsertForeignImmovablePropertyFaRequest r, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new ForeignImmovablePropertyFA
+        {
+            TenantId = ret.TenantId, UserId = ret.UserId, TaxReturnId = ret.Id,
+            CountryCode = r.CountryCode.Trim(), CountryName = r.CountryName.Trim(), ZipCode = r.ZipCode.Trim(),
+            AddressOfProperty = r.AddressOfProperty.Trim(),
+            Ownership = r.Ownership.Trim().ToUpperInvariant(),
+            AcquisitionDate = r.AcquisitionDate,
+            TotalInvestment = Clamp(r.TotalInvestment),
+            IncomeDerived = Clamp(r.IncomeDerived),
+            NatureOfIncome = r.NatureOfIncome.Trim(),
+            TaxableIncomeAmount = Clamp(r.TaxableIncomeAmount),
+            IncomeTaxSchedule = r.IncomeTaxSchedule.Trim().ToUpperInvariant(),
+            IncomeTaxScheduleItem = r.IncomeTaxScheduleItem.Trim(),
+        };
+        _db.ForeignImmovableProperties.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteImmovableAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var entity = await ImmovableQuery(returnId).FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw AppException.NotFound("Foreign property not found.", "FOREIGNASSET.NOT_FOUND");
+        _db.ForeignImmovableProperties.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ----------------------------------------------------------------- financial interest in an entity
+    public async Task<IReadOnlyList<ForeignFinancialInterestDto>> ListFinancialInterestAsync(Guid returnId, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var rows = await FinancialQuery(returnId).OrderBy(f => f.CountryName).ThenBy(f => f.EntityName).ToListAsync(ct);
+        return rows.Select(ToDto).ToList();
+    }
+
+    public async Task<ForeignFinancialInterestDto> AddFinancialInterestAsync(Guid returnId, UpsertForeignFinancialInterestRequest r, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new ForeignFinancialInterest
+        {
+            TenantId = ret.TenantId, UserId = ret.UserId, TaxReturnId = ret.Id,
+            CountryCode = r.CountryCode.Trim(), CountryName = r.CountryName.Trim(), ZipCode = r.ZipCode.Trim(),
+            NatureOfEntity = r.NatureOfEntity.Trim(),
+            EntityName = r.EntityName.Trim(), EntityAddress = r.EntityAddress.Trim(),
+            NatureOfInterest = r.NatureOfInterest.Trim().ToUpperInvariant(),
+            DateHeld = r.DateHeld,
+            TotalInvestment = Clamp(r.TotalInvestment),
+            IncomeFromInterest = Clamp(r.IncomeFromInterest),
+            NatureOfIncome = r.NatureOfIncome.Trim(),
+            TaxableIncomeAmount = Clamp(r.TaxableIncomeAmount),
+            IncomeTaxSchedule = r.IncomeTaxSchedule.Trim().ToUpperInvariant(),
+            IncomeTaxScheduleItem = r.IncomeTaxScheduleItem.Trim(),
+        };
+        _db.ForeignFinancialInterests.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteFinancialInterestAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        await EnsureOwnedReturnAsync(returnId, ct);
+        var entity = await FinancialQuery(returnId).FirstOrDefaultAsync(f => f.Id == id, ct)
+            ?? throw AppException.NotFound("Financial interest not found.", "FOREIGNASSET.NOT_FOUND");
+        _db.ForeignFinancialInterests.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
     // ----------------------------------------------------------------- helpers
+    private IQueryable<ForeignImmovablePropertyFA> ImmovableQuery(Guid returnId)
+        => _db.ForeignImmovableProperties.Where(p => p.TaxReturnId == returnId
+                                                    && p.TenantId == _currentUser.TenantId && p.UserId == _currentUser.UserId);
+
+    private IQueryable<ForeignFinancialInterest> FinancialQuery(Guid returnId)
+        => _db.ForeignFinancialInterests.Where(f => f.TaxReturnId == returnId
+                                                   && f.TenantId == _currentUser.TenantId && f.UserId == _currentUser.UserId);
+
     private IQueryable<ForeignCustodialAccount> CustodialQuery(Guid returnId)
         => _db.ForeignCustodialAccounts.Where(c => c.TaxReturnId == returnId
                                                    && c.TenantId == _currentUser.TenantId && c.UserId == _currentUser.UserId);
@@ -149,4 +244,12 @@ public sealed class ForeignInvestmentsService : IForeignInvestmentsService
     private static ForeignEquityDebtInterestDto ToDto(ForeignEquityDebtInterest e) => new(
         e.Id, e.CountryCode, e.CountryName, e.EntityName, e.EntityAddress, e.ZipCode, e.NatureOfEntity,
         e.AcquisitionDate, e.InitialValue, e.PeakBalance, e.ClosingBalance, e.GrossAmountCredited, e.GrossProceeds);
+
+    private static ForeignImmovablePropertyFaDto ToDto(ForeignImmovablePropertyFA p) => new(
+        p.Id, p.CountryCode, p.CountryName, p.ZipCode, p.AddressOfProperty, p.Ownership, p.AcquisitionDate,
+        p.TotalInvestment, p.IncomeDerived, p.NatureOfIncome, p.TaxableIncomeAmount, p.IncomeTaxSchedule, p.IncomeTaxScheduleItem);
+
+    private static ForeignFinancialInterestDto ToDto(ForeignFinancialInterest f) => new(
+        f.Id, f.CountryCode, f.CountryName, f.ZipCode, f.NatureOfEntity, f.EntityName, f.EntityAddress, f.NatureOfInterest,
+        f.DateHeld, f.TotalInvestment, f.IncomeFromInterest, f.NatureOfIncome, f.TaxableIncomeAmount, f.IncomeTaxSchedule, f.IncomeTaxScheduleItem);
 }

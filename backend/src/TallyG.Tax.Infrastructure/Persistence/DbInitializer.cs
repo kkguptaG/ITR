@@ -311,6 +311,24 @@ public static class DbInitializer
             AcquisitionDate = new DateOnly(2022, 7, 1), InitialValue = 1_000_000m,
             PeakBalance = 1_800_000m, ClosingBalance = 1_600_000m, GrossAmountCredited = 20_000m, GrossProceeds = 0m,
         });
+        db.ForeignImmovableProperties.Add(new ForeignImmovablePropertyFA
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", ZipCode = "98052",
+            AddressOfProperty = "5 Lakeview Drive, Redmond", Ownership = "DIRECT",
+            AcquisitionDate = new DateOnly(2020, 9, 1), TotalInvestment = 18_000_000m,
+            IncomeDerived = 600_000m, NatureOfIncome = "Rental income", TaxableIncomeAmount = 600_000m,
+            IncomeTaxSchedule = "HP", IncomeTaxScheduleItem = "1",
+        });
+        db.ForeignFinancialInterests.Add(new ForeignFinancialInterest
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CountryCode = "2", CountryName = "United States", ZipCode = "94043",
+            NatureOfEntity = "Private company", EntityName = "Initech LLC", EntityAddress = "500 Tech Park, Mountain View",
+            NatureOfInterest = "DIRECT", DateHeld = new DateOnly(2021, 1, 15), TotalInvestment = 5_000_000m,
+            IncomeFromInterest = 120_000m, NatureOfIncome = "Dividend", TaxableIncomeAmount = 120_000m,
+            IncomeTaxSchedule = "OS", IncomeTaxScheduleItem = "1",
+        });
 
         // Donee-wise 80G donations (Schedule 80G). Total ₹11,000 (matches the 80G deduction above); eligible
         // ₹8,000 = ₹5,000 (PM CARES, 100%) + 50% × ₹6,000 (a charitable trust, the limited bucket).

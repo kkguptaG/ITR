@@ -53,4 +53,42 @@ public sealed class ForeignInvestmentsController : ControllerBase
         await _svc.DeleteEquityDebtAsync(returnId, id, ct);
         return NoContent();
     }
+
+    // ----------------------------------------------------------------- immovable property (abroad)
+    [HttpGet("foreign-immovable")]
+    [ProducesResponseType(typeof(IReadOnlyList<ForeignImmovablePropertyFaDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<ForeignImmovablePropertyFaDto>> ListImmovable([FromRoute] Guid returnId, CancellationToken ct)
+        => _svc.ListImmovableAsync(returnId, ct);
+
+    [HttpPost("foreign-immovable")]
+    [ProducesResponseType(typeof(ForeignImmovablePropertyFaDto), StatusCodes.Status200OK)]
+    public Task<ForeignImmovablePropertyFaDto> AddImmovable([FromRoute] Guid returnId, [FromBody] UpsertForeignImmovablePropertyFaRequest request, CancellationToken ct)
+        => _svc.AddImmovableAsync(returnId, request, ct);
+
+    [HttpDelete("foreign-immovable/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteImmovable([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteImmovableAsync(returnId, id, ct);
+        return NoContent();
+    }
+
+    // ----------------------------------------------------------------- financial interest in an entity
+    [HttpGet("foreign-financial-interest")]
+    [ProducesResponseType(typeof(IReadOnlyList<ForeignFinancialInterestDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<ForeignFinancialInterestDto>> ListFinancialInterest([FromRoute] Guid returnId, CancellationToken ct)
+        => _svc.ListFinancialInterestAsync(returnId, ct);
+
+    [HttpPost("foreign-financial-interest")]
+    [ProducesResponseType(typeof(ForeignFinancialInterestDto), StatusCodes.Status200OK)]
+    public Task<ForeignFinancialInterestDto> AddFinancialInterest([FromRoute] Guid returnId, [FromBody] UpsertForeignFinancialInterestRequest request, CancellationToken ct)
+        => _svc.AddFinancialInterestAsync(returnId, request, ct);
+
+    [HttpDelete("foreign-financial-interest/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteFinancialInterest([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteFinancialInterestAsync(returnId, id, ct);
+        return NoContent();
+    }
 }

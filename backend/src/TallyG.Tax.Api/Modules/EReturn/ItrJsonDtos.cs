@@ -89,6 +89,12 @@ public sealed class ItrFilingContext
     /// <summary>Foreign equity / debt interests (Schedule FA DtlsForeignEquityDebtInterest).</summary>
     public IReadOnlyList<ForeignEquityDebtInterest> ForeignEquityDebtInterests { get; init; } = Array.Empty<ForeignEquityDebtInterest>();
 
+    /// <summary>Immovable property held abroad (Schedule FA DetailsImmovableProperty).</summary>
+    public IReadOnlyList<ForeignImmovablePropertyFA> ForeignImmovableProperties { get; init; } = Array.Empty<ForeignImmovablePropertyFA>();
+
+    /// <summary>Financial interest in any foreign entity (Schedule FA DetailsFinancialInterest).</summary>
+    public IReadOnlyList<ForeignFinancialInterest> ForeignFinancialInterests { get; init; } = Array.Empty<ForeignFinancialInterest>();
+
     /// <summary>Itemised 80G donations (Schedule 80G donee-wise tables); empty falls back to totals-only.</summary>
     public IReadOnlyList<Donation80G> Donations80G { get; init; } = Array.Empty<Donation80G>();
 
