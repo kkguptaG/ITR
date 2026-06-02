@@ -100,10 +100,58 @@ public sealed class ReturnService : IReturnService
         };
 
         _db.TaxReturns.Add(entity);
+        await SeedBroughtForwardLossesAsync(entity, ay, ct);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Created return {ReturnId} for user {UserId} AY {Ay}", entity.Id, entity.UserId, ay.Code);
 
         return await BuildDetailAsync(entity.Id, ct);
+    }
+
+    /// <summary>
+    /// Cross-year carry-forward: when a new return is created, pre-fill its brought-forward loss fields
+    /// (s.71B/72/74) from the latest computed return of the immediately-preceding assessment year — so a
+    /// loss carried forward this year is waiting next year. Speculative loss (s.73) has no brought-forward
+    /// input field on the return, so it is not seeded. The user can still edit these afterwards.
+    /// </summary>
+    private async Task SeedBroughtForwardLossesAsync(TaxReturn entity, AssessmentYear ay, CancellationToken ct)
+    {
+        var priorAy = await _db.AssessmentYears
+            .Where(a => a.StartDate < ay.StartDate)
+            .OrderByDescending(a => a.StartDate)
+            .FirstOrDefaultAsync(ct);
+        if (priorAy is null)
+        {
+            return;
+        }
+
+        // Latest computation among this user's prior-AY returns (recommended first, then most recent).
+        var priorComp = await (
+            from r in _db.TaxReturns
+            where r.UserId == _currentUser.UserId && r.TenantId == _currentUser.TenantId && r.AssessmentYearId == priorAy.Id
+            join comp in _db.TaxComputations on r.Id equals comp.TaxReturnId
+            orderby comp.IsRecommended descending, comp.ComputedAt descending
+            select comp).FirstOrDefaultAsync(ct);
+        if (priorComp is null)
+        {
+            return;
+        }
+
+        if (priorComp.HousePropertyLossCarriedForward <= 0m
+            && priorComp.BusinessLossCarriedForward <= 0m
+            && priorComp.ShortTermCapitalLossCarriedForward <= 0m
+            && priorComp.LongTermCapitalLossCarriedForward <= 0m)
+        {
+            return; // nothing carried forward from last year
+        }
+
+        entity.BroughtForwardHousePropertyLoss = priorComp.HousePropertyLossCarriedForward;
+        entity.BroughtForwardBusinessLoss = priorComp.BusinessLossCarriedForward;
+        entity.BroughtForwardShortTermCapitalLoss = priorComp.ShortTermCapitalLossCarriedForward;
+        entity.BroughtForwardLongTermCapitalLoss = priorComp.LongTermCapitalLossCarriedForward;
+        _logger.LogInformation(
+            "Seeded brought-forward losses on the new {Ay} return from prior AY {PriorAy} (HP {Hp}, Biz {Biz}, STCL {Stcl}, LTCL {Ltcl})",
+            ay.Code, priorAy.Code, priorComp.HousePropertyLossCarriedForward, priorComp.BusinessLossCarriedForward,
+            priorComp.ShortTermCapitalLossCarriedForward, priorComp.LongTermCapitalLossCarriedForward);
     }
 
     public async Task<PagedResult<ReturnSummaryDto>> ListAsync(
