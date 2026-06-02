@@ -60,4 +60,21 @@ public class CapitalLossSetOffTests
         r.TotalTax.Should().Be(31_200m); // full 2,00,000 × 15% = 30,000 + 1,200 cess
         r.Trace.Should().Contain(t => t.Step == "CG.BfLtclCarryForward" && t.Amount == 100_000m);
     }
+
+    [Fact]
+    public void Current_year_STCL_sets_off_against_gross_112A_before_the_1_25L_exemption()
+    {
+        // 112A LTCG gross ₹1.5L (sale 4L − cost 2.5L) + a current-year 111A STCL ₹2L (sale 1L − cost 3L).
+        // s.70 set-off precedes the s.112A computation, so the ₹2L STCL sets off against the GROSS ₹1.5L
+        // 112A gain (→ 112A nil), leaving ₹50k STCL to carry forward and no CG tax. (Applying the ₹1.25L
+        // exemption first would have wrongly carried ₹1.75k more — ₹1.75L total.)
+        var r = _engine.Compute(
+            Build(bfStcl: 0m, bfLtcl: 0m,
+                Equity(CapitalGainTerm.Long, 400_000m, 250_000m),
+                Equity(CapitalGainTerm.Short, 100_000m, 300_000m)),
+            Regime.New);
+
+        r.ShortTermCapitalLossCarriedForward.Should().Be(50_000m);
+        r.TotalTax.Should().Be(0m); // 112A fully absorbed by the STCL; nothing taxable
+    }
 }

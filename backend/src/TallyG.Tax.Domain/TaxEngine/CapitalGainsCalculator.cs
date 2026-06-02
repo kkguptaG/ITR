@@ -30,24 +30,26 @@ public static class CapitalGainsCalculator
         var crypto = TaxMath.NonNegative(SumSection(lines, "115BBH")); // VDA (s.115BBH): gains only — never reduced/carried
         var slabRateGains = SumSection(lines, "slab");
 
-        // 112A ₹1.25L exemption applies only to a POSITIVE net 112A long-term gain (after grandfathering).
-        var ltcg112ATaxable = ltcg112AGross > 0m ? TaxMath.NonNegative(ltcg112AGross - rules.Ltcg112AExemption) : ltcg112AGross;
-        var ltcg112AExemptionUsed = ltcg112AGross > 0m ? Math.Min(ltcg112AGross, rules.Ltcg112AExemption) : 0m;
-
-        // Current-year set-off (s.70): LTCL (s.70(3)) sets off ONLY against LTCG; STCL (s.70(2)) against
-        // STCG then LTCG. VDA is isolated. Order matches the brought-forward convention
-        // (LTCL: 112 → 112A ; STCL: slab → 111A → 112 → 112A) — a documented default, pending CA.
+        // Current-year set-off (s.70) runs on the GROSS gains, BEFORE the 112A ₹1.25L exemption: the
+        // exemption is a special-rate-tax concession applied to the 112A LTCG that SURVIVES set-off, not a
+        // reduction of the income that losses set off against (s.70 set-off precedes the s.112A computation).
+        // LTCL (s.70(3)) sets off ONLY against LTCG; STCL (s.70(2)) against STCG then LTCG. VDA is isolated.
+        // Order matches the brought-forward convention (LTCL: 112 → 112A ; STCL: slab → 111A → 112 → 112A).
         decimal stcg111Ag = TaxMath.NonNegative(stcg111A), slabG = TaxMath.NonNegative(slabRateGains);
-        decimal ltcg112G = TaxMath.NonNegative(ltcg112), ltcg112AG = TaxMath.NonNegative(ltcg112ATaxable);
+        decimal ltcg112G = TaxMath.NonNegative(ltcg112), ltcg112AGafterLoss = TaxMath.NonNegative(ltcg112AGross);
         var stcl = TaxMath.NonNegative(-stcg111A) + TaxMath.NonNegative(-slabRateGains);
-        var ltcl = TaxMath.NonNegative(-ltcg112) + TaxMath.NonNegative(-ltcg112ATaxable);
+        var ltcl = TaxMath.NonNegative(-ltcg112) + TaxMath.NonNegative(-ltcg112AGross);
 
         Absorb(ref ltcl, ref ltcg112G);
-        Absorb(ref ltcl, ref ltcg112AG);
+        Absorb(ref ltcl, ref ltcg112AGafterLoss);
         Absorb(ref stcl, ref slabG);
         Absorb(ref stcl, ref stcg111Ag);
         Absorb(ref stcl, ref ltcg112G);
-        Absorb(ref stcl, ref ltcg112AG);
+        Absorb(ref stcl, ref ltcg112AGafterLoss);
+
+        // Apply the ₹1.25L exemption to the 112A long-term gain remaining after set-off.
+        var ltcg112AExemptionUsed = Math.Min(ltcg112AGafterLoss, rules.Ltcg112AExemption);
+        var ltcg112AG = TaxMath.NonNegative(ltcg112AGafterLoss - rules.Ltcg112AExemption);
 
         var buckets = new SpecialRateBuckets(
             Stcg111A: stcg111Ag,
