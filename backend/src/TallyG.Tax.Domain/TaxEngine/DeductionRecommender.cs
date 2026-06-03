@@ -52,6 +52,35 @@ public static class DeductionRecommender
             "Fill s.80C via PPF", used80C, caps.Section80C,
             lockInYears: 15, liquidity: 0.2m, utilityNote: "15-yr lock-in; sovereign-backed, tax-free.");
 
+        // 80EEA — first-time affordable-housing loan interest (₹1.5L over and above 80C), commonly missed.
+        // Only applicable when no house property is owned (self-occupied) + loan before Mar 2022; offer it
+        // whenever no 80EEA is already claimed and there is a house on the return.
+        var has80EEA = input.HouseProperties.Any();
+        if (has80EEA)
+        {
+            AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80EEA",
+                "First-time home loan interest (s.80EEA)", used.GetValueOrDefault("80EEA"),
+                caps.Section80Eea, lockInYears: 0, liquidity: 1.0m,
+                utilityNote: "₹1.5L/yr additional interest deduction on affordable-housing loan sanctioned Apr-2019 to Mar-2022 (stamp duty ≤ ₹45L). Not eligible if any other house property owned.");
+        }
+
+        // 80EEB — EV loan interest (₹1.5L cap), over and above 80C. Applicable when not already claimed.
+        AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80EEB",
+            "Electric-vehicle loan interest (s.80EEB)", used.GetValueOrDefault("80EEB"),
+            caps.Section80Eeb, lockInYears: 0, liquidity: 1.0m,
+            utilityNote: "₹1.5L/yr on EV loan interest; loan sanctioned Apr-2019 to Mar-2023. Not combined with 80C.");
+
+        // 80GG — rent paid when HRA is not received. Only relevant for non-salaried / HRA-nil scenarios.
+        var hasHra = input.Salaries.Any(s => s.HraExemption > 0m);
+        if (!hasHra)
+        {
+            var maxGg = caps.Section80GgMonthly * 12m;
+            AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80GG",
+                "Rent paid — no HRA (s.80GG)", used.GetValueOrDefault("80GG"),
+                maxGg, lockInYears: 0, liquidity: 1.0m,
+                utilityNote: "Deduct rent paid when your employer does not give HRA. Capped at the least of ₹60k p.a., 25% of adj. total income, or actual rent minus 10% income. File Form 10BA.");
+        }
+
         // ROI is identical within a section, so rank by (ROI desc, liquidity desc, lock-in asc).
         var ranked = suggestions
             .Where(s => s.GapToInvest > 0m && s.MarginalTaxSaved > 0m)
@@ -147,6 +176,9 @@ public static class DeductionRecommender
             "80CCD1B" or "80CCDONEB" => "80CCD1B",
             "80D" or "80DSELF" => "80D_SELF",
             "80DPARENTS" => "80D_PARENTS",
+            "80EEA" => "80EEA",
+            "80EEB" => "80EEB",
+            "80GG" => "80GG",
             _ => s,
         };
     }

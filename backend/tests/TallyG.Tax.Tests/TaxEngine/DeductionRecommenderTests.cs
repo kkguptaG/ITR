@@ -1,4 +1,5 @@
 using FluentAssertions;
+using TallyG.Tax.Domain.Enums;
 using TallyG.Tax.Domain.TaxEngine;
 using Xunit;
 
@@ -29,5 +30,27 @@ public class DeductionRecommenderTests
 
         senior.Suggestions.Single(s => s.Section == "80D").GapToInvest.Should().Be(50_000m);
         young.Suggestions.Single(s => s.Section == "80D").GapToInvest.Should().Be(25_000m);
+    }
+
+    [Fact]
+    public void Recommends_80EEA_when_a_house_property_exists_and_80EEA_is_unclaimed()
+    {
+        // A salaried profile with a self-occupied property → 80EEA should be surfaced (₹1.5L headroom).
+        var inputWithHouse = RuleSetFixture.Salaried(1_500_000m) with
+        {
+            HouseProperties = new[] { new HousePropertyInput(HousePropertyType.SelfOccupied, 0m, 0m, 100_000m) },
+        };
+        var r = DeductionRecommender.Recommend(_engine, inputWithHouse);
+        r.Suggestions.Should().Contain(s => s.Section == "80EEA" && s.GapToInvest == 150_000m);
+    }
+
+    [Fact]
+    public void Does_not_recommend_80GG_at_high_income_because_10pct_floor_eliminates_the_deduction()
+    {
+        // 80GG = min(₹5k/month, 25% income, actual_rent − 10% income). At ₹10L gross the taxable income
+        // is ~₹9.25L → 10% = ₹92.5k > ₹60k cap → the effective deduction is zero → no saving → not surfaced.
+        var r = DeductionRecommender.Recommend(_engine, RuleSetFixture.Salaried(1_000_000m));
+        r.Suggestions.Should().NotContain(s => s.Section == "80GG",
+            "80GG's rent-minus-10%-income formula yields zero saving at ₹10L income, so the advisor correctly omits it");
     }
 }
