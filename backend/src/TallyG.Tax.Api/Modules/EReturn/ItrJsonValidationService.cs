@@ -352,6 +352,20 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Schedule 5A applies only to assessees governed by the Portuguese Civil Code (Goa, Dadra & Nagar Haveli, Daman & Diu). Remove it if it does not apply.");
         }
 
+        // --- advance-tax obligation (s.208 / s.234B) ---
+        // Any person with estimated tax liability > ₹10,000 is required to pay advance tax in quarterly
+        // instalments. If the return shows significant tax-due (before subtracting TDS/TCS) but no advance
+        // tax at all, the s.234B interest will be larger than expected — flag it so the user isn't surprised.
+        var totalTaxLiability = c?.TotalTax ?? 0m;
+        var prepaidCredit = (c?.TdsPaid ?? 0m) + ctx.Return.TcsPaid;
+        var netBeforeAdvance = Math.Max(0m, totalTaxLiability - prepaidCredit);
+        if (netBeforeAdvance > 10_000m && (ctx.Return.AdvanceTaxPaid + ctx.Return.SelfAssessmentTaxPaid) <= 0m)
+        {
+            Warn("TAX.ADVANCE_TAX_MISSING", "$..ScheduleIT",
+                $"Net tax after TDS/TCS (₹{netBeforeAdvance:N0}) exceeds the ₹10,000 advance-tax threshold, but no advance-tax or self-assessment-tax payment is recorded. s.234B interest on the shortfall will apply.",
+                "If you paid advance-tax challans, add them (BSR code, date, amount) so the interest and refund/payable are correctly computed. If no advance tax was paid, be aware s.234B interest at 1% per month will be charged on the shortfall.");
+        }
+
         // --- lifecycle ---
         if (ctx.Return.Status is ReturnStatus.Filed or ReturnStatus.Processed)
         {

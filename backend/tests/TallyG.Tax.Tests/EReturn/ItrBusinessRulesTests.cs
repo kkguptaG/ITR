@@ -211,6 +211,39 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Advance_tax_missing_when_net_tax_exceeds_10k_warns()
+    {
+        // Net tax ₹50k after TDS, no advance tax or SAT challan → s.234B interest will apply.
+        var ctx = Ctx(refundOrPayable: -50_000m, tdsPaid: 50_000m);
+        // Manually craft a context with high total tax and low TDS to trigger the gap:
+        var highTaxCtx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25", TdsPaid = 0m },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_500_000m, TaxableIncome = 1_300_000m, TotalTax = 200_000m, TdsPaid = 0m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_500_000m } },
+        };
+        Has(Svc.Validate(highTaxCtx, StubJson), "TAX.ADVANCE_TAX_MISSING").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Advance_tax_not_flagged_when_liability_is_below_threshold()
+    {
+        var lowTaxCtx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 500_000m, TaxableIncome = 400_000m, TotalTax = 5_000m, TdsPaid = 0m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 500_000m } },
+        };
+        Has(Svc.Validate(lowTaxCtx, StubJson), "TAX.ADVANCE_TAX_MISSING").Should().BeFalse();
+    }
+
+    [Fact]
     public void Chapter_VIA_deductions_exceeding_GTI_warn()
     {
         // GTI is ₹8L in the fixture; ₹9L of deductions can't be allowed in full (s.80A(2)).
