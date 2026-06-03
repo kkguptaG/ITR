@@ -99,4 +99,56 @@ public class InterestCalculatorTests
 
         r.Trace.Where(t => t.Step == "Interest.234A").Sum(t => t.Amount).Should().Be(6_552m);
     }
+
+    private static TaxComputationInput DatedBusiness(
+        decimal netProfit, DateOnly filed, decimal advance, AdvanceTaxInstallmentInput[] installments)
+        => new()
+        {
+            AssessmentYearCode = "AY2025-26",
+            RuleSetVersion = "1.0.0",
+            RulesJson = RuleSetFixture.Ay2025_26Json,
+            Age = 35,
+            BusinessIncomes = new[] { new BusinessIncomeInput(false, null, 0m, 0m, 0m, netProfit, false) },
+            AdvanceTaxPaid = advance,
+            FilingDueDate = DueDate,
+            ActualFilingDate = filed,
+            PreviousYearStart = PyStart,
+            PreviousYearEnd = PyEnd,
+            AdvanceTaxInstallments = installments,
+        };
+
+    [Fact]
+    public void S234C_charges_only_deferment_when_the_full_advance_is_paid_late_in_the_year()
+    {
+        // ₹15L business (new regime) → tax ₹1,45,600, no TDS. The full advance is paid — but ALL on the last
+        // installment date (15-Mar) — so s.234B is nil (≥90% paid) yet s.234C deferment interest still runs
+        // for Q1–Q3 (nothing was paid by 15-Jun / 15-Sep / 15-Dec):
+        //   1% × (3×15% + 3×45% + 3×75%) × ₹1,45,600 = ₹5,896.8 → ₹5,897.
+        var input = DatedBusiness(
+            1_500_000m,
+            filed: DueDate,
+            advance: 145_600m,
+            installments: new[] { new AdvanceTaxInstallmentInput(new DateOnly(2026, 3, 15), 145_600m) });
+        var r = _engine.Compute(input, Regime.New);
+
+        r.TotalTax.Should().Be(145_600m);
+        r.Interest234C.Should().Be(5_897m);
+        r.Interest234B.Should().Be(0m, "the full advance was paid (≥90% of assessed tax), so no 234B shortfall");
+        r.Interest234A.Should().Be(0m, "filed on the due date");
+    }
+
+    [Fact]
+    public void Nil_tax_return_filed_late_bears_no_interest()
+    {
+        // ₹5L salary (new regime): net ₹4.25L → slab ₹6,250 fully wiped by the s.87A rebate → nil tax. Even
+        // filed months late, there is no 234A (nothing unpaid) and no 234B/234C (assessed tax is below the
+        // s.208 advance-tax threshold).
+        var r = _engine.Compute(DatedSalaried(500_000m, new DateOnly(2026, 12, 31)), Regime.New);
+
+        r.TotalTax.Should().Be(0m);
+        r.InterestPenalty.Should().Be(0m);
+        r.Interest234A.Should().Be(0m);
+        r.Interest234B.Should().Be(0m);
+        r.Interest234C.Should().Be(0m);
+    }
 }
