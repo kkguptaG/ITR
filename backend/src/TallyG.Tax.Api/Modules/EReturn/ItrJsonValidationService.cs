@@ -280,6 +280,31 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                         "Declare at least 50%, or maintain books + a tax audit to declare a lower profit.");
                 }
             }
+            else if (sec == "44AE")
+            {
+                // 44AE needs the per-vehicle goods-carriage list; without it the presumptive income
+                // can't be computed per s.44AE and the Schedule BP vehicle table is empty.
+                var hasVehicles = !string.IsNullOrWhiteSpace(b.GoodsCarriageJson)
+                                  && b.GoodsCarriageJson.Trim() is not ("[]" or "{}" or "");
+                if (!hasVehicles)
+                {
+                    Warn("PRESUMPTIVE.44AE_NO_VEHICLES", "$..ScheduleBP.GoodsDtlsUs44AE",
+                        "44AE (goods carriage) is selected but no vehicles are listed — the presumptive income can't be computed per-vehicle.",
+                        "Add each goods-carriage vehicle (registration no, tonnage, months held) in the Income step. 44AE also caps at 10 vehicles owned at any time during the year.");
+                }
+            }
+
+            // --- financial-particulars balance check (info) ---
+            // The no-account-case balance sheet should roughly balance. A large gap usually means a
+            // figure was missed; flag it without blocking (the schema doesn't require equality).
+            var totLiab = b.PartnerCapital + b.SecuredLoans + b.UnsecuredLoans + b.SundryCreditors;
+            var totAssets = b.FixedAssets + b.Inventory + b.SundryDebtors + b.BankBalance + b.CashBalance;
+            if (totLiab > 0m && totAssets > 0m && Math.Abs(totLiab - totAssets) > 0.10m * Math.Max(totLiab, totAssets))
+            {
+                Warn("BP.PARTICULARS_UNBALANCED", "$..ScheduleBP.FinanclPartclrOfBusiness",
+                    $"Financial particulars don't balance: liabilities ₹{totLiab:N0} vs assets ₹{totAssets:N0} (>10% apart).",
+                    "In a balance sheet, total capital + liabilities should equal total assets. Re-check the figures — a head may be missing.");
+            }
         }
 
         // --- foreign-source income (Schedule FSI/TR) cross-checks ---

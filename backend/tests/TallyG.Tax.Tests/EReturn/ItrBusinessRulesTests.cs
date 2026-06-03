@@ -124,6 +124,31 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Presumptive_44AE_without_vehicles_warns()
+    {
+        var noVehicles = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 270_000m, GoodsCarriageJson = "[]" } };
+        Has(Svc.Validate(Ctx(businesses: noVehicles), StubJson), "PRESUMPTIVE.44AE_NO_VEHICLES").Should().BeTrue();
+
+        var withVehicles = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 270_000m,
+            GoodsCarriageJson = "[{\"regNo\":\"DL01AB1234\",\"ownership\":\"OWN\",\"tonnage\":15,\"months\":12}]" } };
+        Has(Svc.Validate(Ctx(businesses: withVehicles), StubJson), "PRESUMPTIVE.44AE_NO_VEHICLES").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Financial_particulars_that_do_not_balance_warn()
+    {
+        // Liabilities ₹10L vs assets ₹3L — a >10% gap.
+        var unbalanced = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m,
+            GrossReceiptsDigital = 2_000_000m, PartnerCapital = 1_000_000m, CashBalance = 300_000m } };
+        Has(Svc.Validate(Ctx(businesses: unbalanced), StubJson), "BP.PARTICULARS_UNBALANCED").Should().BeTrue();
+
+        // Balanced: capital ₹10L = fixed assets ₹6L + cash ₹4L.
+        var balanced = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m,
+            GrossReceiptsDigital = 2_000_000m, PartnerCapital = 1_000_000m, FixedAssets = 600_000m, CashBalance = 400_000m } };
+        Has(Svc.Validate(Ctx(businesses: balanced), StubJson), "BP.PARTICULARS_UNBALANCED").Should().BeFalse();
+    }
+
+    [Fact]
     public void Foreign_income_without_a_foreign_asset_disclosure_warns()
     {
         var fsi = new[] { new ForeignSourceIncome { CountryCode = "1", CountryName = "USA", TaxIdentificationNo = "123", Head = ForeignIncomeHead.OtherSources, IncomeFromOutsideIndia = 500_000m, TaxPaidOutsideIndia = 75_000m, ReliefSection = ForeignTaxReliefSection.Section90 } };
