@@ -352,6 +352,26 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Schedule 5A applies only to assessees governed by the Portuguese Civil Code (Goa, Dadra & Nagar Haveli, Daman & Diu). Remove it if it does not apply.");
         }
 
+        // --- s.234A late-filing interest ---
+        // If the return is generated AFTER the due date, s.234A charges 1% per month on net tax payable.
+        // Warn so the user knows they will owe interest and can capture the correct amount before filing.
+        var dueDate = ctx.Ay?.DueDateNonAudit;
+        if (dueDate is { } due && ctx.GeneratedOn > due)
+        {
+            var monthsLate = ((ctx.GeneratedOn.Year - due.Year) * 12 + ctx.GeneratedOn.Month - due.Month);
+            if (monthsLate < 1) monthsLate = 1;           // minimum 1 month per s.234A
+            var prepaid234A = (c?.TdsPaid ?? 0m) + ctx.Return.TcsPaid;
+            var netPayable = Math.Max(0m, (c?.TotalTax ?? 0m) - prepaid234A);
+            if (netPayable > 0m)
+            {
+                var est234A = Math.Round(netPayable * 0.01m * monthsLate, MidpointRounding.AwayFromZero);
+                Warn("TAX.234A_LATE_FILING", "$..PartB_TTI",
+                    $"This return is being filed after the due date ({due:dd-MMM-yyyy}). " +
+                    $"s.234A interest at 1%/month on net tax payable (~₹{est234A:N0} for ~{monthsLate} month{(monthsLate == 1 ? "" : "s")}) will apply.",
+                    "File as soon as possible to limit the interest. Capture the 234A interest amount in the computation; the engine can compute it if you re-run the tax.");
+            }
+        }
+
         // --- advance-tax obligation (s.208 / s.234B) ---
         // Any person with estimated tax liability > ₹10,000 is required to pay advance tax in quarterly
         // instalments. If the return shows significant tax-due (before subtracting TDS/TCS) but no advance

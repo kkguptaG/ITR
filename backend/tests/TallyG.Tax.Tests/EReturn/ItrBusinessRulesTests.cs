@@ -211,6 +211,41 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Late_filing_after_due_date_with_net_tax_due_warns_234A()
+    {
+        var dueDate = new DateOnly(2025, 7, 31);     // non-audit ITR due date
+        var generatedOn = new DateOnly(2025, 10, 5); // filed ~2 months late
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2025-26", TdsPaid = 0m },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2025-26", DueDateNonAudit = dueDate },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 850_000m, TotalTax = 80_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+            GeneratedOn = generatedOn,
+        };
+        Has(Svc.Validate(ctx, StubJson), "TAX.234A_LATE_FILING").Should().BeTrue();
+    }
+
+    [Fact]
+    public void On_time_filing_does_not_warn_234A()
+    {
+        var dueDate = new DateOnly(2025, 7, 31);
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2025-26", TdsPaid = 0m },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2025-26", DueDateNonAudit = dueDate },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 850_000m, TotalTax = 80_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+            GeneratedOn = new DateOnly(2025, 7, 15),  // before the due date
+        };
+        Has(Svc.Validate(ctx, StubJson), "TAX.234A_LATE_FILING").Should().BeFalse();
+    }
+
+    [Fact]
     public void Advance_tax_missing_when_net_tax_exceeds_10k_warns()
     {
         // Net tax ₹50k after TDS, no advance tax or SAT challan → s.234B interest will apply.

@@ -36,8 +36,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ItrType.ITR4 => Wrap("ITR4", BuildItr4(ctx)),
             _ => throw new AppException(
                 "ITRJSON.FORM_UNSUPPORTED",
-                $"{ctx.ItrType} JSON generation is on the roadmap — data capture and computation are ready, " +
-                "but its schema mapper is not yet implemented (ITR-1 and ITR-4 are supported today).", 422)
+                $"{ctx.ItrType} JSON generation is not yet implemented. Supported forms: ITR-1, ITR-2, ITR-3, ITR-4.", 422)
         };
     }
 
