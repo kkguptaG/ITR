@@ -558,7 +558,7 @@ export function OtherIncomeForm({
       </Field>
       <Field
         label="Nature of income"
-        hint="The interest/dividend/pension heads itemise into Schedule OS on ITR-2/3. Winnings/lottery are taxed at a flat 30% (s.115BB); agricultural income is exempt but raises your slab rate."
+        hint="The interest/dividend/pension heads itemise into Schedule OS on ITR-2/3. Winnings — lottery/betting (s.115BB) and online games (s.115BBJ) — are taxed at a flat 30% with no deduction or set-off; agricultural income is exempt but raises your slab rate."
       >
         <Select {...register('nature')}>
           <option value="savings_interest">Interest — savings bank</option>
@@ -567,7 +567,8 @@ export function OtherIncomeForm({
           <option value="interest">Interest — other</option>
           <option value="dividend">Dividend</option>
           <option value="family_pension">Family pension</option>
-          <option value="lottery_115bb">Winnings / lottery (s.115BB)</option>
+          <option value="lottery_115bb">Winnings / lottery / betting (s.115BB)</option>
+          <option value="online_gaming_115bbj">Online game winnings (s.115BBJ)</option>
           <option value="agricultural">Agricultural income</option>
           <option value="normal">Other / general</option>
         </Select>
