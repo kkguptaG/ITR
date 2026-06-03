@@ -624,6 +624,11 @@ public class ItrSchemaConformanceTests
         ti.GetProperty("BroughtFwdLossesSetoff").GetInt64().Should().Be(300_000);
         ti.GetProperty("GrossTotalIncome").GetInt64().Should().Be(825_000);
 
+        // Schedule BFLA ties to PartB-TI: the ₹3L unabsorbed-depreciation set-off + income after CYLA/BFLA == GTI.
+        var bfla = itr3.GetProperty("ScheduleBFLA");
+        bfla.GetProperty("TotalBFLossSetOff").GetProperty("TotUnabsorbedDeprSetoff").GetInt64().Should().Be(300_000);
+        bfla.GetProperty("IncomeOfCurrYrAftCYLABFLA").GetInt64().Should().Be(825_000);
+
         // The deemed STCG now FLOWS into Schedule CG (not just the DCG disclosure): the ₹2L lands as a deemed
         // short-term gain on other assets, taxed at the applicable rate, and ties out through the CG totals.
         var cg = itr3.GetProperty("ScheduleCGFor23");

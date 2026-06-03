@@ -2491,6 +2491,18 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             SetIfInt(ti, "AggregateIncome", taxable);
         }
 
+        // Schedule BFLA bottom line: the s.32(2) unabsorbed-depreciation set off this year (so it ties to
+        // PartB-TI's BroughtFwdLossesSetoff) and the income left after CYLA + BFLA (== GTI). The per-bucket
+        // attribution stays at the skeleton zeros (business b/f is carried in Schedule BP).
+        if (skel["ScheduleBFLA"] is Dictionary<string, object?> bfla)
+        {
+            if (bfla["TotalBFLossSetOff"] is Dictionary<string, object?> totBf)
+            {
+                SetIfInt(totBf, "TotUnabsorbedDeprSetoff", R(udSetOff));
+            }
+            SetIfInt(bfla, "IncomeOfCurrYrAftCYLABFLA", gti);
+        }
+
         if (skel["PartB_TTI"] is Dictionary<string, object?> tti)
         {
             if (tti["ComputationOfTaxLiability"] is Dictionary<string, object?> col)
