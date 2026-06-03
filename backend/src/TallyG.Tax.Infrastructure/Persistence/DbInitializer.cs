@@ -48,6 +48,7 @@ public static class DbInitializer
         await db.SaveChangesAsync(ct);          // persist the AY/ruleset before the return references them
 
         await SeedDemoItr2ReturnAsync(db, ct);
+        await SeedDemoItr3ReturnAsync(db, ct);
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Database seed complete (idempotent).");
@@ -490,6 +491,74 @@ public static class DbInitializer
             Relief90And91 = 75_000m, TotalTax = 1_609_800m,
             // Prepaid = TDS 15L + advance 2L + TCS 25k = 17.25L; refund = 17.25L − 16,09,800 = 1,15,200.
             TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 115_200m,
+        });
+    }
+
+    /// <summary>
+    /// A second showcase return for the demo user — a regular-books ITR-3 (business/profession) on AY2025-26
+    /// so the ITR-3-only schedules (business income, depreciation DPM/DOA/DEP, firm-interest AL) are
+    /// demo-visible and live-verifiable. Reuses the demo user's identity/profile (seeded by the ITR-2 seed);
+    /// seeding bypasses the one-return-per-AY rule.
+    /// </summary>
+    private static async Task SeedDemoItr3ReturnAsync(AppDbContext db, CancellationToken ct)
+    {
+        var returnId = StableId("return:demo:itr3:AY2025-26");
+        if (await db.TaxReturns.AnyAsync(r => r.Id == returnId, ct))
+        {
+            return;
+        }
+
+        db.TaxReturns.Add(new TaxReturn
+        {
+            Id = returnId, TenantId = RetailTenantId, UserId = DemoUserId, AssessmentYearId = Ay2025Id,
+            ItrType = ItrType.ITR3, Regime = Regime.New, Status = ReturnStatus.ComputedReady,
+            RuleSetVersion = SeedRuleSet.Version, QuestionnaireSchemaVersion = "1.0.0",
+            AdvanceTaxPaid = 460_000m,
+        });
+
+        // Regular-books profession (non-presumptive): the ₹25L net profit is the ITR-3 business income.
+        db.BusinessIncomes.Add(new BusinessIncome
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, IsPresumptive = false,
+            NatureOfBusinessCode = "16019", AccountingMethod = "mercantile",
+            Turnover = 12_000_000m, NetProfit = 2_500_000m,
+        });
+
+        // Depreciable assets (Schedule DPM / DOA / DEP): a 15% plant & machinery block + a 10% building block.
+        db.DepreciableAssets.AddRange(
+            new DepreciableAsset
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+                Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m,
+            },
+            new DepreciableAsset
+            {
+                TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+                Category = DepreciableAssetCategory.Building10, OpeningWdv = 3_000_000m,
+            });
+
+        // Interest in a partnership firm (Schedule AL — ITR-3 InterestHeldInaAsset).
+        db.FirmInterestsAL.Add(new FirmInterestAL
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            FirmName = "Sharma & Associates LLP", FirmPan = "AABFS1234K",
+            FlatDoorNo = "3rd Floor, Tower B", Locality = "Cyber City", City = "Gurugram",
+            StateCode = "06", Pincode = "122002", Investment = 1_500_000m,
+        });
+
+        // Exempt income (Schedule EI): tax-free PPF interest.
+        db.ExemptIncomes.Add(new ExemptIncome
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Category = ExemptIncomeCategory.Interest, Description = "PPF interest (s.10(11))", Amount = 50_000m,
+        });
+
+        db.TaxComputations.Add(new TaxComputation
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Regime = Regime.New, IsRecommended = true,
+            GrossTotalIncome = 2_500_000m, TotalDeductions = 0m, TaxableIncome = 2_500_000m,
+            TaxBeforeCess = 440_000m, Surcharge = 0m, Cess = 17_600m, TotalTax = 457_600m,
+            AdvanceTax = 460_000m, RefundOrPayable = 2_400m,
         });
     }
 
