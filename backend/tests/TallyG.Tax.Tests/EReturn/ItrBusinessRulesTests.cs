@@ -288,6 +288,53 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Itr1_with_multiple_house_properties_is_a_hard_error()
+    {
+        var houses = new[]
+        {
+            new HouseProperty { Type = HousePropertyType.SelfOccupied, InterestOnLoan = 100_000m },
+            new HouseProperty { Type = HousePropertyType.LetOut, AnnualValue = 200_000m },
+        };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR1, Regime = Regime.New, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.New, GrossTotalIncome = 900_000m, TaxableIncome = 900_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
+            Houses = houses,
+        };
+        var report = Svc.Validate(ctx, StubJson);
+        Has(report, "FORM.ITR1_MULTIPLE_HP").Should().BeTrue("ITR-1 can only have one house property");
+    }
+
+    [Fact]
+    public void Itr1_with_a_house_property_loss_is_a_hard_error()
+    {
+        // A self-occupied property with ₹3L interest → ₹2L HP loss (capped). ITR-1 can't carry it forward.
+        var houses = new[] { new HouseProperty { Type = HousePropertyType.SelfOccupied, InterestOnLoan = 300_000m } };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR1, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 900_000m, TaxableIncome = 900_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
+            Houses = houses,
+        };
+        Has(Svc.Validate(ctx, StubJson), "FORM.ITR1_HP_LOSS").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Itr4_with_regular_books_business_is_a_hard_error()
+    {
+        var ctx = Ctx(itrType: ItrType.ITR4, businesses: new[] { new BusinessIncome { IsPresumptive = false, NetProfit = 500_000m } });
+        Has(Svc.Validate(ctx, StubJson), "FORM.ITR4_REGULAR_BOOKS").Should().BeTrue("ITR-4 only supports presumptive income");
+    }
+
+    [Fact]
     public void Self_occupied_property_interest_over_2L_cap_warns()
     {
         var houses = new[] { new HouseProperty { Type = HousePropertyType.SelfOccupied, InterestOnLoan = 280_000m } };

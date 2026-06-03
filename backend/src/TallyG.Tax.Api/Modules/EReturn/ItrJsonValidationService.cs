@@ -333,6 +333,44 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Verify the rebate figure: tax on special-rate income (111A/112A STCG/LTCG, 115BBH VDA, 115BB/115BBJ winnings) is excluded from the rebate calculation. The engine does this correctly; check that the computation was rerun after all income was entered.");
         }
 
+        // --- ITR form vs income-data consistency checks ---
+        // These catch the most common "wrong form for your income" errors that generate portal rejections.
+        if (ctx.ItrType == ItrType.ITR1)
+        {
+            // ITR-1 (Sahaj) cannot report more than ONE house property, any business income, or capital gains
+            // beyond the small LTCG-112A relaxation (which the selector already handles). The most common gap
+            // missed by users: a house-property LOSS that would need to be carried forward.
+            if (ctx.Houses.Count > 1)
+            {
+                Err("FORM.ITR1_MULTIPLE_HP", "$..ScheduleHP",
+                    $"{ctx.Houses.Count} house properties are on this return but ITR-1 (Sahaj) can report at most one.",
+                    "Switch to ITR-2 in the Personal step — it supports multiple properties and allows their losses to be carried forward.");
+            }
+
+            // Simplified HP income: let-out NAV minus 30% + interest; self-occupied = -min(interest, 2L).
+            var hpLoss = ctx.Houses.Sum(h => h.Type == HousePropertyType.SelfOccupied
+                ? -Math.Min(h.InterestOnLoan, 200_000m)
+                : Math.Max(0m, h.AnnualValue - h.MunicipalTaxPaid) * 0.70m - h.InterestOnLoan);
+            if (hpLoss < 0m)
+            {
+                Err("FORM.ITR1_HP_LOSS", "$..ScheduleHP",
+                    $"The house-property head has a loss (₹{-hpLoss:N0}) but ITR-1 (Sahaj) cannot carry HP losses forward.",
+                    "Switch to ITR-2 — it supports the HP-loss set-off against salary (up to ₹2L) and carry-forward (s.71B) for up to 8 years.");
+            }
+        }
+
+        if (ctx.ItrType == ItrType.ITR4)
+        {
+            // ITR-4 (Sugam) is only for presumptive income (44AD/44ADA/44AE) with ≤1 house and no capital gains.
+            var hasRegularBooks = ctx.Businesses.Any(b => !b.IsPresumptive);
+            if (hasRegularBooks)
+            {
+                Err("FORM.ITR4_REGULAR_BOOKS", "$..ScheduleBP",
+                    "ITR-4 (Sugam) is for presumptive income (44AD/44ADA/44AE) only — regular-books business income cannot be reported here.",
+                    "Switch to ITR-3 in the Personal step, which supports regular-books business income and full depreciation schedules.");
+            }
+        }
+
         // --- virtual digital assets (s.115BBH) cross-checks ---
         static bool IsVda(CapitalGain g) => g.AssetType == CapitalGainAssetType.CryptoVda
             || (g.TaxSection ?? string.Empty).Contains("115BBH");
