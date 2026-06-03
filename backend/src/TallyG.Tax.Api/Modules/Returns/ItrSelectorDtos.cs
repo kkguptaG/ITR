@@ -63,6 +63,10 @@ public sealed record ItrSelectorInput
 
     /// <summary>Crypto / VDA income requiring Schedule VDA (disqualifies ITR-1/4).</summary>
     public bool HasCryptoVda { get; init; }
+
+    /// <summary>Winnings from lotteries / betting (s.115BB) or online games (s.115BBJ) — special-rate
+    /// income that ITR-1 (Sahaj) and ITR-4 (Sugam) cannot report, so it forces ITR-2/3.</summary>
+    public bool HasWinnings { get; init; }
 }
 
 /// <summary>

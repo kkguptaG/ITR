@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TallyG.Tax.Api.Common;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Enums;
@@ -51,12 +52,12 @@ public sealed class ItrSelectorService : IItrSelectorService
     {
         var incomeSources = await _db.IncomeSources
             .Where(s => s.TaxReturnId == taxReturnId)
-            .Select(s => new { s.Type, s.Amount })
+            .Select(s => new { s.Type, s.Amount, s.SourceMetaJson })
             .ToListAsync(ct);
 
         var capitalGains = await _db.CapitalGains
             .Where(c => c.TaxReturnId == taxReturnId)
-            .Select(c => new { c.TaxSection, c.Term, c.Gain })
+            .Select(c => new { c.TaxSection, c.Term, c.Gain, c.AssetType })
             .ToListAsync(ct);
 
         var businesses = await _db.BusinessIncomes
@@ -86,6 +87,12 @@ public sealed class ItrSelectorService : IItrSelectorService
         var hasPresumptive = businesses.Any(b => b.IsPresumptive);
         var hasRegularBusiness = businesses.Any(b => !b.IsPresumptive && !b.SpeculativeFlag);
 
+        // Special-rate income disqualifying ITR-1/4, derived from the saved return: s.115BB/115BBJ winnings
+        // (by the other-source "nature" tag) and crypto/VDA gains (by asset class or the 115BBH section).
+        var hasWinnings = incomeSources.Any(s => IsWinningsNature(TaxComputationInputFactory.ExtractNature(s.SourceMetaJson)));
+        var hasCryptoVda = capitalGains.Any(c => c.AssetType == CapitalGainAssetType.CryptoVda
+                                                 || (c.TaxSection ?? string.Empty).Contains("115BBH", StringComparison.OrdinalIgnoreCase));
+
         return new ItrSelectorInput
         {
             TotalIncome = totalIncome,
@@ -97,11 +104,15 @@ public sealed class ItrSelectorService : IItrSelectorService
             HasBusinessIncome = hasRegularBusiness,
             HasPresumptiveIncome = hasPresumptive,
             HasSpeculativeIncome = hasSpeculative,
-            HasFnoIncome = hasFno
-            // The remaining flags (foreign assets, director, NR/RNOR, agri, partner, crypto,
-            // brought-forward loss) are sourced from the questionnaire answers in a later pass;
-            // they default to false here and are honoured when Select(...) is called directly
-            // with a fully-populated input from the questionnaire engine (docs 03 §3.3).
+            HasFnoIncome = hasFno,
+            // Derived from the saved return data (not just the questionnaire): crypto/VDA gains and
+            // s.115BB/115BBJ winnings both disqualify ITR-1/4.
+            HasCryptoVda = hasCryptoVda,
+            HasWinnings = hasWinnings
+            // The remaining flags (foreign assets, director, NR/RNOR, agri, partner, brought-forward
+            // loss) are sourced from the questionnaire answers in a later pass; they default to false
+            // here and are honoured when Select(...) is called directly with a fully-populated input
+            // from the questionnaire engine (docs 03 §3.3).
         };
     }
 
@@ -156,7 +167,8 @@ public sealed class ItrSelectorService : IItrSelectorService
                              || f.IsNonResidentOrRnor
                              || f.HasAgriIncomeAbove5000
                              || f.HousePropertyCount > 1
-                             || f.HasCryptoVda;
+                             || f.HasCryptoVda
+                             || f.HasWinnings;
 
         if (hasItr2Trigger)
         {
@@ -170,7 +182,8 @@ public sealed class ItrSelectorService : IItrSelectorService
                                 && !f.IsNonResidentOrRnor
                                 && !f.HasAgriIncomeAbove5000
                                 && f.HousePropertyCount <= 1
-                                && !f.HasCryptoVda;
+                                && !f.HasCryptoVda
+                                && !f.HasWinnings;
 
             if (onlySmallLtcg && itr1Blockers.Count == 0)
             {
@@ -214,6 +227,7 @@ public sealed class ItrSelectorService : IItrSelectorService
         if (f.IsNonResidentOrRnor) b.Add("non_resident_or_rnor");
         if (f.HasAgriIncomeAbove5000) b.Add("agri_income_gt_5000");
         if (f.HasCryptoVda) b.Add("has_crypto_vda");
+        if (f.HasWinnings) b.Add("has_winnings");   // s.115BB/115BBJ winnings can't be reported on Sahaj
 
         // Capital gains block ITR-1 unless it is only small LTCG-112A within the threshold.
         if (f.HasCapitalGains
@@ -241,6 +255,7 @@ public sealed class ItrSelectorService : IItrSelectorService
         if (f.IsNonResidentOrRnor) b.Add("non_resident_or_rnor");
         if (f.HasAgriIncomeAbove5000) b.Add("agri_income_gt_5000");
         if (f.HasCryptoVda) b.Add("has_crypto_vda");
+        if (f.HasWinnings) b.Add("has_winnings");   // s.115BB/115BBJ winnings can't be reported on Sugam
         return b;
     }
 
@@ -278,7 +293,17 @@ public sealed class ItrSelectorService : IItrSelectorService
         if (f.HasAgriIncomeAbove5000) d.Add("agri_income_gt_5000");
         if (f.HousePropertyCount > 1) d.Add("multiple_house_properties");
         if (f.HasCryptoVda) d.Add("has_crypto_vda");
+        if (f.HasWinnings) d.Add("has_winnings");
         return d;
+    }
+
+    /// <summary>True when an other-source "nature" tag is a flat-30% winning: s.115BB (lottery / crossword /
+    /// races / gambling / betting) or s.115BBJ (online games). Mirrors the engine's casual-income natures.</summary>
+    private static bool IsWinningsNature(string? nature)
+    {
+        var n = (nature ?? string.Empty).Trim().ToLowerInvariant();
+        return n is "lottery_115bb" or "lottery" or "115bb" or "casual" or "winnings"
+                 or "online_gaming_115bbj" or "online_gaming" or "gaming" or "115bbj";
     }
 
     private static void AddIfBlocked(
