@@ -100,11 +100,13 @@ public sealed class ExtractionService : IExtractionService
         var salaryTds = RoundTo((long)(rng.Next(30_000, 120_000)), 10);
         var interestTds = RoundTo((long)(rng.Next(0, 8_000)), 10);
         var advTax = RoundTo((long)(rng.Next(0, 40_000)), 100);
+        var tcs = RoundTo((long)(rng.Next(0, 25_000)), 10);
         return new List<ExtractionField>
         {
             Field("form26as.tds_salary", Money(salaryTds), MoneyConfidence(rng)),
             Field("form26as.tds_salary_deductor_tan", Tan(rng), High(rng)),
             Field("form26as.tds_interest", Money(interestTds), MoneyConfidence(rng)),
+            Field("form26as.tcs", Money(tcs), MoneyConfidence(rng)),
             Field("form26as.advance_tax", Money(advTax), MoneyConfidence(rng)),
             Field("form26as.self_assessment_tax", Money(0), High(rng)),
             Field("form26as.assessment_year", "AY 2025-26", High(rng))
@@ -118,14 +120,20 @@ public sealed class ExtractionService : IExtractionService
         var salary = RoundTo(450_000 + rng.Next(0, 850_000), 1000);
         var sbInterest = RoundTo((long)rng.Next(2_000, 25_000), 10);
         var fdInterest = RoundTo((long)rng.Next(0, 60_000), 10);
+        var otherInterest = RoundTo((long)rng.Next(0, 15_000), 10);
+        var refundInterest = RoundTo((long)rng.Next(0, 5_000), 10);
         var dividend = RoundTo((long)rng.Next(0, 40_000), 10);
+        var rentReceived = RoundTo((long)rng.Next(0, 360_000), 100);
         var mfRedemption = RoundTo((long)rng.Next(0, 300_000), 100);
         return new List<ExtractionField>
         {
             Field("ais.salary_gross", Money(salary), MoneyConfidence(rng)),
             Field("ais.interest_savings_bank", Money(sbInterest), MoneyConfidence(rng)),
             Field("ais.interest_term_deposit", Money(fdInterest), MoneyConfidence(rng)),
+            Field("ais.interest_others", Money(otherInterest), MoneyConfidence(rng)),
+            Field("ais.interest_income_tax_refund", Money(refundInterest), MoneyConfidence(rng)),
             Field("ais.dividend_income", Money(dividend), MoneyConfidence(rng)),
+            Field("ais.rent_received", Money(rentReceived), MoneyConfidence(rng)),
             Field("ais.sft_mutual_fund_redemption", Money(mfRedemption), MoneyConfidence(rng)),
             Field("ais.assessment_year", "AY 2025-26", High(rng))
         };
