@@ -196,6 +196,37 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // Chapter VI-A deductions can't exceed gross total income (s.80A(2)); the excess is disallowed. Only
+        // meaningful under the old regime — the new regime ignores most of these anyway (flagged separately).
+        if (regime != Regime.New)
+        {
+            var totalVia = ctx.Deductions.Sum(d => Math.Max(0m, d.Amount));
+            var gtiForVia = c?.GrossTotalIncome ?? 0m;
+            if (gtiForVia > 0m && totalVia > gtiForVia)
+            {
+                Warn("DEDUCTION.VIA_EXCEEDS_GTI", "$..DeductUndChapVIA",
+                    $"Chapter VI-A deductions claimed (₹{totalVia:N0}) exceed the gross total income (₹{gtiForVia:N0}).",
+                    "Deductions under Chapter VI-A can't exceed GTI (s.80A(2)) — they can't create or increase a loss, so the excess is simply disallowed. Trim the total claim to at most your GTI.");
+            }
+        }
+
+        // A salary-TDS credit with no salary income captured — the salary head was almost certainly missed.
+        if (ctx.Salaries.Count == 0 && ctx.TdsEntries.Any(t => t.Head == TdsHead.Salary && t.TaxDeducted > 0m))
+        {
+            Warn("TDS.SALARY_NO_INCOME", "$..ScheduleTDS1",
+                "Salary TDS is claimed but no salary income is on the return — the salary head looks missing.",
+                "Add the salary (Form 16) so the income matches the TDS. Claiming a TDS credit without the corresponding income triggers a 26AS / AIS mismatch.");
+        }
+
+        // A refund can only return taxes already paid — flag a computed refund with no prepaid tax on record.
+        var prepaid = ctx.Return.TdsPaid + ctx.Return.TcsPaid + ctx.Return.AdvanceTaxPaid + ctx.Return.SelfAssessmentTaxPaid;
+        if ((c?.RefundOrPayable ?? 0m) > 0m && prepaid <= 0m)
+        {
+            Warn("REFUND.NO_PREPAID", "$..Refund",
+                "A refund is computed but no prepaid tax (TDS / TCS / advance / self-assessment) is recorded.",
+                "A refund can only return taxes already paid. Capture your TDS (26AS), advance-tax or self-assessment challans — or re-check the computation.");
+        }
+
         // --- presumptive-scheme eligibility (s.44AD / 44ADA): turnover ceilings + minimum declared margin ---
         foreach (var b in ctx.Businesses.Where(x => x.IsPresumptive))
         {

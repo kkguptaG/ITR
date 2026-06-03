@@ -172,6 +172,28 @@ public class ItrBusinessRulesTests
         Has(report, "VDA.DEDUCTION_DISALLOWED").Should().BeFalse();
     }
 
+    [Fact]
+    public void Chapter_VIA_deductions_exceeding_GTI_warn()
+    {
+        // GTI is ₹8L in the fixture; ₹9L of deductions can't be allowed in full (s.80A(2)).
+        var ded = new[] { Deduct("80C", 150_000m), Deduct("80CCD(1B)", 50_000m), Deduct("80E", 700_000m) };
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: ded), StubJson), "DEDUCTION.VIA_EXCEEDS_GTI").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Salary_TDS_with_no_salary_income_warns()
+    {
+        var tds = new[] { new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", TaxDeducted = 40_000m } };
+        Has(Svc.Validate(Ctx(salaries: Array.Empty<SalaryDetail>(), tdsEntries: tds), StubJson), "TDS.SALARY_NO_INCOME").Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_refund_with_no_prepaid_tax_warns_unless_prepaid_exists()
+    {
+        Has(Svc.Validate(Ctx(refundOrPayable: 8_400m), StubJson), "REFUND.NO_PREPAID").Should().BeTrue();
+        Has(Svc.Validate(Ctx(refundOrPayable: 8_400m, tdsPaid: 50_000m), StubJson), "REFUND.NO_PREPAID").Should().BeFalse();
+    }
+
     // ----------------------------------------------------------------- builders
     private static ItrFilingContext Ctx(
         decimal refundOrPayable = 0m,
@@ -184,16 +206,20 @@ public class ItrBusinessRulesTests
         decimal relief90And91 = 0m,
         string stateCode = "27",
         ItrType itrType = ItrType.ITR2,
-        IReadOnlyList<CapitalGain>? gains = null)
+        IReadOnlyList<CapitalGain>? gains = null,
+        IReadOnlyList<SalaryDetail>? salaries = null,
+        IReadOnlyList<TdsEntry>? tdsEntries = null,
+        decimal tdsPaid = 0m)
         => new()
         {
             // AY2024-25 has no bundled schema → SchemaAvailable=false → no conformance noise.
-            Return = new TaxReturn { ItrType = itrType, Regime = regime, RuleSetVersion = "AY2024-25" },
+            Return = new TaxReturn { ItrType = itrType, Regime = regime, RuleSetVersion = "AY2024-25", TdsPaid = tdsPaid },
             User = new User { FullName = "Demo Taxpayer", Email = "demo@itrhelp.com", MobileE164 = "+919000000002", PanMasked = "ABCDE1234F" },
             Profile = new UserProfile { City = "Pune", StateCode = stateCode, Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
             Ay = new AssessmentYear { Code = "AY2024-25" },
             Computation = new TaxComputation { Regime = regime, GrossTotalIncome = 800_000m, TaxableIncome = 800_000m, RefundOrPayable = refundOrPayable, Relief90And91 = relief90And91 },
-            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
+            Salaries = salaries ?? new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
+            TdsEntries = tdsEntries ?? Array.Empty<TdsEntry>(),
             BankAccounts = banks ?? Array.Empty<BankAccountDetail>(),
             Deductions = deductions ?? Array.Empty<Deduction>(),
             Businesses = businesses ?? Array.Empty<BusinessIncome>(),
