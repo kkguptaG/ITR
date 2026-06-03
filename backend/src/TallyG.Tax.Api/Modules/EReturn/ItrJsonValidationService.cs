@@ -1,4 +1,6 @@
 using System.Text.Json;
+using TallyG.Tax.Api.Common;
+using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
 
 namespace TallyG.Tax.Api.Modules.EReturn;
@@ -287,11 +289,29 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- s.87A rebate eligibility cross-checks ---
+        // The 87A rebate applies only against the slab tax on NORMAL income (it never offsets tax on
+        // special-rate income: 111A STCG, 112A LTCG, 115BBH VDA, 115BB/115BBJ winnings). Warn when the
+        // computation shows a rebate and the return also has special-rate income — the user may be expecting
+        // the rebate to offset all their tax, which the portal will reject / intimation will correct.
+        static string Nature(IncomeSource s) => (TaxComputationInputFactory.ExtractNature(s.SourceMetaJson) ?? "normal").Trim().ToLowerInvariant();
+        var hasSpecialRate = ctx.Gains.Any(g => (g.TaxSection ?? string.Empty).Contains("111A")
+                                             || (g.TaxSection ?? string.Empty).Contains("112A"))
+                             || ctx.Gains.Any(g => g.AssetType == CapitalGainAssetType.CryptoVda
+                                               || (g.TaxSection ?? string.Empty).Contains("115BBH"))
+                             || ctx.OtherIncomes.Any(o => Nature(o) is "lottery_115bb" or "lottery" or "115bb"
+                                                       or "online_gaming_115bbj" or "gaming" or "115bbj");
+        if ((c?.Rebate87A ?? 0m) > 0m && hasSpecialRate)
+        {
+            Warn("TAX.87A_SPECIAL_RATE", "$..PartB_TTI.ComputationOfTaxLiability",
+                "s.87A rebate is applied, but the return includes special-rate income (111A/112A capital gains, VDA or winnings). The rebate offsets only the slab tax on normal income — it does NOT reduce tax on special-rate income.",
+                "Verify the rebate figure: tax on special-rate income (111A/112A STCG/LTCG, 115BBH VDA, 115BB/115BBJ winnings) is excluded from the rebate calculation. The engine does this correctly; check that the computation was rerun after all income was entered.");
+        }
+
         // --- virtual digital assets (s.115BBH) cross-checks ---
-        var vdaGains = ctx.Gains
-            .Where(g => g.AssetType == CapitalGainAssetType.CryptoVda
-                        || (g.TaxSection ?? string.Empty).Contains("115BBH"))
-            .ToList();
+        static bool IsVda(CapitalGain g) => g.AssetType == CapitalGainAssetType.CryptoVda
+            || (g.TaxSection ?? string.Empty).Contains("115BBH");
+        var vdaGains = ctx.Gains.Where(IsVda).ToList();
         if (vdaGains.Count > 0)
         {
             // ITR-1/ITR-4 have no Schedule VDA — VDA income forces ITR-2/3.
@@ -315,6 +335,7 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
 
             // s.115BBH allows ONLY the cost of acquisition — improvement / transfer expenses are disallowed.
             if (vdaGains.Any(g => g.CostOfImprovement > 0m || g.ExpensesOnTransfer > 0m))
+
             {
                 Warn("VDA.DEDUCTION_DISALLOWED", "$..ScheduleVDA",
                     "Cost of improvement or transfer expenses are entered against a virtual-digital-asset transfer, but s.115BBH allows only the cost of acquisition.",

@@ -156,6 +156,44 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void S87A_rebate_with_special_rate_income_warns()
+    {
+        // 87A offsets only slab tax — not 111A/112A STCG/LTCG, VDA or winnings. If the computation shows
+        // a rebate AND the return has special-rate income, the user may be relying on the rebate to offset
+        // more tax than it legally can.
+        var comp = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 400_000m, TaxableIncome = 400_000m, Rebate87A = 12_500m };
+        var cgains = new[] { new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m } };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo Taxpayer", Email = "demo@itrhelp.com", MobileE164 = "+919000000002", PanMasked = "ABCDE1234F" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = comp,
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 400_000m } },
+            Gains = cgains,
+        };
+        Has(Svc.Validate(ctx, StubJson), "TAX.87A_SPECIAL_RATE").Should().BeTrue();
+    }
+
+    [Fact]
+    public void S87A_rebate_without_special_rate_income_raises_no_87A_warning()
+    {
+        // Normal salaried return with a 87A rebate and no special-rate income → no warning.
+        var comp = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 450_000m, TaxableIncome = 375_000m, Rebate87A = 12_500m };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = comp,
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 450_000m } },
+        };
+        Has(Svc.Validate(ctx, StubJson), "TAX.87A_SPECIAL_RATE").Should().BeFalse();
+    }
+
+    [Fact]
     public void Vda_income_on_itr1_is_a_wrong_form_error()
     {
         var gains = new[] { Vda(salePrice: 500_000m, cost: 200_000m) };
