@@ -1375,6 +1375,14 @@ public sealed class ReturnService : IReturnService
         decimal deemed;
         switch (section)
         {
+            case "44AE":
+                // Goods carriage: ₹1,000 per ton per month (heavy goods vehicle > 12t) or a ₹7,500/month
+                // floor, summed across the vehicle list. Keeps the taxed income equal to the Schedule BP
+                // per-vehicle total the generator emits.
+                b.PresumptiveRatePct = 0m;
+                deemed = GoodsCarriagePresumptiveTotal(b.GoodsCarriageJson);
+                break;
+
             case "44ADA":
                 b.PresumptiveRatePct = 50m;
                 deemed = Math.Round((b.GrossReceiptsDigital + b.GrossReceiptsCash + b.Turnover) * 0.50m, 2, MidpointRounding.AwayFromZero);
@@ -1434,6 +1442,44 @@ public sealed class ReturnService : IReturnService
         b.PartnerCapital, b.SecuredLoans, b.UnsecuredLoans, b.SundryCreditors, b.FixedAssets,
         b.Inventory, b.SundryDebtors, b.BankBalance, b.CashBalance,
         string.IsNullOrWhiteSpace(b.GoodsCarriageJson) ? "[]" : b.GoodsCarriageJson);
+
+    /// <summary>
+    /// Sum the s.44AE presumptive income across a goods-carriage vehicle JSON list: ₹1,000 per ton of
+    /// gross weight per month for heavy vehicles (&gt; 12t), with a ₹7,500/month floor. Mirrors the
+    /// generator's per-vehicle math so the engine's taxed income equals the Schedule BP disclosure.
+    /// </summary>
+    private static decimal GoodsCarriagePresumptiveTotal(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Trim() is "[]" or "{}" or "")
+        {
+            return 0m;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+            {
+                return 0m;
+            }
+
+            decimal total = 0m;
+            foreach (var v in doc.RootElement.EnumerateArray())
+            {
+                var tonnage = v.TryGetProperty("tonnage", out var t) && t.TryGetDecimal(out var td) ? td : 0m;
+                var months = v.TryGetProperty("months", out var m) && m.TryGetInt32(out var mi) ? mi : 12;
+                months = Math.Clamp(months <= 0 ? 12 : months, 1, 12);
+                var perMonth = tonnage > 12m ? 1000m * tonnage : 7500m;
+                total += Math.Max(7500m, perMonth) * months;
+            }
+
+            return total;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return 0m;
+        }
+    }
 
     /// <summary>Validate/normalise the 44AE goods-carriage JSON: must parse as an array, else "[]".</summary>
     private static string NormalizeGoodsCarriage(string? json)
