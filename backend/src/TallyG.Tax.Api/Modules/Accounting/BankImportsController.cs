@@ -48,6 +48,18 @@ public sealed class BankImportsController : ControllerBase
     public Task<PostImportResponse> Post(Guid id, [FromBody] PostImportRequest? request, CancellationToken ct)
         => _imports.PostAsync(id, request ?? new PostImportRequest(), ct);
 
+    /// <summary>Push posted OtherIncome credit lines from this import onto a tax return as nature-tagged
+    /// IncomeSource rows. Idempotent: re-running updates amounts rather than creating duplicates.</summary>
+    [HttpPost("{id:guid}:push-to-return")]
+    [ProducesResponseType(typeof(PushToReturnResponse), StatusCodes.Status200OK)]
+    public async Task<PushToReturnResponse> PushToReturn(
+        Guid id, [FromQuery] Guid returnId, CancellationToken ct)
+    {
+        var count = await _imports.PushToReturnAsync(id, returnId, ct);
+        return new PushToReturnResponse(count,
+            $"Created or updated {count} income-source row{(count == 1 ? "" : "s")} on the return.");
+    }
+
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
@@ -56,3 +68,6 @@ public sealed class BankImportsController : ControllerBase
         return NoContent();
     }
 }
+
+/// <summary>Result of POST bank-imports/{id}:push-to-return.</summary>
+public sealed record PushToReturnResponse(int RowsUpserted, string Message);

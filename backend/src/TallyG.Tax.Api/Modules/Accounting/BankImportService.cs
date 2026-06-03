@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Accounting;
@@ -606,6 +607,110 @@ public sealed class BankImportService : IBankImportService
     {
         var value = (contentType ?? string.Empty).Trim();
         return value.Length == 0 ? "application/octet-stream" : value.ToLowerInvariant();
+    }
+
+    // ===================================================================== push-to-return
+
+    public async Task<int> PushToReturnAsync(Guid importId, Guid returnId, CancellationToken ct = default)
+    {
+        var import = await LoadOwnedImportAsync(importId, ct);
+
+        // Verify the return is owned by the same user.
+        var taxReturn = await _db.TaxReturns
+            .FirstOrDefaultAsync(r => r.Id == returnId && r.TenantId == _currentUser.TenantId && r.UserId == _currentUser.UserId, ct)
+            ?? throw AppException.NotFound("Tax return not found.", "RETURN.NOT_FOUND");
+
+        // Collect posted CREDIT lines whose counter-ledger is OtherIncome or SalesIncome.
+        var lines = await (
+            from l in _db.BankStatementLines
+            join v in _db.Vouchers on l.VoucherId equals v.Id
+            join led in _db.Ledgers on l.ChosenLedgerId equals led.Id
+            where l.ImportId == import.Id
+               && l.Status == BankLineStatus.Posted
+               && l.Direction == DrCr.Credit         // money into the bank = income
+               && (led.Group == LedgerGroup.OtherIncome || led.Group == LedgerGroup.SalesIncome)
+            group l by new { l.ChosenLedgerId, led.Name } into g
+            select new
+            {
+                g.Key.ChosenLedgerId,
+                LedgerName = g.Key.Name,
+                Total = g.Sum(x => x.Amount),
+            }
+        ).ToListAsync(ct);
+
+        if (lines.Count == 0)
+        {
+            return 0;
+        }
+
+        var existing = await _db.IncomeSources
+            .Where(s => s.TaxReturnId == returnId)
+            .ToListAsync(ct);
+
+        var count = 0;
+        foreach (var line in lines)
+        {
+            if (line.Total <= 0m || line.ChosenLedgerId is null)
+            {
+                continue;
+            }
+
+            var nature = LedgerNameToNature(line.LedgerName);
+            var label = line.LedgerName;
+            var sourceMeta = JsonSerializer.Serialize(new
+            {
+                nature,
+                sourceImportId = import.Id.ToString(),
+                sourceLedgerId = line.ChosenLedgerId.ToString(),
+            });
+
+            // Idempotent: match by (return, import, ledger) embedded in the source meta.
+            var row = existing.FirstOrDefault(s => s.Type == IncomeType.OtherSources
+                && s.SourceMetaJson is not null
+                && s.SourceMetaJson.Contains(line.ChosenLedgerId.ToString()!));
+
+            if (row is null)
+            {
+                row = new IncomeSource
+                {
+                    TenantId = taxReturn.TenantId,
+                    TaxReturnId = returnId,
+                    Type = IncomeType.OtherSources,
+                    Label = label,
+                    Amount = line.Total,
+                    SourceMetaJson = sourceMeta,
+                };
+                _db.IncomeSources.Add(row);
+            }
+            else
+            {
+                row.Amount = line.Total;
+                row.Label = label;
+            }
+
+            count++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return count;
+    }
+
+    /// <summary>Map a counter-ledger name to the IncomeSource nature tag the engine and Schedule OS use.</summary>
+    private static string LedgerNameToNature(string name)
+    {
+        var n = LedgerNaming.Strip(name).ToLowerInvariant();
+        if (n.Contains("saving") || n.Contains("sb interest") || n.Contains("sbint"))
+            return "savings_interest";
+        if (n.Contains("fd") || n.Contains("fixed deposit") || n.Contains("term deposit") || n.Contains("rdinterest"))
+            return "fd_interest";
+        if (n.Contains("refund interest") || n.Contains("itrefund"))
+            return "refund_interest";
+        if (n.Contains("dividend") || n.Contains("div "))
+            return "dividend";
+        // Generic interest or sales income → the broadest catch-all
+        if (n.Contains("interest"))
+            return "interest";
+        return "normal";
     }
 
     private void RequireAuthenticated()

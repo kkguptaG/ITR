@@ -27,4 +27,12 @@ public interface IBankImportService
 
     /// <summary>Soft-delete an import (blocked once any of its lines have been posted).</summary>
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Push posted OtherIncome / SalesIncome credit lines from this bank import onto a tax return as
+    /// nature-tagged IncomeSource records (savings/FD/other interest, dividend, business receipts).
+    /// Idempotent per (import, return, ledger): re-running updates amounts rather than duplicating.
+    /// Returns how many income-source rows were created or updated.
+    /// </summary>
+    Task<int> PushToReturnAsync(Guid importId, Guid returnId, CancellationToken ct = default);
 }
