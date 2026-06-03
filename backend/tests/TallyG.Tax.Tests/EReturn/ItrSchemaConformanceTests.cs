@@ -817,6 +817,48 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_pan_deductor_tds_in_scheduleTDS3()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withPanTds: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with ScheduleTDS3 must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        // The TAN-deductor row (s.194A bank interest) stays in ScheduleTDS2; the PAN-deductor row (a s.194S
+        // crypto buyer) moves to ScheduleTDS3, keyed by PANOfBuyerTenant.
+        itr2.GetProperty("ScheduleTDS2").GetProperty("TotalTDSonOthThanSals").GetInt64().Should().Be(8_000);
+        itr2.GetProperty("ScheduleTDS2").GetProperty("TDSOthThanSalaryDtls").GetArrayLength().Should().Be(1);
+
+        var tds3 = itr2.GetProperty("ScheduleTDS3");
+        tds3.GetProperty("TotalTDS3OnOthThanSal").GetInt64().Should().Be(5_000);
+        var row = tds3.GetProperty("TDS3onOthThanSalDtls")[0];
+        row.GetProperty("TDSCreditName").GetString().Should().Be("S");
+        row.GetProperty("PANOfBuyerTenant").GetString().Should().Be("ABCDE1234F");
+        row.GetProperty("TDSSection").GetString().Should().Be("94S");   // 194S → the ITD's compressed code
+        row.GetProperty("TaxDeductCreditDtls").GetProperty("TaxClaimedOwnHands").GetInt64().Should().Be(5_000);
+        // HeadOfIncome is absent from the ScheduleTDS3 item (additionalProperties:false) — must not be emitted.
+        row.TryGetProperty("HeadOfIncome", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Itr3_reports_pan_deductor_tds_in_scheduleTDS3()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withPanTds: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with ScheduleTDS3 must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleTDS3")
+            .GetProperty("TDS3onOthThanSalDtls")[0].GetProperty("PANOfBuyerTenant").GetString().Should().Be("ABCDE1234F");
+    }
+
+    [Fact]
     public void Itr3_reports_amt_with_section_split()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
@@ -1211,7 +1253,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false)
     {
         var user = new User
         {
@@ -1513,11 +1555,20 @@ public class ItrSchemaConformanceTests
                 new BankAccountDetail { BankName = "State Bank of India", AccountNumber = "30200999888", AccountType = "CA", Ifsc = "SBIN0000456", UseForRefund = false },
             },
             // Deductor-wise TDS + self-paid challans so the gate exercises the TDS schedules + Schedule IT.
-            TdsEntries = new[]
-            {
-                new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", DeductorName = "Acme Corp", IncomeOffered = 1_000_000m, TaxDeducted = 50_000m },
-                new TdsEntry { Head = TdsHead.OtherThanSalary, DeductorTan = "MUMB54321Z", DeductorName = "HDFC Bank", TdsSection = "94A", IncomeOffered = 80_000m, TaxDeducted = 8_000m },
-            },
+            // withPanTds appends a PAN-deductor row (a P2P crypto buyer who deducted 1% u/s 194S via Form 26QE)
+            // so the gate exercises ScheduleTDS3 (PANOfBuyerTenant) distinct from ScheduleTDS2 (TANOfDeductor).
+            TdsEntries = withPanTds
+                ? new[]
+                {
+                    new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", DeductorName = "Acme Corp", IncomeOffered = 1_000_000m, TaxDeducted = 50_000m },
+                    new TdsEntry { Head = TdsHead.OtherThanSalary, DeductorTan = "MUMB54321Z", DeductorName = "HDFC Bank", TdsSection = "94A", IncomeOffered = 80_000m, TaxDeducted = 8_000m },
+                    new TdsEntry { Head = TdsHead.OtherThanSalary, DeductorTan = "ABCDE1234F", DeductorName = "Rohan Buyer", TdsSection = "194S", IncomeOffered = 500_000m, TaxDeducted = 5_000m },
+                }
+                : new[]
+                {
+                    new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", DeductorName = "Acme Corp", IncomeOffered = 1_000_000m, TaxDeducted = 50_000m },
+                    new TdsEntry { Head = TdsHead.OtherThanSalary, DeductorTan = "MUMB54321Z", DeductorName = "HDFC Bank", TdsSection = "94A", IncomeOffered = 80_000m, TaxDeducted = 8_000m },
+                },
             Challans = new[]
             {
                 new TaxPaymentChallan { Kind = ChallanKind.Advance, BsrCode = "1234567", DepositDate = new DateOnly(2025, 12, 15), ChallanSerial = 12345, Amount = 15_000m },

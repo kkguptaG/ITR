@@ -3120,22 +3120,78 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddChallanSchedule(form, ctx, "ScheduleIT");
     }
 
-    /// <summary>ITR-2/ITR-3: ScheduleTDS1 + ScheduleTDS2 (detailed TDSOthThanSalaryDtls) + ScheduleIT.</summary>
+    /// <summary>ITR-2/ITR-3: ScheduleTDS1 + ScheduleTDS2/TDS3 (detailed) + ScheduleIT. A non-salary TDS row
+    /// whose deductor is identified by a PAN rather than a TAN — i.e. a buyer / tenant who deducted u/s
+    /// 194-IA (property), 194-IB (rent), 194M or 194S (P2P VDA) via Form 26QB/26QC/26QD/26QE without a TAN —
+    /// belongs in ScheduleTDS3 (PANOfBuyerTenant), not ScheduleTDS2 (TANOfDeductor).</summary>
     private static void AddTaxesPaidSchedulesDetailed(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
         AddSalaryTdsSchedule(form, ctx, "ScheduleTDS1");
+
         var oth = OtherTds(ctx);
-        if (oth.Count > 0)
+        var tanDeducted = oth.Where(t => !IsPanIdentifier(t.DeductorTan)).ToList();
+        var panDeducted = oth.Where(t => IsPanIdentifier(t.DeductorTan)).ToList();
+
+        if (tanDeducted.Count > 0)
         {
             form["ScheduleTDS2"] = new Dictionary<string, object?>
             {
-                ["TDSOthThanSalaryDtls"] = oth.Select(TdsOtherItemDetailed).ToList(),
-                ["TotalTDSonOthThanSals"] = R(oth.Sum(t => t.TaxDeducted)),
+                ["TDSOthThanSalaryDtls"] = tanDeducted.Select(TdsOtherItemDetailed).ToList(),
+                ["TotalTDSonOthThanSals"] = R(tanDeducted.Sum(t => t.TaxDeducted)),
+            };
+        }
+
+        if (panDeducted.Count > 0)
+        {
+            form["ScheduleTDS3"] = new Dictionary<string, object?>
+            {
+                ["TDS3onOthThanSalDtls"] = panDeducted.Select(TdsThirdItem).ToList(),
+                ["TotalTDS3OnOthThanSal"] = R(panDeducted.Sum(t => t.TaxDeducted)),
             };
         }
 
         AddChallanSchedule(form, ctx, "ScheduleIT");
         AddScheduleTcs(form, ctx);
+    }
+
+    // ScheduleTDS3 item: TDS deducted by a PAN-holder buyer/tenant (s.194-IA/IB/M/S, Form 26QB/QC/QD/QE).
+    // The credit-detail block mirrors TDS2's; the deductor is a PAN (PANOfBuyerTenant), and HeadOfIncome is
+    // absent from this schedule (additionalProperties:false), so it must not be emitted.
+    private static Dictionary<string, object?> TdsThirdItem(TdsEntry t) => new()
+    {
+        ["TDSCreditName"] = "S",   // S = self (own hands)
+        ["PANOfBuyerTenant"] = ValidPan(t.DeductorTan),
+        ["TDSSection"] = Tds3Section(t.TdsSection),
+        ["TaxDeductCreditDtls"] = new Dictionary<string, object?>
+        {
+            ["TaxDeductedOwnHands"] = R(t.TaxDeducted),
+            ["TaxDeductedIncome"] = R(t.IncomeOffered),
+            ["TaxDeductedTDS"] = R(t.TaxDeducted),
+            ["TaxClaimedOwnHands"] = R(t.TaxDeducted),
+            ["TaxClaimedIncome"] = R(t.IncomeOffered),
+            ["TaxClaimedTDS"] = R(t.TaxDeducted),
+        },
+        ["AmtCarriedFwd"] = 0L,
+    };
+
+    /// <summary>True when a deductor identifier is a PAN (5 letters + 4 digits + 1 letter) rather than a TAN
+    /// (4 letters + 5 digits + 1 letter) — i.e. a buyer/tenant who deducted without a TAN ⇒ ScheduleTDS3.</summary>
+    private static bool IsPanIdentifier(string? id)
+    {
+        var s = (id ?? string.Empty).Trim().ToUpperInvariant();
+        return System.Text.RegularExpressions.Regex.IsMatch(s, "^[A-Z]{5}[0-9]{4}[A-Z]$");
+    }
+
+    /// <summary>Map a captured TDS section to the ITD ScheduleTDS3 enum code: 194-IA→4IA, 194-IB→4IB,
+    /// 194M→94M, 194S→94S. Defaults to 4IA (the most common PAN-deductor case, immovable property).</summary>
+    private static string Tds3Section(string? section)
+    {
+        var s = (section ?? string.Empty).ToUpperInvariant().Replace("-", string.Empty).Replace(" ", string.Empty);
+        if (s.Contains("IA")) return "4IA";   // 194-IA — sale of immovable property
+        if (s.Contains("IB")) return "4IB";   // 194-IB — rent
+        if (s.EndsWith("M")) return "94M";    // 194M — contractor / professional
+        if (s.EndsWith("S")) return "94S";    // 194S — transfer of virtual digital assets
+        return "4IA";
     }
 
     // ----------------------------------------------------------------- Schedule TCS (tax collected at source)
