@@ -303,6 +303,17 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- house-property s.24(b) self-occupied cap check ---
+        // Interest on a self-occupied property loan is capped at ₹2,00,000 under s.24(b) (old regime)
+        // or ₹nil under the new regime. Warn when the captured interest exceeds the cap so the taxpayer
+        // doesn't expect more than ₹2L to reduce their GTI.
+        foreach (var h in ctx.Houses.Where(x => x.Type == HousePropertyType.SelfOccupied && x.InterestOnLoan > 200_000m))
+        {
+            Warn("HP.SOP_INTEREST_OVER_CAP", "$..ScheduleHP",
+                $"Self-occupied property loan interest (₹{h.InterestOnLoan:N0}) exceeds the ₹2,00,000 s.24(b) cap. Only ₹2,00,000 will be deducted.",
+                "The HP head is capped at a ₹2L loss for self-occupied properties (old regime; new regime disallows the interest altogether). The excess is non-deductible.");
+        }
+
         // --- s.87A rebate eligibility cross-checks ---
         // The 87A rebate applies only against the slab tax on NORMAL income (it never offsets tax on
         // special-rate income: 111A STCG, 112A LTCG, 115BBH VDA, 115BB/115BBJ winnings). Warn when the

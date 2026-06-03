@@ -288,6 +288,31 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Self_occupied_property_interest_over_2L_cap_warns()
+    {
+        var houses = new[] { new HouseProperty { Type = HousePropertyType.SelfOccupied, InterestOnLoan = 280_000m } };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 800_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+            Houses = houses,
+        };
+        Has(Svc.Validate(ctx, StubJson), "HP.SOP_INTEREST_OVER_CAP").Should().BeTrue();
+        // Within-cap entry should not warn.
+        var ctx2 = new ItrFilingContext
+        {
+            Return = ctx.Return, User = ctx.User, Profile = ctx.Profile, Ay = ctx.Ay, Computation = ctx.Computation,
+            Salaries = ctx.Salaries,
+            Houses = new[] { new HouseProperty { Type = HousePropertyType.SelfOccupied, InterestOnLoan = 180_000m } },
+        };
+        Has(Svc.Validate(ctx2, StubJson), "HP.SOP_INTEREST_OVER_CAP").Should().BeFalse();
+    }
+
+    [Fact]
     public void Chapter_VIA_deductions_exceeding_GTI_warn()
     {
         // GTI is ₹8L in the fixture; ₹9L of deductions can't be allowed in full (s.80A(2)).
