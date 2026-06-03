@@ -554,6 +554,31 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr3_reports_depreciation_in_scheduleDPM_DEP()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withDepreciation: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule DPM/DEP must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+
+        // 15% block: WDV 10L + 2L(≥180d)@15% + 1L(<180d)@7.5% = 1,87,500 depreciation.
+        var r15 = itr3.GetProperty("ScheduleDPM").GetProperty("PlantMachinery").GetProperty("Rate15").GetProperty("DepreciationDetail");
+        r15.GetProperty("WDVFirstDay").GetInt64().Should().Be(1_000_000);
+        r15.GetProperty("TotalDepreciation").GetInt64().Should().Be(187_500);
+        r15.GetProperty("WDVLastDay").GetInt64().Should().Be(1_112_500);
+
+        var dep = itr3.GetProperty("ScheduleDEP").GetProperty("SummaryFromDeprSch");
+        // 40% block (5L, no additions) = 2,00,000; total depreciation = 1,87,500 + 2,00,000 = 3,87,500.
+        dep.GetProperty("PlantMachinerySummary").GetProperty("DeprBlockTot40Percent").GetInt64().Should().Be(200_000);
+        dep.GetProperty("PlantMachinerySummary").GetProperty("TotPlntMach").GetInt64().Should().Be(387_500);
+        dep.GetProperty("TotalDepreciation").GetInt64().Should().Be(387_500);
+    }
+
+    [Fact]
     public void Itr3_reports_amt_with_section_split()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
@@ -948,7 +973,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false)
     {
         var user = new User
         {
@@ -1168,6 +1193,14 @@ public class ItrSchemaConformanceTests
                     new PassThroughIncome { BusinessName = "Embassy Office Parks REIT", BusinessPan = "AABCE1234R", InvestmentType = PassThroughInvestmentType.BusinessTrust115UA, Category = PassThroughIncomeCategory.LongTermCapitalGain112A, AmountOfIncome = 25_000m, TdsAmount = 0m },
                 }
                 : Array.Empty<PassThroughIncome>(),
+            // Depreciable plant & machinery blocks so the ITR-3 gate exercises Schedule DPM + DEP.
+            DepreciableAssets = withDepreciation
+                ? new[]
+                {
+                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m, AdditionsBelow180Days = 100_000m },
+                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery40, OpeningWdv = 500_000m },
+                }
+                : Array.Empty<DepreciableAsset>(),
             // Portuguese-Civil-Code spouse apportionment so the ITR-2/3 gate exercises Schedule 5A.
             SpouseApportionment = withSpouseApportionment
                 ? new SpouseIncomeApportionment { SpouseName = "Maria Fernandes", SpousePan = "ABCPF1234M", SpouseAadhaar = "789012345678" }

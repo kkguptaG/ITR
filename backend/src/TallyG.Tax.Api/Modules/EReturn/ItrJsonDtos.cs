@@ -134,6 +134,9 @@ public sealed class ItrFilingContext
     /// <summary>Portuguese-Civil-Code spouse apportionment (Schedule 5A); null unless declared.</summary>
     public SpouseIncomeApportionment? SpouseApportionment { get; init; }
 
+    /// <summary>Depreciable asset blocks (Schedule DPM / DEP); ITR-3.</summary>
+    public IReadOnlyList<DepreciableAsset> DepreciableAssets { get; init; } = Array.Empty<DepreciableAsset>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

@@ -4,6 +4,7 @@ using TallyG.Tax.Api.Modules.Accounting;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
+using TallyG.Tax.Domain.TaxEngine;
 
 namespace TallyG.Tax.Api.Modules.EReturn;
 
@@ -207,6 +208,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddSchedulePti(skel, ctx);
         AddSchedule5A(skel, ctx);
         AddScheduleAmt(skel, ctx);
+        AddScheduleDpmDep(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1551,6 +1553,84 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
     private static bool DeductionSectionContains(string? section, string token)
         => (section ?? string.Empty).Replace(" ", string.Empty).ToUpperInvariant().Contains(token);
+
+    // ----------------------------------------------------------------- Schedule DPM + DEP (depreciation)
+    // Block-of-assets depreciation on plant & machinery (s.32) for ITR-3. Each rate block (15/30/40/45%) is
+    // computed by DepreciationCalculator (full rate on opening WDV + ≥180-day additions; half rate on
+    // <180-day additions) and emitted as a DepreciationDetail; Schedule DEP summarises the block totals.
+    // This is the asset-block detail behind the books' depreciation expense (which already flows into the
+    // ITR-3 P&L / business income). Sales/transfers (deemed gains u/s 50), the Schedule DOA other-asset
+    // blocks, and unabsorbed depreciation (Schedule UD) are future additions. ITR-3 only.
+    private static void AddScheduleDpmDep(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType != ItrType.ITR3 || ctx.DepreciableAssets.Count == 0)
+        {
+            return;
+        }
+
+        var pm = new Dictionary<string, object?>();
+
+        decimal Block(string key, DepreciableAssetCategory category, decimal rate)
+        {
+            var rows = ctx.DepreciableAssets.Where(a => a.Category == category).ToList();
+            if (rows.Count == 0)
+            {
+                return 0m;
+            }
+            var d = DepreciationCalculator.Compute(
+                rows.Sum(r => r.OpeningWdv), rows.Sum(r => r.AdditionsAbove180Days), rows.Sum(r => r.AdditionsBelow180Days), rate);
+            pm[key] = new Dictionary<string, object?> { ["DepreciationDetail"] = DepreciationDetailNode(d) };
+            return d.TotalDepreciation;
+        }
+
+        var tot15 = Block("Rate15", DepreciableAssetCategory.PlantMachinery15, 0.15m);
+        var tot30 = Block("Rate30", DepreciableAssetCategory.PlantMachinery30, 0.30m);
+        var tot40 = Block("Rate40", DepreciableAssetCategory.PlantMachinery40, 0.40m);
+        var tot45 = Block("Rate45", DepreciableAssetCategory.PlantMachinery45, 0.45m);
+        if (pm.Count == 0)
+        {
+            return;
+        }
+
+        form["ScheduleDPM"] = new Dictionary<string, object?> { ["PlantMachinery"] = pm };
+
+        var totPm = tot15 + tot30 + tot40 + tot45;
+        form["ScheduleDEP"] = new Dictionary<string, object?>
+        {
+            ["SummaryFromDeprSch"] = new Dictionary<string, object?>
+            {
+                ["PlantMachinerySummary"] = new Dictionary<string, object?>
+                {
+                    ["DeprBlockTot15Percent"] = R(tot15),
+                    ["DeprBlockTot30Percent"] = R(tot30),
+                    ["DeprBlockTot40Percent"] = R(tot40),
+                    ["DeprBlockTot45Percent"] = R(tot45),
+                    ["TotPlntMach"] = R(totPm),
+                },
+                ["TotalDepreciation"] = R(totPm),
+            },
+        };
+    }
+
+    private static Dictionary<string, object?> DepreciationDetailNode(DepreciationCalculator.BlockDepreciation d) => new()
+    {
+        ["WDVFirstDay"] = R(d.OpeningWdv),
+        ["AdditionsGrThan180Days"] = R(d.AdditionsAbove180),
+        ["AdditionsLessThan180Days"] = R(d.AdditionsBelow180),
+        ["RealizationTotalPeriod"] = 0L,
+        ["RealizationPeriodLessThan180days"] = 0L,
+        ["FullRateDeprAmt"] = R(d.FullRateBase),
+        ["HalfRateDeprAmt"] = R(d.HalfRateBase),
+        ["DepreciationAtFullRate"] = R(d.DepreciationAtFullRate),
+        ["DepreciationAtHalfRate"] = R(d.DepreciationAtHalfRate),
+        ["TotalDepreciation"] = R(d.TotalDepreciation),
+        ["DepDisAllowUs38_2"] = 0L,
+        ["NetAggregateDepreciation"] = R(d.TotalDepreciation),
+        ["ProportionateAggDepreciation"] = R(d.TotalDepreciation),
+        ["ExpdrOnTrforSaleAsset"] = 0L,
+        ["CapGainUs50"] = 0L,
+        ["WDVLastDay"] = R(d.ClosingWdv),
+    };
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
