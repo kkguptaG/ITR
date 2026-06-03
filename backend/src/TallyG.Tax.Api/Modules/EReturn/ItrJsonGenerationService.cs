@@ -2260,7 +2260,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     /// that concession is applied later (Schedule SI), and the engine now sets off on gross too, so they
     /// reconcile. 112A equity acquired on/before 31-Jan-2018 uses the grandfathered cost (s.55(2)(ac)).
     /// </summary>
-    private readonly record struct CgSetOff(decimal ShortGain, decimal LongGrossGain, decimal StclSetOffLtcg, decimal LongGainAfterSetoff);
+    private readonly record struct CgSetOff(decimal ShortGain, decimal LongGrossGain, decimal StclSetOffLtcg, decimal LongGainAfterSetoff, decimal ResidualStcl);
 
     private static CgSetOff ComputeCgSetOff(IReadOnlyList<CapitalGain> gains)
     {
@@ -2282,7 +2282,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var longGross = Math.Max(0m, longNet);
         var residualStcl = Math.Max(0m, -shortNet);              // net STCL remaining after the intra-short set-off
         var stclSetOffLtcg = Math.Min(residualStcl, longGross);  // s.70(2): residual STCL → LTCG
-        return new CgSetOff(shortGain, longGross, stclSetOffLtcg, longGross - stclSetOffLtcg);
+        return new CgSetOff(shortGain, longGross, stclSetOffLtcg, longGross - stclSetOffLtcg, residualStcl);
     }
 
     /// <summary>s.112A grandfathering cutoff — shares acquired before this date qualify (i.e. on/before 31-Jan-2018).</summary>

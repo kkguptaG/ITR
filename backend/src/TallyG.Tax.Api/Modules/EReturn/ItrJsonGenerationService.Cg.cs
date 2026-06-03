@@ -68,12 +68,18 @@ public sealed partial class ItrJsonGenerationService
                 }
             }
 
-            var b = D(D(skel["CurrYrLosses"])["InLtcg12_5Per"]);
+            var losses = D(skel["CurrYrLosses"]);
+            var b = D(losses["InLtcg12_5Per"]);
             b["CurrYearIncome"] = R(cg.LongGrossGain);
             if (cg.StclSetOffLtcg > 0m)
             {
-                // A net short-term capital loss set off against this LTCG (s.70(2)).
+                // A net short-term capital loss set off against this LTCG (s.70(2)). Reflect it in both the
+                // LTCG bucket and the matrix's summary rows so the set-off table stays internally consistent:
+                // loss available (InLossSetOff) = loss set off (TotLossSetOff) + loss remaining (LossRemainSetOff).
                 b[stclSetoffColumn] = R(cg.StclSetOffLtcg);
+                D(losses["InLossSetOff"])[stclSetoffColumn] = R(cg.ResidualStcl);
+                D(losses["TotLossSetOff"])[stclSetoffColumn] = R(cg.StclSetOffLtcg);
+                D(losses["LossRemainSetOff"])[stclSetoffColumn] = R(cg.ResidualStcl - cg.StclSetOffLtcg);
             }
 
             b["CurrYrCapGain"] = R(cgLong);

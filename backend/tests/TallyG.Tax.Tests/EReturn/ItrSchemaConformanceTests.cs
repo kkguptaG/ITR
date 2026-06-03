@@ -739,6 +739,12 @@ public class ItrSchemaConformanceTests
         ltLosses.GetProperty("CurrYrCapGain").GetInt64().Should().Be(130_000);
         cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(200_000);
         cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(130_000);
+
+        // The set-off matrix's summary rows reconcile: loss available = loss set off + loss remaining.
+        var curr = cg.GetProperty("CurrYrLosses");
+        curr.GetProperty("InLossSetOff").GetProperty("StclSetoff20Per").GetInt64().Should().Be(70_000);   // STCL available
+        curr.GetProperty("TotLossSetOff").GetProperty("StclSetoff20Per").GetInt64().Should().Be(70_000);  // fully set off against the 2L LTCG
+        curr.GetProperty("LossRemainSetOff").GetProperty("StclSetoff20Per").GetInt64().Should().Be(0);     // nothing carries forward
     }
 
     [Fact]
