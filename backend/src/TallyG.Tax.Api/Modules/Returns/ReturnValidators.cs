@@ -120,6 +120,20 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
     }
 }
 
+public sealed class UpsertCapitalGainBuyerRequestValidator : AbstractValidator<UpsertCapitalGainBuyerRequest>
+{
+    public UpsertCapitalGainBuyerRequestValidator()
+    {
+        RuleFor(x => x.BuyerName).NotEmpty().MaximumLength(75);
+        RuleFor(x => x.PercentageShare).InclusiveBetween(0m, 100m);
+        RuleFor(x => x.Amount).InclusiveBetween(0m, 99_999_999_999_999m);
+        RuleFor(x => x.AddressOfProperty).NotEmpty().MaximumLength(50);
+        RuleFor(x => x.StateCode).NotEmpty();
+        RuleFor(x => x).Must(x => !string.IsNullOrWhiteSpace(x.BuyerPan) || !string.IsNullOrWhiteSpace(x.BuyerAadhaar))
+            .WithMessage("Provide the buyer's PAN or Aadhaar (s.194-IA).");
+    }
+}
+
 public sealed class UpsertBusinessIncomeRequestValidator : AbstractValidator<UpsertBusinessIncomeRequest>
 {
     private static readonly string[] PresumptiveSections = { "44AD", "44ADA", "44AE" };

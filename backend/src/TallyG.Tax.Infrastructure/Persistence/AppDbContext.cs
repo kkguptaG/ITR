@@ -68,6 +68,7 @@ public class AppDbContext : DbContext
     public DbSet<SpouseIncomeApportionment> SpouseIncomeApportionments => Set<SpouseIncomeApportionment>();
     public DbSet<DepreciableAsset> DepreciableAssets => Set<DepreciableAsset>();
     public DbSet<UnabsorbedDepreciation> UnabsorbedDepreciations => Set<UnabsorbedDepreciation>();
+    public DbSet<CapitalGainBuyer> CapitalGainBuyers => Set<CapitalGainBuyer>();
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();
 

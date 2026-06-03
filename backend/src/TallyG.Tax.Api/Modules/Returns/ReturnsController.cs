@@ -176,6 +176,26 @@ public sealed class ReturnsController : ControllerBase
         return NoContent();
     }
 
+    // ------------------------------------------------------------- immovable-property buyers (s.194-IA)
+
+    [HttpGet("{id:guid}/capital-gains/{gainId:guid}/buyers")]
+    [ProducesResponseType(typeof(IReadOnlyList<CapitalGainBuyerDto>), StatusCodes.Status200OK)]
+    public Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyers(Guid id, Guid gainId, CancellationToken ct)
+        => _returns.ListCapitalGainBuyersAsync(id, gainId, ct);
+
+    [HttpPost("{id:guid}/capital-gains/{gainId:guid}/buyers")]
+    [ProducesResponseType(typeof(CapitalGainBuyerDto), StatusCodes.Status200OK)]
+    public Task<CapitalGainBuyerDto> AddCapitalGainBuyer(Guid id, Guid gainId, [FromBody] UpsertCapitalGainBuyerRequest request, CancellationToken ct)
+        => _returns.AddCapitalGainBuyerAsync(id, gainId, request, ct);
+
+    [HttpDelete("{id:guid}/capital-gains/{gainId:guid}/buyers/{buyerId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteCapitalGainBuyer(Guid id, Guid gainId, Guid buyerId, CancellationToken ct)
+    {
+        await _returns.DeleteCapitalGainBuyerAsync(id, gainId, buyerId, ct);
+        return NoContent();
+    }
+
     // ------------------------------------------------------------- business income
 
     [HttpGet("{id:guid}/business-income")]

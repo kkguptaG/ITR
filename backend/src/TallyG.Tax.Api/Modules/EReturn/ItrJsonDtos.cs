@@ -65,6 +65,7 @@ public sealed class ItrFilingContext
     public IReadOnlyList<SalaryDetail> Salaries { get; init; } = Array.Empty<SalaryDetail>();
     public IReadOnlyList<HouseProperty> Houses { get; init; } = Array.Empty<HouseProperty>();
     public IReadOnlyList<CapitalGain> Gains { get; init; } = Array.Empty<CapitalGain>();
+    public IReadOnlyList<CapitalGainBuyer> CapitalGainBuyers { get; init; } = Array.Empty<CapitalGainBuyer>();
     public IReadOnlyList<BusinessIncome> Businesses { get; init; } = Array.Empty<BusinessIncome>();
     public IReadOnlyList<IncomeSource> OtherIncomes { get; init; } = Array.Empty<IncomeSource>();
     public IReadOnlyList<Deduction> Deductions { get; init; } = Array.Empty<Deduction>();

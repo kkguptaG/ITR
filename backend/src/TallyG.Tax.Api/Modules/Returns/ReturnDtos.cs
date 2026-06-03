@@ -201,6 +201,30 @@ public sealed record CapitalGainDto(
     string? Isin,
     decimal FairMarketValue31Jan2018);
 
+// ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
+
+public sealed record UpsertCapitalGainBuyerRequest(
+    string BuyerName,
+    string? BuyerPan,
+    string? BuyerAadhaar,
+    decimal PercentageShare,
+    decimal Amount,
+    string AddressOfProperty,
+    string StateCode,
+    int PinCode);
+
+public sealed record CapitalGainBuyerDto(
+    Guid Id,
+    Guid CapitalGainId,
+    string BuyerName,
+    string? BuyerPan,
+    string? BuyerAadhaar,
+    decimal PercentageShare,
+    decimal Amount,
+    string AddressOfProperty,
+    string StateCode,
+    int PinCode);
+
 // ----------------------------------------------------------------- business income
 
 public sealed record UpsertBusinessIncomeRequest(

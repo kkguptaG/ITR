@@ -164,6 +164,46 @@ public sealed partial class ItrJsonGenerationService
         var stcgRows = new List<Dictionary<string, object?>>();
         var ltcgRows = new List<Dictionary<string, object?>>();
         var ltcgNetTotal = 0m;
+
+        // Per-buyer s.194-IA detail (TrnsfImmblPrprty) — attached to a property row when buyers were captured.
+        // Optional in the schema, so absent when no buyers exist.
+        void AttachBuyers(Dictionary<string, object?> row, CapitalGain gain)
+        {
+            var buyers = ctx.CapitalGainBuyers.Where(x => x.CapitalGainId == gain.Id).ToList();
+            if (buyers.Count == 0)
+            {
+                return;
+            }
+
+            var buyerRows = new List<Dictionary<string, object?>>();
+            foreach (var b in buyers)
+            {
+                var br = new Dictionary<string, object?>
+                {
+                    ["NameOfBuyer"] = Trunc((b.BuyerName ?? string.Empty).Trim(), 75),
+                    ["PercentageShare"] = b.PercentageShare,
+                    ["Amount"] = R(b.Amount),
+                    ["AddressOfProperty"] = Trunc((b.AddressOfProperty ?? string.Empty).Trim(), 50),
+                    ["StateCode"] = b.StateCode,
+                    ["CountryCode"] = "91",
+                    ["PinCode"] = (long)b.PinCode,
+                };
+                var pan = (b.BuyerPan ?? string.Empty).Trim().ToUpperInvariant();
+                if (System.Text.RegularExpressions.Regex.IsMatch(pan, "^[A-Z]{5}[0-9]{4}[A-Z]$"))
+                {
+                    br["PANofBuyer"] = pan;
+                }
+                else if (!string.IsNullOrWhiteSpace(b.BuyerAadhaar))
+                {
+                    br["AaadhaarOfBuyer"] = b.BuyerAadhaar.Trim();
+                }
+
+                buyerRows.Add(br);
+            }
+
+            row["TrnsfImmblPrprty"] = new Dictionary<string, object?> { ["TrnsfImmblPrprtyDtls"] = buyerRows };
+        }
+
         foreach (var g in props)
         {
             var sale = Math.Max(0m, g.SalePrice);
@@ -177,7 +217,7 @@ public sealed partial class ItrJsonGenerationService
 
             if (g.Term == CapitalGainTerm.Short)
             {
-                stcgRows.Add(new Dictionary<string, object?>
+                var row = new Dictionary<string, object?>
                 {
                     ["FullConsideration"] = R(sale),
                     ["PropertyValuation"] = R(sale),
@@ -189,13 +229,15 @@ public sealed partial class ItrJsonGenerationService
                     ["Balance"] = R(balance),
                     ["DeductionUs54B"] = R(exemption),
                     ["STCGonImmvblPrprty"] = R(net),
-                });
+                };
+                AttachBuyers(row, g);
+                stcgRows.Add(row);
             }
             else
             {
                 // Improvement is folded into the (non-indexed) acquisition-cost line — the LTCG item has no
                 // separate required improvement leaf — so TotalDedn = AquisitCostIndex + ExpOnTrans stays exact.
-                ltcgRows.Add(new Dictionary<string, object?>
+                var row = new Dictionary<string, object?>
                 {
                     ["FullConsideration"] = R(sale),
                     ["PropertyValuation"] = R(sale),
@@ -207,7 +249,9 @@ public sealed partial class ItrJsonGenerationService
                     ["Balance"] = R(balance),
                     ["ExemptionOrDednUs54"] = new Dictionary<string, object?> { ["ExemptionGrandTotal"] = R(exemption) },
                     ["LTCGonImmvblPrprty"] = R(net),
-                });
+                };
+                AttachBuyers(row, g);
+                ltcgRows.Add(row);
                 ltcgNetTotal += net;
             }
         }

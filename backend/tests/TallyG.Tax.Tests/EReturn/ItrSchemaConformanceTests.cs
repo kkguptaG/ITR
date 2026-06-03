@@ -20,6 +20,9 @@ public class ItrSchemaConformanceTests
 {
     private readonly ItrJsonGenerationService _gen = new();
 
+    // Fixed id so a withPropertySale buyer can be linked to the long-term immovable-property gain.
+    private static readonly Guid PropertyLtcgGainId = new("a1a1a1a1-1111-4111-8111-111111111111");
+
     private static string Format(SchemaValidationResult r)
         => string.Join("\n", r.Errors.Select(e => $"{e.Path} :: {e.Kind} ({e.Property})"));
 
@@ -665,6 +668,12 @@ public class ItrSchemaConformanceTests
         lt.GetProperty("ExemptionOrDednUs54").GetProperty("ExemptionGrandTotal").GetInt64().Should().Be(1_000_000);
         lt.GetProperty("LTCGonImmvblPrprty").GetInt64().Should().Be(4_300_000);
 
+        // The s.194-IA buyer detail (TrnsfImmblPrprty) on the long-term property sale.
+        var buyer = lt.GetProperty("TrnsfImmblPrprty").GetProperty("TrnsfImmblPrprtyDtls")[0];
+        buyer.GetProperty("NameOfBuyer").GetString().Should().Be("Riya Buyer");
+        buyer.GetProperty("PANofBuyer").GetString().Should().Be("ABCDE1234F");
+        buyer.GetProperty("Amount").GetInt64().Should().Be(10_000_000);
+
         // The per-transaction net gains tie to the rate-bucket headline totals.
         cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(1_700_000);
         cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(4_300_000);
@@ -1170,7 +1179,7 @@ public class ItrSchemaConformanceTests
                     // and a long-term sale u/s 112 (sale ₹1Cr − cost ₹40L − improvement ₹5L − expenses ₹2L −
                     // ₹10L s.54 exemption = ₹43L) so the gate exercises Schedule CG SaleofLandBuild.
                     new CapitalGain { AssetType = CapitalGainAssetType.ImmovableProperty, Term = CapitalGainTerm.Short, SalePrice = 5_000_000m, CostOfAcquisition = 3_000_000m, CostOfImprovement = 200_000m, ExpensesOnTransfer = 100_000m },
-                    new CapitalGain { AssetType = CapitalGainAssetType.ImmovableProperty, Term = CapitalGainTerm.Long, TaxSection = "112", SalePrice = 10_000_000m, CostOfAcquisition = 4_000_000m, CostOfImprovement = 500_000m, ExpensesOnTransfer = 200_000m, ExemptionAmount = 1_000_000m },
+                    new CapitalGain { Id = PropertyLtcgGainId, AssetType = CapitalGainAssetType.ImmovableProperty, Term = CapitalGainTerm.Long, TaxSection = "112", SalePrice = 10_000_000m, CostOfAcquisition = 4_000_000m, CostOfImprovement = 500_000m, ExpensesOnTransfer = 200_000m, ExemptionAmount = 1_000_000m },
                 }
                 : withGrandfathering
                 ? new[]
@@ -1202,6 +1211,13 @@ public class ItrSchemaConformanceTests
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m, Isin = "INE002A01018" },
                 }
                 : Array.Empty<CapitalGain>(),
+            // A s.194-IA buyer on the long-term property sale so the gate exercises Schedule CG TrnsfImmblPrprty.
+            CapitalGainBuyers = withPropertySale
+                ? new[]
+                {
+                    new CapitalGainBuyer { CapitalGainId = PropertyLtcgGainId, BuyerName = "Riya Buyer", BuyerPan = "ABCDE1234F", PercentageShare = 100m, Amount = 10_000_000m, AddressOfProperty = "14 Hill Road, Bandra", StateCode = "27", PinCode = 400050 },
+                }
+                : Array.Empty<CapitalGainBuyer>(),
             // Chapter VI-A deductions so the ITR-2/3 gate exercises the itemised Schedule VIA.
             Deductions = withDeductions
                 ? new[]

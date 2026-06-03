@@ -606,6 +606,62 @@ public sealed class ReturnService : IReturnService
         await MarkInProgressAndSaveAsync(ret, ct);
     }
 
+    // =========================================================== immovable-property buyers (s.194-IA)
+
+    public async Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default)
+    {
+        await LoadOwnedReturnAsync(id, ct);
+        return await _db.CapitalGainBuyers
+            .Where(b => b.TaxReturnId == id && b.CapitalGainId == gainId)
+            .Select(b => ToCapitalGainBuyerDto(b))
+            .ToListAsync(ct);
+    }
+
+    public async Task<CapitalGainBuyerDto> AddCapitalGainBuyerAsync(Guid id, Guid gainId, UpsertCapitalGainBuyerRequest request, CancellationToken ct = default)
+    {
+        var ret = await LoadOwnedReturnAsync(id, ct);
+        EnsureMutable(ret);
+
+        var gain = await _db.CapitalGains.FirstOrDefaultAsync(c => c.Id == gainId && c.TaxReturnId == id, ct)
+                   ?? throw AppException.NotFound("Capital gain not found.", "RETURN.CG_NOT_FOUND");
+
+        var entity = new CapitalGainBuyer
+        {
+            TenantId = ret.TenantId,
+            UserId = ret.UserId,
+            TaxReturnId = ret.Id,
+            CapitalGainId = gain.Id,
+            BuyerName = request.BuyerName.Trim(),
+            BuyerPan = request.BuyerPan?.Trim(),
+            BuyerAadhaar = request.BuyerAadhaar?.Trim(),
+            PercentageShare = request.PercentageShare,
+            Amount = request.Amount,
+            AddressOfProperty = request.AddressOfProperty.Trim(),
+            StateCode = request.StateCode.Trim(),
+            PinCode = request.PinCode,
+        };
+        _db.CapitalGainBuyers.Add(entity);
+        await MarkInProgressAndSaveAsync(ret, ct);
+        return ToCapitalGainBuyerDto(entity);
+    }
+
+    public async Task DeleteCapitalGainBuyerAsync(Guid id, Guid gainId, Guid buyerId, CancellationToken ct = default)
+    {
+        var ret = await LoadOwnedReturnAsync(id, ct);
+        EnsureMutable(ret);
+
+        var entity = await _db.CapitalGainBuyers.FirstOrDefaultAsync(
+                         b => b.Id == buyerId && b.CapitalGainId == gainId && b.TaxReturnId == id, ct)
+                     ?? throw AppException.NotFound("Property buyer not found.", "RETURN.CG_BUYER_NOT_FOUND");
+
+        _db.CapitalGainBuyers.Remove(entity);
+        await MarkInProgressAndSaveAsync(ret, ct);
+    }
+
+    private static CapitalGainBuyerDto ToCapitalGainBuyerDto(CapitalGainBuyer b) => new(
+        b.Id, b.CapitalGainId, b.BuyerName, b.BuyerPan, b.BuyerAadhaar, b.PercentageShare, b.Amount,
+        b.AddressOfProperty, b.StateCode, b.PinCode);
+
     // =========================================================== business income
 
     public async Task<IReadOnlyList<BusinessIncomeDto>> ListBusinessIncomesAsync(Guid id, CancellationToken ct = default)
