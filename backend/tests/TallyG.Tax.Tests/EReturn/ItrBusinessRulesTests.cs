@@ -40,6 +40,15 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void New_regime_with_hra_exemption_warns_it_is_silently_dropped()
+    {
+        // Under the new regime, s.10(13A) HRA is disallowed — the engine drops it but users may not notice.
+        var newRegimeSalaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m, HraExemption = 120_000m } };
+        Has(Svc.Validate(Ctx(regime: Regime.New, salaries: newRegimeSalaries), StubJson), "REGIME.HRA_IGNORED").Should().BeTrue();
+        Has(Svc.Validate(Ctx(regime: Regime.Old, salaries: newRegimeSalaries), StubJson), "REGIME.HRA_IGNORED").Should().BeFalse();
+    }
+
+    [Fact]
     public void New_regime_disallowed_deductions_are_flagged_and_old_regime_is_not()
     {
         var ded = new[] { Deduct("80C", 100_000m), Deduct("80CCD(2)", 40_000m) };

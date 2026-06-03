@@ -120,8 +120,22 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "The portal expects at least one bank account even when no refund is due — add one in Settings → Bank accounts.");
         }
 
-        // --- regime ⇄ deduction interlock: most Chapter VI-A deductions vanish under the new regime ---
+        // --- regime ⇄ deduction interlock + new-regime income exemption disallowances ---
         var regime = ctx.Return.Regime ?? c?.Regime;
+
+        // s.10(13A) HRA exemption is disallowed under the new regime. The engine silently drops it —
+        // warn so the taxpayer understands the computation and can reconsider the regime choice.
+        if (regime == Regime.New)
+        {
+            var hraTotal = ctx.Salaries.Sum(s => s.HraExemption);
+            if (hraTotal > 0m)
+            {
+                Warn("REGIME.HRA_IGNORED", "$..AllwncExtentExemptUs10",
+                    $"₹{hraTotal:N0} of HRA exemption is entered but the new regime does NOT allow s.10(13A) HRA — it has been silently excluded from the computation.",
+                    "Either switch to the old regime (Regime step) if HRA + Chapter VI-A deductions save more, or accept the new regime and remove the HRA exemption to avoid confusion.");
+            }
+        }
+
         if (regime == Regime.New)
         {
             var disallowed = ctx.Deductions
