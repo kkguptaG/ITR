@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using TallyG.Tax.Api.Common;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Entities;
@@ -406,6 +407,7 @@ public sealed class DocumentService : IDocumentService
         TaxReturn taxReturn, Document document, IReadOnlyDictionary<string, StoredField> fields, CancellationToken ct)
     {
         var incomeByType = new Dictionary<IncomeType, (decimal Amount, string Label)>();
+        var otherByNature = new Dictionary<string, (decimal Amount, string Label)>();
         var deductionBySection = new Dictionary<string, decimal>();
 
         foreach (var (key, field) in fields)
@@ -425,13 +427,24 @@ public sealed class DocumentService : IDocumentService
                     Accumulate(incomeByType, IncomeType.Salary, amount, "Salary");
                     break;
 
-                // ---- interest / other sources ----
+                // ---- other sources: kept as separate nature-tagged rows so Schedule OS itemises them and
+                // the AIS/26AS reconciliation matches them head-by-head (not lumped into one untagged row). ----
                 case "ais.interest_savings_bank":
-                case "ais.interest_term_deposit":
                 case "bank.interest_savings_bank":
+                    AccumulateOther(otherByNature, "savings_interest", amount, "Interest — savings bank");
+                    break;
+                case "ais.interest_term_deposit":
                 case "bank.interest_fixed_deposit":
+                    AccumulateOther(otherByNature, "fd_interest", amount, "Interest — term deposit");
+                    break;
+                case "ais.interest_others":
+                    AccumulateOther(otherByNature, "interest", amount, "Interest — other");
+                    break;
+                case "ais.interest_income_tax_refund":
+                    AccumulateOther(otherByNature, "refund_interest", amount, "Interest on income-tax refund");
+                    break;
                 case "ais.dividend_income":
-                    Accumulate(incomeByType, IncomeType.OtherSources, amount, "Interest & other income");
+                    AccumulateOther(otherByNature, "dividend", amount, "Dividend");
                     break;
 
                 // ---- capital gains ----
@@ -461,6 +474,7 @@ public sealed class DocumentService : IDocumentService
         }
 
         var income = await UpsertIncomeSourcesAsync(taxReturn, document, incomeByType, ct);
+        income += await UpsertOtherIncomeByNatureAsync(taxReturn, document, otherByNature, ct);
         var deductions = await UpsertDeductionsAsync(taxReturn, document, deductionBySection, ct);
 
         // Form 16 carries a full salary breakup + salary TDS — map it onto a SalaryDetail (+ a deductor-wise
@@ -581,6 +595,51 @@ public sealed class DocumentService : IDocumentService
         return count;
     }
 
+    /// <summary>Upsert one OtherSources income row per nature (savings/fd/other/refund interest, dividend),
+    /// tagged with the nature in SourceMetaJson so Schedule OS itemises it and the reconciliation matches it.
+    /// Idempotent per (document, nature).</summary>
+    private async Task<int> UpsertOtherIncomeByNatureAsync(
+        TaxReturn taxReturn, Document document, Dictionary<string, (decimal Amount, string Label)> otherByNature, CancellationToken ct)
+    {
+        if (otherByNature.Count == 0)
+        {
+            return 0;
+        }
+
+        var existing = await _db.IncomeSources
+            .Where(s => s.TaxReturnId == taxReturn.Id && s.Type == IncomeType.OtherSources)
+            .ToListAsync(ct);
+
+        var count = 0;
+        foreach (var (nature, value) in otherByNature)
+        {
+            var row = existing.FirstOrDefault(s => SourceDocumentId(s.SourceMetaJson) == document.Id
+                && string.Equals(TaxComputationInputFactory.ExtractNature(s.SourceMetaJson), nature, StringComparison.OrdinalIgnoreCase));
+            if (row is null)
+            {
+                row = new IncomeSource
+                {
+                    TenantId = taxReturn.TenantId,
+                    TaxReturnId = taxReturn.Id,
+                    Type = IncomeType.OtherSources,
+                    Label = value.Label,
+                    Amount = value.Amount,
+                    SourceMetaJson = BuildSourceMeta(document.Id, document.Kind, nature)
+                };
+                _db.IncomeSources.Add(row);
+            }
+            else
+            {
+                row.Amount = value.Amount;
+                row.Label = value.Label;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
     private async Task<int> UpsertDeductionsAsync(
         TaxReturn taxReturn, Document document, Dictionary<string, decimal> deductionBySection, CancellationToken ct)
     {
@@ -631,6 +690,19 @@ public sealed class DocumentService : IDocumentService
         else
         {
             map[type] = (amount, label);
+        }
+    }
+
+    private static void AccumulateOther(
+        Dictionary<string, (decimal Amount, string Label)> map, string nature, decimal amount, string label)
+    {
+        if (map.TryGetValue(nature, out var current))
+        {
+            map[nature] = (current.Amount + amount, current.Label);
+        }
+        else
+        {
+            map[nature] = (amount, label);
         }
     }
 
@@ -836,6 +908,9 @@ public sealed class DocumentService : IDocumentService
 
     private static string BuildSourceMeta(Guid documentId, DocumentKind kind)
         => JsonSerializer.Serialize(new { sourceDocumentId = documentId, sourceKind = kind.ToString() }, JsonOptions);
+
+    private static string BuildSourceMeta(Guid documentId, DocumentKind kind, string nature)
+        => JsonSerializer.Serialize(new { sourceDocumentId = documentId, sourceKind = kind.ToString(), nature }, JsonOptions);
 
     private static Guid? SourceDocumentId(string sourceMetaJson)
     {
