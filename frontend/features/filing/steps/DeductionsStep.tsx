@@ -106,7 +106,14 @@ export function DeductionsStep() {
             <Spinner label={t('loadingRecommendations')} />
           </div>
         ) : recsQuery.data ? (
-          <DeductionRecommendations data={recsQuery.data} />
+          <DeductionRecommendations
+            data={recsQuery.data}
+            onClaim={(section, gapToInvest) =>
+              void deductions.addMutation
+                .mutateAsync({ section, amount: Math.round(gapToInvest), description: `Claimed via advisor` })
+                .then(() => void recsQuery.refetch())
+            }
+          />
         ) : null}
       </WizardStep>
 

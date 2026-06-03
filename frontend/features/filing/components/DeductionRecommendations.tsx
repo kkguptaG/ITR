@@ -7,12 +7,19 @@
 // ---------------------------------------------------------------------------
 
 import { useTranslations } from 'next-intl';
-import { Sparkles, TrendingUp } from 'lucide-react';
-import { Alert, Badge, Card } from '@/components/ui';
+import { Sparkles, TrendingUp, Plus } from 'lucide-react';
+import { Alert, Badge, Button, Card } from '@/components/ui';
 import { formatInr } from '@/lib/format';
 import type { RecommendationsResponse } from '../types';
 
-export function DeductionRecommendations({ data }: { data: RecommendationsResponse }) {
+export function DeductionRecommendations({
+  data,
+  onClaim,
+}: {
+  data: RecommendationsResponse;
+  /** Called with the section code when the user taps "Claim". */
+  onClaim?: (section: string, amount: number) => void;
+}) {
   const t = useTranslations('wizard');
 
   return (
@@ -52,12 +59,23 @@ export function DeductionRecommendations({ data }: { data: RecommendationsRespon
                   })}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <div className="inline-flex items-center gap-1 text-money-700">
                   <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                   <span className="text-sm font-semibold tabular-nums">{formatInr(s.marginalTaxSaved)}</span>
                 </div>
                 <div className="text-[11px] text-ink-400">{t('taxSaved')}</div>
+                {onClaim && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onClaim(s.section, s.gapToInvest)}
+                  >
+                    <Plus className="h-3 w-3" aria-hidden="true" />
+                    Claim
+                  </Button>
+                )}
               </div>
             </li>
           ))}
