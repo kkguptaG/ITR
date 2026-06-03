@@ -27,5 +27,9 @@ public class DepreciableAsset : BaseEntity, ITenantScoped
     /// <summary>Additions put to use for less than 180 days (eligible for half the rate this year).</summary>
     public decimal AdditionsBelow180Days { get; set; }
 
+    /// <summary>Sale proceeds (money received) on assets of the block transferred during the year. When
+    /// these exceed the block's value the excess is a deemed short-term capital gain u/s 50.</summary>
+    public decimal SaleProceeds { get; set; }
+
     public TaxReturn? TaxReturn { get; set; }
 }

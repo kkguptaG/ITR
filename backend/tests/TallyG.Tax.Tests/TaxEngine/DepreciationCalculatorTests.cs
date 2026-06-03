@@ -32,4 +32,26 @@ public class DepreciationCalculatorTests
         d.TotalDepreciation.Should().Be(200_000m);   // 5L × 40%
         d.ClosingWdv.Should().Be(300_000m);
     }
+
+    [Fact]
+    public void Sale_below_block_value_reduces_the_base_with_no_deemed_gain()
+    {
+        // WDV 10L, sale proceeds 3L → depreciation on 7L @ 15%; no deemed gain; block continues.
+        var d = DepreciationCalculator.Compute(1_000_000m, 0m, 0m, 0.15m, saleProceeds: 300_000m);
+
+        d.DeemedCapitalGain.Should().Be(0m);
+        d.TotalDepreciation.Should().Be(105_000m);   // 7L × 15%
+        d.ClosingWdv.Should().Be(595_000m);          // 7L − 1,05,000
+    }
+
+    [Fact]
+    public void Sale_exceeding_the_block_yields_a_deemed_short_term_gain_us_50()
+    {
+        // WDV 10L (+2L additions = 12L block), sold for 15L → block ceases, deemed STCG ₹3L, no depreciation.
+        var d = DepreciationCalculator.Compute(1_000_000m, 200_000m, 0m, 0.15m, saleProceeds: 1_500_000m);
+
+        d.DeemedCapitalGain.Should().Be(300_000m);   // 15L − 12L
+        d.TotalDepreciation.Should().Be(0m);
+        d.ClosingWdv.Should().Be(0m);
+    }
 }

@@ -45,6 +45,7 @@ public sealed class DepreciableAssetService : IDepreciableAssetService
             OpeningWdv = Clamp(r.OpeningWdv),
             AdditionsAbove180Days = Clamp(r.AdditionsAbove180Days),
             AdditionsBelow180Days = Clamp(r.AdditionsBelow180Days),
+            SaleProceeds = Clamp(r.SaleProceeds),
         };
         _db.DepreciableAssets.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -82,5 +83,5 @@ public sealed class DepreciableAssetService : IDepreciableAssetService
     private static decimal Clamp(decimal v) => Math.Clamp(v, 0m, 99_999_999_999_999m);
 
     private static DepreciableAssetDto ToDto(DepreciableAsset a) => new(
-        a.Id, a.Category, a.OpeningWdv, a.AdditionsAbove180Days, a.AdditionsBelow180Days);
+        a.Id, a.Category, a.OpeningWdv, a.AdditionsAbove180Days, a.AdditionsBelow180Days, a.SaleProceeds);
 }

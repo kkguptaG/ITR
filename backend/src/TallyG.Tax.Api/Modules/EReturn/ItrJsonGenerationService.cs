@@ -1568,8 +1568,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             return;
         }
 
-        // Build a rate block's DepreciationDetail node + its total depreciation (null when the block is empty).
-        (Dictionary<string, object?> Detail, decimal Total)? Block(DepreciableAssetCategory category, decimal rate)
+        // Build a rate block's DepreciationDetail node + its depreciation total + deemed CG (null when empty).
+        (Dictionary<string, object?> Detail, decimal Total, decimal Deemed)? Block(DepreciableAssetCategory category, decimal rate)
         {
             var rows = ctx.DepreciableAssets.Where(a => a.Category == category).ToList();
             if (rows.Count == 0)
@@ -1577,9 +1577,10 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 return null;
             }
             var d = DepreciationCalculator.Compute(
-                rows.Sum(r => r.OpeningWdv), rows.Sum(r => r.AdditionsAbove180Days), rows.Sum(r => r.AdditionsBelow180Days), rate);
+                rows.Sum(r => r.OpeningWdv), rows.Sum(r => r.AdditionsAbove180Days),
+                rows.Sum(r => r.AdditionsBelow180Days), rate, rows.Sum(r => r.SaleProceeds));
             // The rate-block node wraps the detail: { DepreciationDetail: { … } }.
-            return (new Dictionary<string, object?> { ["DepreciationDetail"] = DepreciationDetailNode(d) }, d.TotalDepreciation);
+            return (new Dictionary<string, object?> { ["DepreciationDetail"] = DepreciationDetailNode(d) }, d.TotalDepreciation, d.DeemedCapitalGain);
         }
 
         var pm15 = Block(DepreciableAssetCategory.PlantMachinery15, 0.15m);
@@ -1593,7 +1594,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var intang = Block(DepreciableAssetCategory.IntangibleAssets25, 0.25m);
         var ships = Block(DepreciableAssetCategory.Ships20, 0.20m);
 
-        static decimal T((Dictionary<string, object?> Detail, decimal Total)? b) => b?.Total ?? 0m;
+        static decimal T((Dictionary<string, object?> Detail, decimal Total, decimal Deemed)? b) => b?.Total ?? 0m;
+        static decimal G((Dictionary<string, object?> Detail, decimal Total, decimal Deemed)? b) => b?.Deemed ?? 0m;
 
         // --- Schedule DPM (plant & machinery) ---
         var pm = new Dictionary<string, object?>();
@@ -1660,6 +1662,48 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         summary["TotalDepreciation"] = R(pmTot + bldTot + furnTot + intTot + shipTot);
 
         form["ScheduleDEP"] = new Dictionary<string, object?> { ["SummaryFromDeprSch"] = summary };
+
+        // --- Schedule DCG (deemed capital gains u/s 50 on block sales) — same structure as DEP, but the
+        // per-block values are the deemed STCG (proceeds exceeding the block). Emitted only when one exists.
+        // NOTE: the deemed gain is disclosed here + in each block's CapGainUs50; feeding it into Schedule CG
+        // and the tax (so it's actually taxed) is a documented follow-up — a validation rule reminds the
+        // filer to report it under Capital Gains in the meantime.
+        var pmGain = G(pm15) + G(pm30) + G(pm40) + G(pm45);
+        var bldGain = G(bd5) + G(bd10) + G(bd40);
+        var furnGain = G(furn);
+        var intGain = G(intang);
+        var shipGain = G(ships);
+        var totalGain = pmGain + bldGain + furnGain + intGain + shipGain;
+        if (totalGain > 0m)
+        {
+            var cgSummary = new Dictionary<string, object?>
+            {
+                ["PlantMachinerySummaryCG"] = new Dictionary<string, object?>
+                {
+                    ["DeprBlockTot15Percent"] = R(G(pm15)),
+                    ["DeprBlockTot30Percent"] = R(G(pm30)),
+                    ["DeprBlockTot40Percent"] = R(G(pm40)),
+                    ["DeprBlockTot45Percent"] = R(G(pm45)),
+                    ["TotPlntMach"] = R(pmGain),
+                },
+                ["TotalDepreciation"] = R(totalGain),
+            };
+            if (building.Count > 0 || bldGain > 0m)
+            {
+                cgSummary["BuildingSummaryCG"] = new Dictionary<string, object?>
+                {
+                    ["DeprBlockTot5Percent"] = R(G(bd5)),
+                    ["DeprBlockTot10Percent"] = R(G(bd10)),
+                    ["DeprBlockTot40Percent"] = R(G(bd40)),
+                    ["TotBuildng"] = R(bldGain),
+                };
+            }
+            if (furn is not null) cgSummary["FurnitureSummary"] = R(furnGain);
+            if (intang is not null) cgSummary["IntangibleAssetSummary"] = R(intGain);
+            if (ships is not null) cgSummary["ShipsSummary"] = R(shipGain);
+
+            form["ScheduleDCG"] = new Dictionary<string, object?> { ["SummaryFromDeprSchCG"] = cgSummary };
+        }
     }
 
     private static Dictionary<string, object?> DepreciationDetailNode(DepreciationCalculator.BlockDepreciation d) => new()
@@ -1667,18 +1711,18 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["WDVFirstDay"] = R(d.OpeningWdv),
         ["AdditionsGrThan180Days"] = R(d.AdditionsAbove180),
         ["AdditionsLessThan180Days"] = R(d.AdditionsBelow180),
-        ["RealizationTotalPeriod"] = 0L,
         ["RealizationPeriodLessThan180days"] = 0L,
         ["FullRateDeprAmt"] = R(d.FullRateBase),
         ["HalfRateDeprAmt"] = R(d.HalfRateBase),
         ["DepreciationAtFullRate"] = R(d.DepreciationAtFullRate),
         ["DepreciationAtHalfRate"] = R(d.DepreciationAtHalfRate),
         ["TotalDepreciation"] = R(d.TotalDepreciation),
+        ["RealizationTotalPeriod"] = R(d.SaleProceeds),
         ["DepDisAllowUs38_2"] = 0L,
         ["NetAggregateDepreciation"] = R(d.TotalDepreciation),
         ["ProportionateAggDepreciation"] = R(d.TotalDepreciation),
         ["ExpdrOnTrforSaleAsset"] = 0L,
-        ["CapGainUs50"] = 0L,
+        ["CapGainUs50"] = R(d.DeemedCapitalGain),
         ["WDVLastDay"] = R(d.ClosingWdv),
     };
 

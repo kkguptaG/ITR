@@ -37,7 +37,7 @@ const CATEGORIES: { value: DepreciableAssetCategory; label: string }[] = [
 const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label])) as Record<DepreciableAssetCategory, string>;
 
 const EMPTY: UpsertDepreciableAssetBody = {
-  category: 'PlantMachinery15', openingWdv: 0, additionsAbove180Days: 0, additionsBelow180Days: 0,
+  category: 'PlantMachinery15', openingWdv: 0, additionsAbove180Days: 0, additionsBelow180Days: 0, saleProceeds: 0,
 };
 
 export function DepreciationCard({ returnId, editable }: { returnId: string; editable: boolean }) {
@@ -135,6 +135,7 @@ export function DepreciationCard({ returnId, editable }: { returnId: string; edi
                   <Field label="Opening WDV (₹)"><Controller control={control} name="openingWdv" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} /></Field>
                   <Field label="Additions — used ≥180 days (₹)"><Controller control={control} name="additionsAbove180Days" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} /></Field>
                   <Field label="Additions — used <180 days (₹)" hint="Half-rate this year"><Controller control={control} name="additionsBelow180Days" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} /></Field>
+                  <Field label="Sale proceeds (₹)" hint="Money received on assets sold this year; an excess over the block is a deemed gain"><Controller control={control} name="saleProceeds" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} /></Field>
                 </div>
                 {addMut.isError ? <Alert variant="error">Could not add. Enter an opening WDV or additions.</Alert> : null}
                 <div className="flex justify-end gap-2">

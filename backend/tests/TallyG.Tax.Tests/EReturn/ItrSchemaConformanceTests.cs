@@ -581,8 +581,18 @@ public class ItrSchemaConformanceTests
         dep.GetProperty("PlantMachinerySummary").GetProperty("DeprBlockTot40Percent").GetInt64().Should().Be(200_000);
         dep.GetProperty("PlantMachinerySummary").GetProperty("TotPlntMach").GetInt64().Should().Be(387_500);
         dep.GetProperty("BuildingSummary").GetProperty("DeprBlockTot10Percent").GetInt64().Should().Be(200_000);
-        // Grand total = P&M 3,87,500 + building 2,00,000 = 5,87,500.
+        // Grand total = P&M 3,87,500 + building 2,00,000 = 5,87,500 (the ceased 30% block depreciates to nil).
         dep.GetProperty("TotalDepreciation").GetInt64().Should().Be(587_500);
+
+        // Schedule DCG: the 30% block sold for ₹6L (value ₹4L) → deemed STCG ₹2,00,000 u/s 50.
+        var dcg = itr3.GetProperty("ScheduleDCG").GetProperty("SummaryFromDeprSchCG");
+        dcg.GetProperty("PlantMachinerySummaryCG").GetProperty("DeprBlockTot30Percent").GetInt64().Should().Be(200_000);
+        dcg.GetProperty("TotalDepreciation").GetInt64().Should().Be(200_000);
+        // The block detail carries the deemed gain (CapGainUs50) + the realization, and depreciates to nil.
+        var r30 = itr3.GetProperty("ScheduleDPM").GetProperty("PlantMachinery").GetProperty("Rate30").GetProperty("DepreciationDetail");
+        r30.GetProperty("CapGainUs50").GetInt64().Should().Be(200_000);
+        r30.GetProperty("RealizationTotalPeriod").GetInt64().Should().Be(600_000);
+        r30.GetProperty("TotalDepreciation").GetInt64().Should().Be(0);
     }
 
     [Fact]
@@ -1207,6 +1217,8 @@ public class ItrSchemaConformanceTests
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m, AdditionsBelow180Days = 100_000m },
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery40, OpeningWdv = 500_000m },
                     new DepreciableAsset { Category = DepreciableAssetCategory.Building10, OpeningWdv = 2_000_000m },
+                    // A 30% block (₹4L) sold for ₹6L → block ceases: deemed STCG ₹2L (Schedule DCG), no depreciation.
+                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery30, OpeningWdv = 400_000m, SaleProceeds = 600_000m },
                 }
                 : Array.Empty<DepreciableAsset>(),
             // Portuguese-Civil-Code spouse apportionment so the ITR-2/3 gate exercises Schedule 5A.

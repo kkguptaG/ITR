@@ -18,6 +18,7 @@ export interface DepreciableAssetDto {
   openingWdv: number;
   additionsAbove180Days: number;
   additionsBelow180Days: number;
+  saleProceeds: number;
 }
 
 export interface UpsertDepreciableAssetBody {
@@ -25,4 +26,5 @@ export interface UpsertDepreciableAssetBody {
   openingWdv: number;
   additionsAbove180Days: number;
   additionsBelow180Days: number;
+  saleProceeds: number;
 }
