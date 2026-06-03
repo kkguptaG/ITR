@@ -45,6 +45,24 @@ public class DeductionRecommenderTests
     }
 
     [Fact]
+    public void Recommends_80TTB_not_80TTA_for_a_senior_citizen()
+    {
+        var seniorInput = RuleSetFixture.Salaried(1_500_000m, age: 65);
+        var r = DeductionRecommender.Recommend(_engine, seniorInput);
+        r.Suggestions.Should().Contain(s => s.Section == "80TTB", "seniors get the ₹50k 80TTB cap");
+        r.Suggestions.Should().NotContain(s => s.Section == "80TTA", "80TTA is not available to seniors");
+    }
+
+    [Fact]
+    public void Recommends_80TTA_not_80TTB_for_a_non_senior()
+    {
+        var youngInput = RuleSetFixture.Salaried(1_500_000m, age: 35);
+        var r = DeductionRecommender.Recommend(_engine, youngInput);
+        r.Suggestions.Should().Contain(s => s.Section == "80TTA");
+        r.Suggestions.Should().NotContain(s => s.Section == "80TTB", "80TTB is for seniors only");
+    }
+
+    [Fact]
     public void Does_not_recommend_80GG_at_high_income_because_10pct_floor_eliminates_the_deduction()
     {
         // 80GG = min(₹5k/month, 25% income, actual_rent − 10% income). At ₹10L gross the taxable income

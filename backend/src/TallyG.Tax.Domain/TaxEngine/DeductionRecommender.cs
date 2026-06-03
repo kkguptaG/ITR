@@ -52,6 +52,31 @@ public static class DeductionRecommender
             "Fill s.80C via PPF", used80C, caps.Section80C,
             lockInYears: 15, liquidity: 0.2m, utilityNote: "15-yr lock-in; sovereign-backed, tax-free.");
 
+        // 80TTA / 80TTB interest deduction — mutually exclusive; age-aware.
+        // Under-60: 80TTA (savings interest only, ₹10k). Senior ≥60: 80TTB (savings + deposits, ₹50k).
+        // Advise the APPLICABLE one; skip if the wrong one was already claimed (let the validation warn about it).
+        var used80TTA = used.GetValueOrDefault("80TTA");
+        var used80TTB = used.GetValueOrDefault("80TTB");
+        if (input.Age >= 60)
+        {
+            // Senior: offer 80TTB only (80TTA is not available for seniors).
+            if (used80TTA <= 0m)   // only offer if they haven't already misused 80TTA (handled by validation)
+            {
+                AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80TTB",
+                    "Interest income deduction (s.80TTB, senior ≥60)", used80TTB,
+                    caps.Section80Ttb, lockInYears: 0, liquidity: 1.0m,
+                    utilityNote: "Seniors can deduct up to ₹50,000 on savings + term-deposit + recurring-deposit interest — far more than 80TTA's ₹10,000.");
+            }
+        }
+        else
+        {
+            // Below 60: offer 80TTA (savings interest only, ₹10k).
+            AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80TTA",
+                "Savings bank interest deduction (s.80TTA)", used80TTA,
+                caps.Section80Tta, lockInYears: 0, liquidity: 1.0m,
+                utilityNote: "Deduct up to ₹10,000 of savings-bank interest from your taxable income — claim it only for savings account interest (not FD/RD).");
+        }
+
         // 80EEA — first-time affordable-housing loan interest (₹1.5L over and above 80C), commonly missed.
         // Only applicable when no house property is owned (self-occupied) + loan before Mar 2022; offer it
         // whenever no 80EEA is already claimed and there is a house on the return.
@@ -179,6 +204,8 @@ public static class DeductionRecommender
             "80EEA" => "80EEA",
             "80EEB" => "80EEB",
             "80GG" => "80GG",
+            "80TTA" => "80TTA",
+            "80TTB" => "80TTB",
             _ => s,
         };
     }
