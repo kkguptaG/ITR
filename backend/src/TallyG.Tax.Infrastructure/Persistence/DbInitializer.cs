@@ -50,6 +50,7 @@ public static class DbInitializer
         await SeedDemoItr2ReturnAsync(db, ct);
         await SeedDemoItr3ReturnAsync(db, ct);
         await SeedDemoItr2Ay2026ReturnAsync(db, ct);   // AY2026-27 current-year demo
+        await SeedDemoItr4Ay2026ReturnAsync(db, ct);   // AY2026-27 Sugam presumptive demo
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Database seed complete (idempotent).");
@@ -649,6 +650,67 @@ public static class DbInitializer
             TotalTax = 1_141_816m,
             TdsPaid = 1_000_000m,
             RefundOrPayable = -141_816m,     // tax due
+        });
+    }
+
+    /// <summary>
+    /// An AY2026-27 ITR-4 (Sugam) presumptive demo: a 44AD small-business with the full Schedule BP —
+    /// nature code, the 6%/8% digital-vs-cash split, and a balanced "FinanclPartclrOfBusiness" no-account
+    /// balance sheet. Exercises the new ITR-4 Schedule BP end-to-end.
+    /// </summary>
+    private static async Task SeedDemoItr4Ay2026ReturnAsync(AppDbContext db, CancellationToken ct)
+    {
+        var returnId = StableId("return:demo:itr4:AY2026-27");
+        if (await db.TaxReturns.AnyAsync(r => r.Id == returnId, ct))
+        {
+            return;
+        }
+
+        db.TaxReturns.Add(new TaxReturn
+        {
+            Id = returnId, TenantId = RetailTenantId, UserId = DemoUserId, AssessmentYearId = Ay2026Id,
+            ItrType = ItrType.ITR4, Regime = Regime.New, Status = ReturnStatus.ComputedReady,
+            RuleSetVersion = SeedRuleSet.Ay2026Version,
+        });
+
+        // 44AD: ₹2.4Cr turnover, all digital → presumptive income 6% = ₹14,40,000.
+        // Financial particulars balance: capital ₹20L + creditors ₹2L = ₹22L liabilities;
+        // fixed assets ₹8L + stock ₹5L + debtors ₹3L + bank ₹4L + cash ₹2L = ₹22L assets.
+        db.BusinessIncomes.Add(new BusinessIncome
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId,
+            IsPresumptive = true, PresumptiveSection = "44AD", NatureOfBusinessCode = "09028",
+            AccountingMethod = "noaccount",
+            Turnover = 24_000_000m, GrossReceiptsDigital = 24_000_000m, GrossReceiptsCash = 0m,
+            NetProfit = 1_440_000m, GstTurnoverReported = 24_000_000m,
+            PartnerCapital = 2_000_000m, SundryCreditors = 200_000m,
+            FixedAssets = 800_000m, Inventory = 500_000m, SundryDebtors = 300_000m,
+            BankBalance = 400_000m, CashBalance = 200_000m,
+        });
+
+        db.IncomeSources.Add(new IncomeSource
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources,
+            Label = "SBI savings interest", Amount = 10_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}",
+        });
+
+        db.BankAccountDetails.Add(new BankAccountDetail
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId,
+            BankName = "ICICI Bank", AccountNumber = "60100111222333", AccountType = "SB",
+            Ifsc = "ICIC0000456", UseForRefund = true,
+        });
+
+        // GTI = ₹14,40,000 (business) + ₹10,000 (interest) = ₹14,50,000.
+        // AY2026-27 new regime: nil→₹4L + 5%×₹4L (20k) + 10%×₹4L (40k) + 15%×₹2.5L (37,500) = ₹97,500
+        //   + 4% cess (₹3,900) = ₹1,01,400. No prepaid tax → ₹1,01,400 payable.
+        db.TaxComputations.Add(new TaxComputation
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId,
+            Regime = Regime.New, IsRecommended = true,
+            GrossTotalIncome = 1_450_000m, TotalDeductions = 0m, TaxableIncome = 1_450_000m,
+            TaxBeforeCess = 97_500m, Surcharge = 0m, Cess = 3_900m, TotalTax = 1_01_400m,
+            RefundOrPayable = -1_01_400m,
         });
     }
 
