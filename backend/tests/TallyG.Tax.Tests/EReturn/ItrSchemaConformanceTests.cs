@@ -347,6 +347,14 @@ public class ItrSchemaConformanceTests
         firm.GetProperty("FirmCapBalOn31Mar").GetInt64().Should().Be(1_500_000);
         sif.GetProperty("TotalProfitShareAmt").GetInt64().Should().Be(800_000);
         sif.GetProperty("TotalFirmCapBalOn31Mar").GetInt64().Should().Be(1_500_000);
+
+        // The exempt profit share (s.10(2A)) must also surface in Schedule EI's Others.
+        var ei = itr3.GetProperty("ScheduleEI");
+        ei.GetProperty("Others").GetInt64().Should().BeGreaterThanOrEqualTo(800_000);
+        var otherRows = ei.GetProperty("OthersInc").GetProperty("OthersIncDtls");
+        var hasFirmShare = otherRows.EnumerateArray().Any(r =>
+            r.GetProperty("OthNatOfInc").GetString()!.Contains("Share of profit from firm"));
+        hasFirmShare.Should().BeTrue("the partner's s.10(2A) profit share is disclosed in Schedule EI");
     }
 
     [Fact]

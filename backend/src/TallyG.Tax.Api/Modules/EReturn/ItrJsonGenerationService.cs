@@ -1203,7 +1203,13 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     // on ITR-2 but ABSENT from the ITR-3 schema (additionalProperties:false forbids it), so it is ITR-2-only.
     private static void AddScheduleEI(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
-        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || ctx.ExemptIncomes.Count == 0)
+        // The partner's share of firm profit is exempt u/s 10(2A) and disclosed in Schedule EI (ITR-3).
+        var firmProfitShare = ctx.ItrType == ItrType.ITR3
+            ? ctx.FirmInterestsAL.Sum(f => Math.Max(0m, f.ProfitShareAmount))
+            : 0m;
+
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3)
+            || (ctx.ExemptIncomes.Count == 0 && firmProfitShare <= 0m))
         {
             return;
         }
@@ -1211,6 +1217,18 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         decimal interest = 0m, grossAgri = 0m, others = 0m;
         var otherRows = new List<Dictionary<string, object?>>();
         var agriDistricts = new List<Dictionary<string, object?>>();
+
+        // Partner's exempt share of firm profit (s.10(2A)) → an "Others" disclosure line.
+        if (firmProfitShare > 0m)
+        {
+            others += firmProfitShare;
+            otherRows.Add(new Dictionary<string, object?>
+            {
+                ["NatureDesc"] = "OTH",
+                ["OthNatOfInc"] = "Share of profit from firm (s.10(2A))",
+                ["OthAmount"] = R(firmProfitShare),
+            });
+        }
 
         foreach (var e in ctx.ExemptIncomes)
         {
