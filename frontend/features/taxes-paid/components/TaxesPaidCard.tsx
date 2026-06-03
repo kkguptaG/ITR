@@ -42,11 +42,14 @@ import {
   taxesPaidKeys,
 } from '../api';
 
-const TAN_RE = /^[A-Z]{4}[0-9]{5}[A-Z]$/;
+const TAN_RE = /^[A-Z]{4}[0-9]{5}[A-Z]$/;       // 4L+5D+1L — standard TAN (Form 16A deductors with a TAN)
+const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;       // 5L+4D+1L — buyer/tenant PAN (s.194-IA/IB/M/S Form 26QB/QC/QD/QE)
+const TAN_OR_PAN_RE = /^[A-Z]{4,5}[0-9]{4,5}[A-Z]$/;  // accepts both patterns
 const BSR_RE = /^[0-9]{3}[0-9A-Z]{4}$/;
 
 // A small, valid subset of the schema's TDS-section enum for non-salary TDS.
-const TDS_SECTIONS = ['94A', '194', '94C', '94J-B', '195'] as const;
+// Includes the PAN-deductor sections (194-IA/IB/M/S) — users enter the buyer/tenant PAN as the TAN.
+const TDS_SECTIONS = ['94A', '194', '94C', '94J-B', '195', '4IA', '4IB', '94M', '94S'] as const;
 
 export function TaxesPaidCard({ returnId, editable }: { returnId: string; editable: boolean }) {
   const t = useTranslations('taxesPaid');
@@ -327,7 +330,10 @@ const tdsSchema = z
     deductorTan: z
       .string()
       .trim()
-      .regex(TAN_RE, 'Enter a valid 10-character TAN (e.g. DELH12345A).'),
+      .min(10)
+      .max(10)
+      .regex(TAN_OR_PAN_RE,
+        "Enter a TAN (DELH12345A) or, for buyer TDS (194-IA/194S), the buyer's PAN (ABCDE1234F)."),
     tdsSection: z.string().optional(),
     incomeOffered: z.coerce.number().min(0),
     taxDeducted: z.coerce.number().min(0),
@@ -395,11 +401,15 @@ function AddTdsForm({ returnId, onDone, onSaved }: { returnId: string; onDone: (
       <Field label={t('deductorName')} error={errors.deductorName?.message}>
         <Input {...register('deductorName')} placeholder={t('deductorNamePh')} maxLength={125} />
       </Field>
-      <Field label={t('tan')} error={errors.deductorTan?.message}>
+      <Field
+        label="TAN / PAN of deductor"
+        hint="Use TAN for regular TDS. For property buyer (194-IA) or crypto buyer (194S) TDS via Form 26QB/26QE, enter the buyer's PAN."
+        error={errors.deductorTan?.message}
+      >
         <Input
           {...tanReg}
           onChange={(e) => { e.target.value = e.target.value.toUpperCase(); void tanReg.onChange(e); }}
-          placeholder="DELH12345A"
+          placeholder="DELH12345A  or  ABCDE1234F"
           className="font-mono tracking-wide"
           maxLength={10}
         />
