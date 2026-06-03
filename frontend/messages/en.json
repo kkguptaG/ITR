@@ -794,6 +794,7 @@
     "pageSubtitle": "Answers to common questions about filing with TallyG Tax.",
     "group": {
       "filing": "Filing your return",
+      "income": "Special income & tax situations",
       "documents": "Documents & uploads",
       "payments": "Payments & invoices",
       "security": "Security & privacy"
@@ -814,6 +815,22 @@
       "editAfterFile": {
         "q": "Can I change my return after filing?",
         "a": "Once filed, a return can’t be edited, but you can file a revised return within the allowed window if you spot a mistake."
+      },
+      "cryptoVda": {
+        "q": "How do I report cryptocurrency / crypto gains?",
+        "a": "Under s.115BBH every crypto or NFT sale is taxed at a flat 30% — only the cost of acquisition can be deducted, no expense or exemption is allowed, and a loss cannot be set off against any other income. Add each trade as a capital gain with asset type 'Crypto/VDA' in the Income step; the app will emit the mandatory Schedule VDA and route it to ITR-2 or ITR-3."
+      },
+      "salaryArrears": {
+        "q": "I received salary / pension arrears — will I pay extra tax?",
+        "a": "Arrears bunched into one year can push you into a higher slab. s.89(1) provides relief: use the Form 10E calculator on this page (scroll down) to estimate how much of the extra tax is forgiven. File Form 10E on the income-tax portal before claiming the relief in your return."
+      },
+      "advanceTax": {
+        "q": "Do I need to pay advance tax?",
+        "a": "Yes, if your total tax after TDS/TCS credit exceeds ₹10,000 you must pay in quarterly instalments (by 15 Jun/15 Sep/15 Dec/15 Mar). If you miss or underpay, s.234B and s.234C interest applies at 1% per month on the shortfall. Add your advance-tax challans in the Summary step."
+      },
+      "aisReconciliation": {
+        "q": "What is the AIS/26AS reconciliation and why does it matter?",
+        "a": "The Income Tax Department's AIS (Annual Information Statement) and Form 26AS record every income and tax credit reported for your PAN. If your return under-reports income relative to what the department knows, you'll get a §143(1) mismatch notice. Upload your AIS and Form 26AS in the Documents step; the app cross-checks your return and flags gaps before you file."
       },
       "form16": {
         "q": "How do I use my Form 16?",

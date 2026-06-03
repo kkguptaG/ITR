@@ -18,6 +18,10 @@ export const faqGroups: FaqGroup[] = [
     ids: ['whichItr', 'regime', 'documentsNeeded', 'editAfterFile'],
   },
   {
+    titleKey: 'income',
+    ids: ['cryptoVda', 'salaryArrears', 'advanceTax', 'aisReconciliation'],
+  },
+  {
     titleKey: 'documents',
     ids: ['form16', 'uploadSafe', 'extractionWrong'],
   },
