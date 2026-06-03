@@ -17,6 +17,7 @@ import {
 } from '@/components/ui';
 import { faqGroups } from '@/features/help/faqs';
 import { FaqItem } from '@/features/help/components/FaqItem';
+import { Form10ECard } from '@/features/help/components/Form10ECard';
 
 export default function HelpPage() {
   const t = useTranslations('help');
@@ -53,6 +54,8 @@ export default function HelpPage() {
 
         {/* Contact rail */}
         <div className="space-y-6">
+          <Form10ECard />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
