@@ -96,6 +96,7 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
         </div>
         <div className="py-1.5">
           <Line label={t('tdsPaid')} value={comp.tdsPaid} tone="subtract" />
+          {comp.tcsPaid > 0 && <Line label="TCS credit (26AS)" value={comp.tcsPaid} tone="subtract" />}
           {comp.advanceTax > 0 && <Line label={t('advanceTax')} value={comp.advanceTax} tone="subtract" />}
         </div>
       </div>

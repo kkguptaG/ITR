@@ -115,6 +115,7 @@ public sealed record TaxComputationResultDto(
     decimal Cess,
     decimal TotalTax,
     decimal TdsPaid,
+    decimal TcsPaid,
     decimal AdvanceTax,
     decimal InterestPenalty,
     decimal Interest234A,

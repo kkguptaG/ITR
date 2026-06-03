@@ -202,6 +202,7 @@ public sealed record ComputationResult
     public decimal TotalTax { get; init; }
 
     public decimal TdsPaid { get; init; }
+    public decimal TcsPaid { get; init; }
     public decimal AdvanceTax { get; init; }
     public decimal InterestPenalty { get; init; }
 

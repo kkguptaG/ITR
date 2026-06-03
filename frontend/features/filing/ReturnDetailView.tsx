@@ -186,6 +186,7 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     cess: num(c.cess),
     totalTax: num(c.totalTax),
     tdsPaid: num(c.tdsPaid),
+    tcsPaid: 0,   // TcsPaid is on TaxReturn not TaxComputation; shown separately in TaxesPaidCard
     advanceTax: num(c.advanceTax),
     interestPenalty: num(c.interestPenalty),
     interest234A: num(c.interest234A),

@@ -259,6 +259,7 @@ export interface TaxComputationResultDto {
   cess: number;
   totalTax: number;
   tdsPaid: number;
+  tcsPaid: number;
   advanceTax: number;
   interestPenalty: number;
   interest234A: number;

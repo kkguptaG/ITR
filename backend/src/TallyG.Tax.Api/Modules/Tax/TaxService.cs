@@ -389,6 +389,7 @@ public sealed class TaxService : ITaxService
             r.Cess,
             r.TotalTax,
             r.TdsPaid,
+            r.TcsPaid,
             r.AdvanceTax,
             r.InterestPenalty,
             r.Interest234A,
