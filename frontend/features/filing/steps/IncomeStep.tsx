@@ -54,6 +54,24 @@ import {
   SalaryForm,
 } from '../components/income-forms';
 import { OTHER_INCOME_NATURES } from '../schemas';
+import type { GoodsCarriageVehicle } from '../schemas';
+
+/** Parse the stored goodsCarriageJson into a vehicle array the form can edit (tolerant of bad data). */
+function parseGoodsCarriage(json: string | null | undefined): GoodsCarriageVehicle[] {
+  if (!json) return [];
+  try {
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((v) => ({
+      regNo: typeof v.regNo === 'string' ? v.regNo : '',
+      ownership: v.ownership === 'LEASE' || v.ownership === 'HIRED' ? v.ownership : 'OWN',
+      tonnage: Number(v.tonnage) || 0,
+      months: Number(v.months) || 12,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export function IncomeStep() {
   const t = useTranslations('wizard');
@@ -296,19 +314,36 @@ export function IncomeStep() {
                       ? {
                           isPresumptive: item.isPresumptive,
                           presumptiveSection: (item.presumptiveSection as '44AD' | '44ADA' | '44AE') ?? '44AD',
+                          natureOfBusinessCode: item.natureOfBusinessCode ?? '',
                           turnover: item.turnover,
                           grossReceiptsDigital: item.grossReceiptsDigital,
                           grossReceiptsCash: item.grossReceiptsCash,
                           netProfit: item.netProfit,
                           speculativeFlag: item.speculativeFlag,
                           gstTurnoverReported: item.gstTurnoverReported,
+                          partnerCapital: item.partnerCapital,
+                          securedLoans: item.securedLoans,
+                          unsecuredLoans: item.unsecuredLoans,
+                          sundryCreditors: item.sundryCreditors,
+                          fixedAssets: item.fixedAssets,
+                          inventory: item.inventory,
+                          sundryDebtors: item.sundryDebtors,
+                          bankBalance: item.bankBalance,
+                          cashBalance: item.cashBalance,
+                          goodsCarriage: parseGoodsCarriage(item.goodsCarriageJson),
                         }
                       : undefined
                   }
                   loading={business.addMutation.isPending || business.updateMutation.isPending}
                   onCancel={done}
                   onSubmit={(v) => {
-                    const body = { ...v, presumptiveSection: v.isPresumptive ? v.presumptiveSection : null };
+                    // Fold the vehicle array into goodsCarriageJson; drop the array from the request body.
+                    const { goodsCarriage, ...rest } = v;
+                    const body = {
+                      ...rest,
+                      presumptiveSection: v.isPresumptive ? v.presumptiveSection : null,
+                      goodsCarriageJson: JSON.stringify(goodsCarriage ?? []),
+                    };
                     const op = item
                       ? business.updateMutation.mutateAsync({ id: item.id, body })
                       : business.addMutation.mutateAsync(body);

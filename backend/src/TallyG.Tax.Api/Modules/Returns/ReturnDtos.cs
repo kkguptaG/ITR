@@ -239,7 +239,19 @@ public sealed record UpsertBusinessIncomeRequest(
     decimal GrossReceiptsCash,
     decimal NetProfit,
     bool SpeculativeFlag,
-    decimal GstTurnoverReported);
+    decimal GstTurnoverReported,
+    // Financial particulars of business (ITR-4 Sugam no-account case / ITR-3 books) — all optional.
+    decimal PartnerCapital = 0m,
+    decimal SecuredLoans = 0m,
+    decimal UnsecuredLoans = 0m,
+    decimal SundryCreditors = 0m,
+    decimal FixedAssets = 0m,
+    decimal Inventory = 0m,
+    decimal SundryDebtors = 0m,
+    decimal BankBalance = 0m,
+    decimal CashBalance = 0m,
+    // 44AE goods-carriage vehicles (JSON list); null/blank → unchanged.
+    string? GoodsCarriageJson = null);
 
 public sealed record BusinessIncomeDto(
     Guid Id,
@@ -253,7 +265,17 @@ public sealed record BusinessIncomeDto(
     decimal PresumptiveRatePct,
     decimal NetProfit,
     bool SpeculativeFlag,
-    decimal GstTurnoverReported);
+    decimal GstTurnoverReported,
+    decimal PartnerCapital = 0m,
+    decimal SecuredLoans = 0m,
+    decimal UnsecuredLoans = 0m,
+    decimal SundryCreditors = 0m,
+    decimal FixedAssets = 0m,
+    decimal Inventory = 0m,
+    decimal SundryDebtors = 0m,
+    decimal BankBalance = 0m,
+    decimal CashBalance = 0m,
+    string GoodsCarriageJson = "[]");
 
 // ----------------------------------------------------------------- deductions
 

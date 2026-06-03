@@ -697,7 +697,17 @@ public sealed class ReturnService : IReturnService
             GrossReceiptsCash = request.GrossReceiptsCash,
             NetProfit = request.NetProfit,
             SpeculativeFlag = request.SpeculativeFlag,
-            GstTurnoverReported = request.GstTurnoverReported
+            GstTurnoverReported = request.GstTurnoverReported,
+            PartnerCapital = request.PartnerCapital,
+            SecuredLoans = request.SecuredLoans,
+            UnsecuredLoans = request.UnsecuredLoans,
+            SundryCreditors = request.SundryCreditors,
+            FixedAssets = request.FixedAssets,
+            Inventory = request.Inventory,
+            SundryDebtors = request.SundryDebtors,
+            BankBalance = request.BankBalance,
+            CashBalance = request.CashBalance,
+            GoodsCarriageJson = NormalizeGoodsCarriage(request.GoodsCarriageJson),
         };
 
         ApplyBusinessIncomeDerived(entity);
@@ -724,6 +734,16 @@ public sealed class ReturnService : IReturnService
         entity.NetProfit = request.NetProfit;
         entity.SpeculativeFlag = request.SpeculativeFlag;
         entity.GstTurnoverReported = request.GstTurnoverReported;
+        entity.PartnerCapital = request.PartnerCapital;
+        entity.SecuredLoans = request.SecuredLoans;
+        entity.UnsecuredLoans = request.UnsecuredLoans;
+        entity.SundryCreditors = request.SundryCreditors;
+        entity.FixedAssets = request.FixedAssets;
+        entity.Inventory = request.Inventory;
+        entity.SundryDebtors = request.SundryDebtors;
+        entity.BankBalance = request.BankBalance;
+        entity.CashBalance = request.CashBalance;
+        entity.GoodsCarriageJson = NormalizeGoodsCarriage(request.GoodsCarriageJson);
 
         ApplyBusinessIncomeDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1410,7 +1430,30 @@ public sealed class ReturnService : IReturnService
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,
         b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash, b.PresumptiveRatePct, b.NetProfit,
-        b.SpeculativeFlag, b.GstTurnoverReported);
+        b.SpeculativeFlag, b.GstTurnoverReported,
+        b.PartnerCapital, b.SecuredLoans, b.UnsecuredLoans, b.SundryCreditors, b.FixedAssets,
+        b.Inventory, b.SundryDebtors, b.BankBalance, b.CashBalance,
+        string.IsNullOrWhiteSpace(b.GoodsCarriageJson) ? "[]" : b.GoodsCarriageJson);
+
+    /// <summary>Validate/normalise the 44AE goods-carriage JSON: must parse as an array, else "[]".</summary>
+    private static string NormalizeGoodsCarriage(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "[]";
+        }
+
+        var trimmed = json.Trim();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(trimmed);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array ? trimmed : "[]";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return "[]";
+        }
+    }
 
     private static TaxComputationDto ToComputationDto(TaxComputation c) => new(
         c.Id, c.Regime, c.GrossTotalIncome, c.TotalDeductions, c.TaxableIncome, c.TaxBeforeCess,

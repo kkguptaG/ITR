@@ -175,7 +175,19 @@ export interface UpsertCapitalGainRequest {
   fairMarketValue31Jan2018?: number;
 }
 
-export interface BusinessIncomeDto {
+export interface BusinessFinancialParticulars {
+  partnerCapital: number;
+  securedLoans: number;
+  unsecuredLoans: number;
+  sundryCreditors: number;
+  fixedAssets: number;
+  inventory: number;
+  sundryDebtors: number;
+  bankBalance: number;
+  cashBalance: number;
+}
+
+export interface BusinessIncomeDto extends BusinessFinancialParticulars {
   id: Guid;
   natureOfBusinessCode: string | null;
   accountingMethod: string;
@@ -188,8 +200,10 @@ export interface BusinessIncomeDto {
   netProfit: number;
   speculativeFlag: boolean;
   gstTurnoverReported: number;
+  /** JSON array of 44AE goods-carriage vehicles. */
+  goodsCarriageJson: string;
 }
-export interface UpsertBusinessIncomeRequest {
+export interface UpsertBusinessIncomeRequest extends Partial<BusinessFinancialParticulars> {
   natureOfBusinessCode?: string | null;
   accountingMethod?: string | null;
   isPresumptive: boolean;
@@ -200,6 +214,7 @@ export interface UpsertBusinessIncomeRequest {
   netProfit: number;
   speculativeFlag: boolean;
   gstTurnoverReported: number;
+  goodsCarriageJson?: string | null;
 }
 
 export interface DeductionDto {

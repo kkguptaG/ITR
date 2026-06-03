@@ -111,16 +111,38 @@ export const capitalGainSchema = z.object({
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 
 // ----------------------------------------------------------------- business income
+/** One s.44AE goods-carriage vehicle (presumptive transport income). */
+export const goodsCarriageVehicleSchema = z.object({
+  regNo: z.string().trim().max(11, 'Max 11 characters').optional().or(z.literal('')),
+  ownership: z.enum(['OWN', 'LEASE', 'HIRED']).default('OWN'),
+  tonnage: z.coerce.number().min(0).max(100).default(0),
+  months: z.coerce.number().int().min(1).max(12).default(12),
+});
+export type GoodsCarriageVehicle = z.infer<typeof goodsCarriageVehicleSchema>;
+
 export const businessIncomeSchema = z
   .object({
     isPresumptive: z.boolean().default(true),
     presumptiveSection: z.enum(['44AD', '44ADA', '44AE']).optional(),
+    natureOfBusinessCode: z.string().trim().max(10).optional().or(z.literal('')),
     turnover: optionalMoney,
     grossReceiptsDigital: optionalMoney,
     grossReceiptsCash: optionalMoney,
     netProfit: optionalSignedMoney,
     speculativeFlag: z.boolean().default(false),
     gstTurnoverReported: optionalMoney,
+    // Financial particulars (ITR-4 no-account case / ITR-3 books) — all optional.
+    partnerCapital: optionalMoney,
+    securedLoans: optionalMoney,
+    unsecuredLoans: optionalMoney,
+    sundryCreditors: optionalMoney,
+    fixedAssets: optionalMoney,
+    inventory: optionalMoney,
+    sundryDebtors: optionalMoney,
+    bankBalance: optionalMoney,
+    cashBalance: optionalMoney,
+    // 44AE per-vehicle list.
+    goodsCarriage: z.array(goodsCarriageVehicleSchema).optional(),
   })
   .refine((v) => !v.isPresumptive || !!v.presumptiveSection, {
     message: 'Select a presumptive section (44AD/44ADA).',
@@ -129,6 +151,16 @@ export const businessIncomeSchema = z
   .refine((v) => !v.isPresumptive || (v.netProfit ?? 0) >= 0, {
     message: 'Presumptive income cannot be a loss.',
     path: ['netProfit'],
+  })
+  // 44ADA turnover ceiling: ₹75 lakh.
+  .refine((v) => v.presumptiveSection !== '44ADA' || (v.turnover ?? 0) <= 7_500_000, {
+    message: '44ADA applies only when gross receipts are ₹75 lakh or less.',
+    path: ['turnover'],
+  })
+  // 44AD turnover ceiling: ₹3 crore.
+  .refine((v) => v.presumptiveSection !== '44AD' || (v.turnover ?? 0) <= 30_000_000, {
+    message: '44AD applies only when turnover is ₹3 crore or less.',
+    path: ['turnover'],
   });
 export type BusinessIncomeFormValues = z.infer<typeof businessIncomeSchema>;
 

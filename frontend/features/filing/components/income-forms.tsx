@@ -478,11 +478,17 @@ export function BusinessIncomeForm({
       isPresumptive: true,
       presumptiveSection: '44AD',
       turnover: 0, grossReceiptsDigital: 0, grossReceiptsCash: 0, netProfit: 0,
-      speculativeFlag: false, gstTurnoverReported: 0,
+      speculativeFlag: false, gstTurnoverReported: 0, natureOfBusinessCode: '',
+      partnerCapital: 0, securedLoans: 0, unsecuredLoans: 0, sundryCreditors: 0,
+      fixedAssets: 0, inventory: 0, sundryDebtors: 0, bankBalance: 0, cashBalance: 0,
+      goodsCarriage: [],
       ...defaultValues,
     } as DefaultValues<BusinessIncomeFormValues>,
   });
   const isPresumptive = watch('isPresumptive');
+  const section = watch('presumptiveSection');
+
+  const vehicles = useFieldArray({ control, name: 'goodsCarriage' });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
@@ -504,12 +510,56 @@ export function BusinessIncomeForm({
               <option value="44AE">44AE — {t('section44AE')}</option>
             </Select>
           </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MoneyField control={control} name="turnover" label={t('turnover')} error={errors.turnover?.message} />
-            <MoneyField control={control} name="grossReceiptsDigital" label={t('digitalReceipts')} hint={t('digitalReceiptsHint')} />
-            <MoneyField control={control} name="grossReceiptsCash" label={t('cashReceipts')} hint={t('cashReceiptsHint')} />
-            <MoneyField control={control} name="gstTurnoverReported" label={t('gstTurnover')} />
-          </div>
+          <Field label={t('natureCode')} hint={t('natureCodeHint')}>
+            <Input placeholder="e.g. 09028" {...register('natureOfBusinessCode')} />
+          </Field>
+          {section !== '44AE' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <MoneyField control={control} name="turnover" label={t('turnover')} error={errors.turnover?.message} />
+              <MoneyField control={control} name="grossReceiptsDigital" label={t('digitalReceipts')} hint={t('digitalReceiptsHint')} />
+              <MoneyField control={control} name="grossReceiptsCash" label={t('cashReceipts')} hint={t('cashReceiptsHint')} />
+              <MoneyField control={control} name="gstTurnoverReported" label={t('gstTurnover')} />
+            </div>
+          )}
+
+          {/* s.44AE goods-carriage vehicles */}
+          {section === '44AE' && (
+            <div className="space-y-2 rounded-xl border border-ink-200 p-3">
+              <p className="text-sm font-medium text-ink-800">{t('goodsCarriageTitle')}</p>
+              <p className="text-xs text-ink-500">{t('goodsCarriageHint')}</p>
+              {vehicles.fields.map((field, i) => (
+                <div key={field.id} className="grid items-end gap-2 sm:grid-cols-[1.4fr_1fr_0.8fr_0.8fr_auto]">
+                  <Field label={i === 0 ? t('vehicleRegNo') : ''}>
+                    <Input placeholder="DL01AB1234" {...register(`goodsCarriage.${i}.regNo` as const)} />
+                  </Field>
+                  <Field label={i === 0 ? t('vehicleOwnership') : ''}>
+                    <Select {...register(`goodsCarriage.${i}.ownership` as const)}>
+                      <option value="OWN">{t('owned')}</option>
+                      <option value="LEASE">{t('leased')}</option>
+                      <option value="HIRED">{t('hired')}</option>
+                    </Select>
+                  </Field>
+                  <Field label={i === 0 ? t('vehicleTonnage') : ''}>
+                    <Input type="number" step="0.1" {...register(`goodsCarriage.${i}.tonnage` as const)} />
+                  </Field>
+                  <Field label={i === 0 ? t('vehicleMonths') : ''}>
+                    <Input type="number" min="1" max="12" {...register(`goodsCarriage.${i}.months` as const)} />
+                  </Field>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => vehicles.remove(i)}>
+                    ✕
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => vehicles.append({ regNo: '', ownership: 'OWN', tonnage: 0, months: 12 })}
+              >
+                + {t('addVehicle')}
+              </Button>
+            </div>
+          )}
         </>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -517,6 +567,23 @@ export function BusinessIncomeForm({
           <MoneyField control={control} name="netProfit" label={t('netProfit')} hint={t('netProfitHint')} error={errors.netProfit?.message} allowNegative />
         </div>
       )}
+
+      {/* Financial particulars (ITR-4 no-account case + ITR-3 books) */}
+      <details className="rounded-xl border border-ink-200 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-ink-800">{t('financialParticulars')}</summary>
+        <p className="mt-1 mb-2 text-xs text-ink-500">{t('financialParticularsHint')}</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <MoneyField control={control} name="partnerCapital" label={t('partnerCapital')} />
+          <MoneyField control={control} name="securedLoans" label={t('securedLoans')} />
+          <MoneyField control={control} name="unsecuredLoans" label={t('unsecuredLoans')} />
+          <MoneyField control={control} name="sundryCreditors" label={t('sundryCreditors')} />
+          <MoneyField control={control} name="fixedAssets" label={t('fixedAssets')} />
+          <MoneyField control={control} name="inventory" label={t('inventory')} />
+          <MoneyField control={control} name="sundryDebtors" label={t('sundryDebtors')} />
+          <MoneyField control={control} name="bankBalance" label={t('bankBalance')} />
+          <MoneyField control={control} name="cashBalance" label={t('cashBalance')} />
+        </div>
+      </details>
 
       {!presumptiveOnly && (
         <Field label={t('speculative')} hint={t('speculativeHint')}>
