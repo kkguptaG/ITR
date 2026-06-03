@@ -2434,7 +2434,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var gtiRaw = c?.GrossTotalIncome ?? 0m;
         // GTI is net of the s.32(2) unabsorbed-depreciation set-off, which isn't attributable to one head —
         // add it back so salary (the plug) stays anchored to the engine's GTI.
-        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw + UnabsorbedDepSetOff(ctx);
+        var udSetOff = UnabsorbedDepSetOff(ctx);
+        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw + udSetOff;
 
         var gti = R(gtiRaw);
         var taxable = R(c?.TaxableIncome ?? 0m);
@@ -2444,9 +2445,48 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         {
             SetIfInt(ti, "Salaries", R(salaryNet));
             SetIfInt(ti, "IncomeFromHP", R(hpRaw));
+
+            // Itemise the remaining income heads (previously left at the zero skeleton, so business / capital
+            // gains / other-sources income vanished from PartB-TI even though the schedules carried it). Heads
+            // are shown GROSS of brought-forward set-off; the s.32(2) unabsorbed-depreciation set-off is shown
+            // in BroughtFwdLossesSetoff, so BalanceAfterSetoffLosses − that == GrossTotalIncome.
+            if (ti["ProfBusGain"] is Dictionary<string, object?> pbg)
+            {
+                SetIfInt(pbg, "ProfGainNoSpecBus", R(businessRaw));
+                SetIfInt(pbg, "TotProfBusGain", R(businessRaw));
+            }
+            if (ti["CapGain"] is Dictionary<string, object?> cgNode)
+            {
+                // STCG by rate: 111A equity at 20%, everything else (incl. the deemed s.50 gain) at applicable rate.
+                var deemed = DeemedStcgUs50(ctx);
+                var stcg111A = ctx.Gains.Any(g => g.Term == CapitalGainTerm.Short && (g.TaxSection ?? string.Empty).Contains("111A"));
+                var capturedShort = cgShort - deemed;
+                var stcg20 = stcg111A ? capturedShort : 0m;
+                var stcgApp = (stcg111A ? 0m : capturedShort) + deemed;
+                if (cgNode["ShortTerm"] is Dictionary<string, object?> st)
+                {
+                    SetIfInt(st, "ShortTerm20Per", R(stcg20));
+                    SetIfInt(st, "ShortTermAppRate", R(stcgApp));
+                    SetIfInt(st, "TotalShortTerm", R(cgShort));
+                }
+                if (cgNode["LongTerm"] is Dictionary<string, object?> lt)
+                {
+                    SetIfInt(lt, "LongTerm12_5Per", R(cgLong));
+                    SetIfInt(lt, "TotalLongTerm", R(cgLong));
+                }
+                SetIfInt(cgNode, "ShortTermLongTermTotal", R(cgShort + cgLong));
+                SetIfInt(cgNode, "TotalCapGains", R(cgShort + cgLong));
+            }
+            if (ti["IncFromOS"] is Dictionary<string, object?> osNode)
+            {
+                SetIfInt(osNode, "OtherSrcThanOwnRaceHorse", R(otherRaw));
+                SetIfInt(osNode, "TotIncFromOS", R(otherRaw));
+            }
+
+            SetIfInt(ti, "BalanceAfterSetoffLosses", R(gtiRaw + udSetOff));
+            SetIfInt(ti, "BroughtFwdLossesSetoff", R(udSetOff));
             SetIfInt(ti, "GrossTotalIncome", gti);
             SetIfInt(ti, "TotalTI", gti);
-            SetIfInt(ti, "BalanceAfterSetoffLosses", gti);
             SetIfInt(ti, "TotalIncome", taxable);
             SetIfInt(ti, "AggregateIncome", taxable);
         }

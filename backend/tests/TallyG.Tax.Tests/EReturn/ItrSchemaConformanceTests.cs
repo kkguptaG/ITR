@@ -613,6 +613,17 @@ public class ItrSchemaConformanceTests
         bp.GetProperty("DepreciationAllowITAct32").GetProperty("TotDeprAllowITAct").GetInt64().Should().Be(587_500);
         bp.GetProperty("AdjustPLAfterDeprOthSpecInc").GetInt64().Should().Be(812_500);
 
+        // PartB-TI now ITEMISES each head (was: everything folded into the salary plug). Business ₹8,12,500
+        // (after the BP depreciation reconciliation) + deemed STCG ₹2L; the ₹3L UD set-off shows as a
+        // brought-forward set-off, so BalanceAfterSetoffLosses (₹11,25,000) − ₹3L == GrossTotalIncome ₹8,25,000.
+        var ti = itr3.GetProperty("PartB-TI");
+        ti.GetProperty("ProfBusGain").GetProperty("TotProfBusGain").GetInt64().Should().Be(812_500);
+        ti.GetProperty("CapGain").GetProperty("TotalCapGains").GetInt64().Should().Be(200_000);
+        ti.GetProperty("CapGain").GetProperty("ShortTerm").GetProperty("ShortTermAppRate").GetInt64().Should().Be(200_000);
+        ti.GetProperty("BalanceAfterSetoffLosses").GetInt64().Should().Be(1_125_000);
+        ti.GetProperty("BroughtFwdLossesSetoff").GetInt64().Should().Be(300_000);
+        ti.GetProperty("GrossTotalIncome").GetInt64().Should().Be(825_000);
+
         // The deemed STCG now FLOWS into Schedule CG (not just the DCG disclosure): the ₹2L lands as a deemed
         // short-term gain on other assets, taxed at the applicable rate, and ties out through the CG totals.
         var cg = itr3.GetProperty("ScheduleCGFor23");
