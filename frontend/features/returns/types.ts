@@ -30,6 +30,8 @@ export interface ReturnSummaryDto {
   acknowledgmentNumber: string | null;
   createdAt: IsoDateTime;
   submittedAt: IsoDateTime | null;
+  /** Positive = refund due, negative = payable; null when not yet computed. */
+  refundOrPayable: number | null;
 }
 
 /** A single persisted (or freshly computed) tax computation for one regime. */

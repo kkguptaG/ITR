@@ -190,7 +190,13 @@ public sealed class ReturnService : IReturnService
             r.Regime,
             r.AcknowledgmentNumber,
             r.CreatedAt,
-            r.SubmittedAt));
+            r.SubmittedAt,
+            // Recommended computation's refund/payable — positive = refund, negative = payable.
+            r.Computations
+                .Where(c => c.IsRecommended)
+                .OrderByDescending(c => c.ComputedAt)
+                .Select(c => (decimal?)c.RefundOrPayable)
+                .FirstOrDefault()));
 
         List<ReturnSummaryDto> items;
         if (_db.Database.IsSqlite())

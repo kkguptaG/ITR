@@ -42,7 +42,9 @@ public sealed record ReturnSummaryDto(
     Regime? Regime,
     string? AcknowledgmentNumber,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? SubmittedAt);
+    DateTimeOffset? SubmittedAt,
+    /// <summary>From the recommended computation (positive = refund, negative = payable). Null when not yet computed.</summary>
+    decimal? RefundOrPayable = null);
 
 /// <summary>
 /// Full return detail for GET /returns/{id}: header plus every income head, the deductions,

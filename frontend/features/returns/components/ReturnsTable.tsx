@@ -8,7 +8,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Table, THead, TBody, TR, TH, TD, Badge } from '@/components/ui';
-import { formatAssessmentYear, formatDate } from '@/lib/format';
+import { formatAssessmentYear, formatDate, formatInr } from '@/lib/format';
 import type { ReturnSummaryDto } from '../types';
 import { formatItrType } from '../helpers';
 import { ReturnStatusBadge } from './ReturnStatusBadge';
@@ -27,6 +27,7 @@ export function ReturnsTable({ items }: { items: ReturnSummaryDto[] }) {
               <TH>{t('colAy')}</TH>
               <TH>{t('colItrType')}</TH>
               <TH>{t('colStatus')}</TH>
+              <TH className="text-right">Refund / Payable</TH>
               <TH>{t('colCreated')}</TH>
               <TH className="text-right">{t('colActions')}</TH>
             </TR>
@@ -46,6 +47,15 @@ export function ReturnsTable({ items }: { items: ReturnSummaryDto[] }) {
                 </TD>
                 <TD>
                   <ReturnStatusBadge status={item.status} />
+                </TD>
+                <TD className="text-right">
+                  {item.refundOrPayable == null ? (
+                    <span className="text-xs text-ink-400">—</span>
+                  ) : item.refundOrPayable >= 0 ? (
+                    <span className="text-sm font-medium tabular-nums text-money-700">+{formatInr(item.refundOrPayable)}</span>
+                  ) : (
+                    <span className="text-sm font-medium tabular-nums text-payable-700">{formatInr(-item.refundOrPayable)}</span>
+                  )}
                 </TD>
                 <TD className="whitespace-nowrap text-ink-500">{formatDate(item.createdAt)}</TD>
                 <TD className="text-right">
