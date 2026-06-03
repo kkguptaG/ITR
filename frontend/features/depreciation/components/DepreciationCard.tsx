@@ -26,6 +26,12 @@ const CATEGORIES: { value: DepreciableAssetCategory; label: string }[] = [
   { value: 'PlantMachinery30', label: 'Plant & machinery — 30%' },
   { value: 'PlantMachinery40', label: 'Plant & machinery — 40% (computers, etc.)' },
   { value: 'PlantMachinery45', label: 'Plant & machinery — 45%' },
+  { value: 'Building5', label: 'Building — 5%' },
+  { value: 'Building10', label: 'Building — 10%' },
+  { value: 'Building40', label: 'Building — 40% (temporary structures)' },
+  { value: 'FurnitureFittings10', label: 'Furniture & fittings — 10%' },
+  { value: 'IntangibleAssets25', label: 'Intangible assets — 25%' },
+  { value: 'Ships20', label: 'Ships — 20%' },
 ];
 
 const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label])) as Record<DepreciableAssetCategory, string>;

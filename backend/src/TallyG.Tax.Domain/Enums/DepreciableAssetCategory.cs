@@ -17,5 +17,25 @@ public enum DepreciableAssetCategory
     PlantMachinery40 = 2,
 
     /// <summary>Plant &amp; machinery — 45% block.</summary>
-    PlantMachinery45 = 3
+    PlantMachinery45 = 3,
+
+    // --- Schedule DOA (other assets) ---
+
+    /// <summary>Building — 5% block.</summary>
+    Building5 = 4,
+
+    /// <summary>Building — 10% block.</summary>
+    Building10 = 5,
+
+    /// <summary>Building — 40% block (purely temporary erections).</summary>
+    Building40 = 6,
+
+    /// <summary>Furniture &amp; fittings — 10% block.</summary>
+    FurnitureFittings10 = 7,
+
+    /// <summary>Intangible assets (know-how, patents, copyrights, …) — 25% block.</summary>
+    IntangibleAssets25 = 8,
+
+    /// <summary>Ships — 20% block.</summary>
+    Ships20 = 9
 }

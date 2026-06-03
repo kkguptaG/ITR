@@ -571,11 +571,18 @@ public class ItrSchemaConformanceTests
         r15.GetProperty("TotalDepreciation").GetInt64().Should().Be(187_500);
         r15.GetProperty("WDVLastDay").GetInt64().Should().Be(1_112_500);
 
+        // DOA: a 10% building block (₹20L, no additions) = ₹2,00,000 depreciation.
+        var bld = itr3.GetProperty("ScheduleDOA").GetProperty("Building").GetProperty("Rate10").GetProperty("DepreciationDetail");
+        bld.GetProperty("TotalDepreciation").GetInt64().Should().Be(200_000);
+        bld.GetProperty("WDVLastDay").GetInt64().Should().Be(1_800_000);
+
         var dep = itr3.GetProperty("ScheduleDEP").GetProperty("SummaryFromDeprSch");
-        // 40% block (5L, no additions) = 2,00,000; total depreciation = 1,87,500 + 2,00,000 = 3,87,500.
+        // P&M 40% block (5L, no additions) = 2,00,000; P&M total = 1,87,500 + 2,00,000 = 3,87,500.
         dep.GetProperty("PlantMachinerySummary").GetProperty("DeprBlockTot40Percent").GetInt64().Should().Be(200_000);
         dep.GetProperty("PlantMachinerySummary").GetProperty("TotPlntMach").GetInt64().Should().Be(387_500);
-        dep.GetProperty("TotalDepreciation").GetInt64().Should().Be(387_500);
+        dep.GetProperty("BuildingSummary").GetProperty("DeprBlockTot10Percent").GetInt64().Should().Be(200_000);
+        // Grand total = P&M 3,87,500 + building 2,00,000 = 5,87,500.
+        dep.GetProperty("TotalDepreciation").GetInt64().Should().Be(587_500);
     }
 
     [Fact]
@@ -1199,6 +1206,7 @@ public class ItrSchemaConformanceTests
                 {
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m, AdditionsBelow180Days = 100_000m },
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery40, OpeningWdv = 500_000m },
+                    new DepreciableAsset { Category = DepreciableAssetCategory.Building10, OpeningWdv = 2_000_000m },
                 }
                 : Array.Empty<DepreciableAsset>(),
             // Portuguese-Civil-Code spouse apportionment so the ITR-2/3 gate exercises Schedule 5A.

@@ -4,7 +4,13 @@ export type DepreciableAssetCategory =
   | 'PlantMachinery15'
   | 'PlantMachinery30'
   | 'PlantMachinery40'
-  | 'PlantMachinery45';
+  | 'PlantMachinery45'
+  | 'Building5'
+  | 'Building10'
+  | 'Building40'
+  | 'FurnitureFittings10'
+  | 'IntangibleAssets25'
+  | 'Ships20';
 
 export interface DepreciableAssetDto {
   id: string;

@@ -1568,48 +1568,98 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             return;
         }
 
-        var pm = new Dictionary<string, object?>();
-
-        decimal Block(string key, DepreciableAssetCategory category, decimal rate)
+        // Build a rate block's DepreciationDetail node + its total depreciation (null when the block is empty).
+        (Dictionary<string, object?> Detail, decimal Total)? Block(DepreciableAssetCategory category, decimal rate)
         {
             var rows = ctx.DepreciableAssets.Where(a => a.Category == category).ToList();
             if (rows.Count == 0)
             {
-                return 0m;
+                return null;
             }
             var d = DepreciationCalculator.Compute(
                 rows.Sum(r => r.OpeningWdv), rows.Sum(r => r.AdditionsAbove180Days), rows.Sum(r => r.AdditionsBelow180Days), rate);
-            pm[key] = new Dictionary<string, object?> { ["DepreciationDetail"] = DepreciationDetailNode(d) };
-            return d.TotalDepreciation;
+            // The rate-block node wraps the detail: { DepreciationDetail: { … } }.
+            return (new Dictionary<string, object?> { ["DepreciationDetail"] = DepreciationDetailNode(d) }, d.TotalDepreciation);
         }
 
-        var tot15 = Block("Rate15", DepreciableAssetCategory.PlantMachinery15, 0.15m);
-        var tot30 = Block("Rate30", DepreciableAssetCategory.PlantMachinery30, 0.30m);
-        var tot40 = Block("Rate40", DepreciableAssetCategory.PlantMachinery40, 0.40m);
-        var tot45 = Block("Rate45", DepreciableAssetCategory.PlantMachinery45, 0.45m);
-        if (pm.Count == 0)
+        var pm15 = Block(DepreciableAssetCategory.PlantMachinery15, 0.15m);
+        var pm30 = Block(DepreciableAssetCategory.PlantMachinery30, 0.30m);
+        var pm40 = Block(DepreciableAssetCategory.PlantMachinery40, 0.40m);
+        var pm45 = Block(DepreciableAssetCategory.PlantMachinery45, 0.45m);
+        var bd5 = Block(DepreciableAssetCategory.Building5, 0.05m);
+        var bd10 = Block(DepreciableAssetCategory.Building10, 0.10m);
+        var bd40 = Block(DepreciableAssetCategory.Building40, 0.40m);
+        var furn = Block(DepreciableAssetCategory.FurnitureFittings10, 0.10m);
+        var intang = Block(DepreciableAssetCategory.IntangibleAssets25, 0.25m);
+        var ships = Block(DepreciableAssetCategory.Ships20, 0.20m);
+
+        static decimal T((Dictionary<string, object?> Detail, decimal Total)? b) => b?.Total ?? 0m;
+
+        // --- Schedule DPM (plant & machinery) ---
+        var pm = new Dictionary<string, object?>();
+        if (pm15 is { } a15) pm["Rate15"] = a15.Detail;
+        if (pm30 is { } a30) pm["Rate30"] = a30.Detail;
+        if (pm40 is { } a40) pm["Rate40"] = a40.Detail;
+        if (pm45 is { } a45) pm["Rate45"] = a45.Detail;
+        if (pm.Count > 0)
+        {
+            form["ScheduleDPM"] = new Dictionary<string, object?> { ["PlantMachinery"] = pm };
+        }
+
+        // --- Schedule DOA (other assets: building / furniture / intangibles / ships) ---
+        var building = new Dictionary<string, object?>();
+        if (bd5 is { } e5) building["Rate5"] = e5.Detail;
+        if (bd10 is { } e10) building["Rate10"] = e10.Detail;
+        if (bd40 is { } e40) building["Rate40"] = e40.Detail;
+        var doa = new Dictionary<string, object?>();
+        if (building.Count > 0) doa["Building"] = building;
+        if (furn is { } ef) doa["FurnitureFittings"] = new Dictionary<string, object?> { ["Rate10"] = ef.Detail };
+        if (intang is { } ei) doa["IntangibleAssets"] = new Dictionary<string, object?> { ["Rate25"] = ei.Detail };
+        if (ships is { } es) doa["Ships"] = new Dictionary<string, object?> { ["Rate20"] = es.Detail };
+        if (doa.Count > 0)
+        {
+            form["ScheduleDOA"] = doa;
+        }
+
+        if (pm.Count == 0 && doa.Count == 0)
         {
             return;
         }
 
-        form["ScheduleDPM"] = new Dictionary<string, object?> { ["PlantMachinery"] = pm };
-
-        var totPm = tot15 + tot30 + tot40 + tot45;
-        form["ScheduleDEP"] = new Dictionary<string, object?>
+        // --- Schedule DEP (summary of DPM + DOA) ---
+        var pmTot = T(pm15) + T(pm30) + T(pm40) + T(pm45);
+        var bldTot = T(bd5) + T(bd10) + T(bd40);
+        var furnTot = T(furn);
+        var intTot = T(intang);
+        var shipTot = T(ships);
+        var summary = new Dictionary<string, object?>();
+        if (pm.Count > 0)
         {
-            ["SummaryFromDeprSch"] = new Dictionary<string, object?>
+            summary["PlantMachinerySummary"] = new Dictionary<string, object?>
             {
-                ["PlantMachinerySummary"] = new Dictionary<string, object?>
-                {
-                    ["DeprBlockTot15Percent"] = R(tot15),
-                    ["DeprBlockTot30Percent"] = R(tot30),
-                    ["DeprBlockTot40Percent"] = R(tot40),
-                    ["DeprBlockTot45Percent"] = R(tot45),
-                    ["TotPlntMach"] = R(totPm),
-                },
-                ["TotalDepreciation"] = R(totPm),
-            },
-        };
+                ["DeprBlockTot15Percent"] = R(T(pm15)),
+                ["DeprBlockTot30Percent"] = R(T(pm30)),
+                ["DeprBlockTot40Percent"] = R(T(pm40)),
+                ["DeprBlockTot45Percent"] = R(T(pm45)),
+                ["TotPlntMach"] = R(pmTot),
+            };
+        }
+        if (building.Count > 0)
+        {
+            summary["BuildingSummary"] = new Dictionary<string, object?>
+            {
+                ["DeprBlockTot5Percent"] = R(T(bd5)),
+                ["DeprBlockTot10Percent"] = R(T(bd10)),
+                ["DeprBlockTot40Percent"] = R(T(bd40)),
+                ["TotBuildng"] = R(bldTot),
+            };
+        }
+        if (furn is not null) summary["FurnitureSummary"] = R(furnTot);
+        if (intang is not null) summary["IntangibleAssetSummary"] = R(intTot);
+        if (ships is not null) summary["ShipsSummary"] = R(shipTot);
+        summary["TotalDepreciation"] = R(pmTot + bldTot + furnTot + intTot + shipTot);
+
+        form["ScheduleDEP"] = new Dictionary<string, object?> { ["SummaryFromDeprSch"] = summary };
     }
 
     private static Dictionary<string, object?> DepreciationDetailNode(DepreciationCalculator.BlockDepreciation d) => new()
