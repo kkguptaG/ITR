@@ -46,4 +46,17 @@ public sealed class TaxesPaidController : ControllerBase
         await _svc.DeleteChallanAsync(returnId, id, ct);
         return NoContent();
     }
+
+    [HttpPost("tcs")]
+    [ProducesResponseType(typeof(TcsEntryDto), StatusCodes.Status200OK)]
+    public Task<TcsEntryDto> AddTcs([FromRoute] Guid returnId, [FromBody] UpsertTcsEntryRequest request, CancellationToken ct)
+        => _svc.AddTcsAsync(returnId, request, ct);
+
+    [HttpDelete("tcs/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteTcs([FromRoute] Guid returnId, [FromRoute] Guid id, CancellationToken ct)
+    {
+        await _svc.DeleteTcsAsync(returnId, id, ct);
+        return NoContent();
+    }
 }

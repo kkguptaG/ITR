@@ -236,6 +236,7 @@ public static class DbInitializer
             QuestionnaireSchemaVersion = "1.0.0",
             TdsPaid = 1_500_000m,
             AdvanceTaxPaid = 200_000m,
+            TcsPaid = 25_000m,
         });
 
         db.SalaryDetails.Add(new SalaryDetail
@@ -467,6 +468,12 @@ public static class DbInitializer
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Head = TdsHead.Salary,
             DeductorTan = "DELG12345C", DeductorName = "Globex Corporation Pvt Ltd", IncomeOffered = 6_000_000m, TaxDeducted = 1_500_000m,
         });
+        // TCS (Schedule TCS): tax collected on an LRS foreign remittance, claimed in the assessee's own hands.
+        db.TcsEntries.Add(new TcsEntry
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            CollectorTan = "MUMA09876B", CollectorName = "HDFC Bank Ltd (LRS remittance)", TcsCollected = 25_000m,
+        });
         db.TaxPaymentChallans.Add(new TaxPaymentChallan
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId, Kind = ChallanKind.Advance,
@@ -481,7 +488,8 @@ public static class DbInitializer
             // s.90 foreign tax credit on the US consultancy income (Schedule FSI/TR) — ₹75k, capped at the
             // Indian tax on that income — reduces the net liability below the ₹16,84,800 gross.
             Relief90And91 = 75_000m, TotalTax = 1_609_800m,
-            TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 90_200m,
+            // Prepaid = TDS 15L + advance 2L + TCS 25k = 17.25L; refund = 17.25L − 16,09,800 = 1,15,200.
+            TdsPaid = 1_500_000m, AdvanceTax = 200_000m, RefundOrPayable = 115_200m,
         });
     }
 

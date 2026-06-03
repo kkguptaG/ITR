@@ -12,8 +12,10 @@ import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import type {
   ChallanDto,
   TaxesPaidSummaryDto,
+  TcsEntryDto,
   TdsEntryDto,
   UpsertChallanBody,
+  UpsertTcsEntryBody,
   UpsertTdsEntryBody,
 } from './types';
 
@@ -42,4 +44,12 @@ export function addChallan(returnId: string, body: UpsertChallanBody): Promise<C
 
 export function deleteChallan(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${base(returnId)}/challans/${id}`);
+}
+
+export function addTcs(returnId: string, body: UpsertTcsEntryBody): Promise<TcsEntryDto> {
+  return apiPost<TcsEntryDto>(`${base(returnId)}/tcs`, body);
+}
+
+export function deleteTcs(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${base(returnId)}/tcs/${id}`);
 }

@@ -42,6 +42,19 @@ export interface UpsertChallanBody {
   amount: number;
 }
 
+export interface TcsEntryDto {
+  id: string;
+  collectorTan: string;
+  collectorName: string;
+  tcsCollected: number;
+}
+
+export interface UpsertTcsEntryBody {
+  collectorTan: string;
+  collectorName: string;
+  tcsCollected: number;
+}
+
 export interface TaxesPaidSummaryDto {
   tdsEntries: TdsEntryDto[];
   challans: ChallanDto[];
@@ -51,4 +64,6 @@ export interface TaxesPaidSummaryDto {
   totalAdvanceTax: number;
   totalSelfAssessmentTax: number;
   totalPrepaid: number;
+  tcsEntries: TcsEntryDto[];
+  totalTcs: number;
 }

@@ -14,6 +14,8 @@ public interface ITaxesPaidService
     Task DeleteTdsAsync(Guid returnId, Guid id, CancellationToken ct = default);
     Task<ChallanDto> AddChallanAsync(Guid returnId, UpsertChallanRequest request, CancellationToken ct = default);
     Task DeleteChallanAsync(Guid returnId, Guid id, CancellationToken ct = default);
+    Task<TcsEntryDto> AddTcsAsync(Guid returnId, UpsertTcsEntryRequest request, CancellationToken ct = default);
+    Task DeleteTcsAsync(Guid returnId, Guid id, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -38,7 +40,8 @@ public sealed class TaxesPaidService : ITaxesPaidService
         await EnsureOwnedReturnAsync(returnId, ct);
         var tds = await TdsQuery(returnId).ToListAsync(ct);
         var challans = await ChallanQuery(returnId).ToListAsync(ct);
-        return Summarize(tds, challans);
+        var tcs = await TcsQuery(returnId).ToListAsync(ct);
+        return Summarize(tds, challans, tcs);
     }
 
     public async Task<TdsEntryDto> AddTdsAsync(Guid returnId, UpsertTdsEntryRequest request, CancellationToken ct = default)
@@ -102,34 +105,74 @@ public sealed class TaxesPaidService : ITaxesPaidService
         await RecomputeRollupsAsync(ret, ct);
     }
 
+    public async Task<TcsEntryDto> AddTcsAsync(Guid returnId, UpsertTcsEntryRequest request, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = new TcsEntry
+        {
+            TenantId = _currentUser.TenantId,
+            UserId = _currentUser.UserId,
+            TaxReturnId = ret.Id,
+            CollectorTan = request.CollectorTan.Trim().ToUpperInvariant(),
+            CollectorName = request.CollectorName.Trim(),
+            TcsCollected = Math.Max(0m, request.TcsCollected),
+        };
+        _db.TcsEntries.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        await RecomputeRollupsAsync(ret, ct);
+        return ToDto(entity);
+    }
+
+    public async Task DeleteTcsAsync(Guid returnId, Guid id, CancellationToken ct = default)
+    {
+        var ret = await OwnedReturnAsync(returnId, ct);
+        var entity = await TcsQuery(returnId).FirstOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw AppException.NotFound("TCS entry not found.", "TCS.NOT_FOUND");
+        _db.TcsEntries.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+        await RecomputeRollupsAsync(ret, ct);
+    }
+
     // ----------------------------------------------------------------- helpers
 
     /// <summary>Re-derive the return's prepaid-tax rollups from the itemised rows (the source of truth
-    /// once the user itemises). Leaves TCS untouched (captured separately/lump-sum for now).</summary>
+    /// once the user itemises). TCS rolls up to TcsPaid once any TCS row is captured.</summary>
     private async Task RecomputeRollupsAsync(TaxReturn ret, CancellationToken ct)
     {
         var tds = await TdsQuery(ret.Id).ToListAsync(ct);
         var challans = await ChallanQuery(ret.Id).ToListAsync(ct);
+        var tcs = await TcsQuery(ret.Id).ToListAsync(ct);
 
         ret.TdsPaid = tds.Sum(t => t.TaxDeducted);
         ret.AdvanceTaxPaid = challans.Where(c => c.Kind == ChallanKind.Advance).Sum(c => c.Amount);
         ret.SelfAssessmentTaxPaid = challans.Where(c => c.Kind == ChallanKind.SelfAssessment).Sum(c => c.Amount);
+        if (tcs.Count > 0)
+        {
+            ret.TcsPaid = tcs.Sum(t => t.TcsCollected);
+        }
         await _db.SaveChangesAsync(ct);
     }
 
-    private static TaxesPaidSummaryDto Summarize(List<TdsEntry> tds, List<TaxPaymentChallan> challans)
+    private static TaxesPaidSummaryDto Summarize(List<TdsEntry> tds, List<TaxPaymentChallan> challans, List<TcsEntry> tcs)
     {
         var salaryTds = tds.Where(t => t.Head == TdsHead.Salary).Sum(t => t.TaxDeducted);
         var otherTds = tds.Where(t => t.Head == TdsHead.OtherThanSalary).Sum(t => t.TaxDeducted);
         var advance = challans.Where(c => c.Kind == ChallanKind.Advance).Sum(c => c.Amount);
         var sat = challans.Where(c => c.Kind == ChallanKind.SelfAssessment).Sum(c => c.Amount);
+        var totalTcs = tcs.Sum(t => t.TcsCollected);
 
         return new TaxesPaidSummaryDto(
             tds.OrderBy(t => t.Head).ThenBy(t => t.DeductorName).Select(ToDto).ToList(),
             challans.OrderBy(c => c.Kind).ThenBy(c => c.DepositDate).Select(ToDto).ToList(),
             salaryTds, otherTds, salaryTds + otherTds, advance, sat,
-            salaryTds + otherTds + advance + sat);
+            salaryTds + otherTds + advance + sat + totalTcs,
+            tcs.OrderBy(t => t.CollectorName).Select(ToDto).ToList(),
+            totalTcs);
     }
+
+    private IQueryable<TcsEntry> TcsQuery(Guid returnId)
+        => _db.TcsEntries.Where(t => t.TaxReturnId == returnId
+                                     && t.TenantId == _currentUser.TenantId && t.UserId == _currentUser.UserId);
 
     private IQueryable<TdsEntry> TdsQuery(Guid returnId)
         => _db.TdsEntries.Where(t => t.TaxReturnId == returnId
@@ -158,4 +201,7 @@ public sealed class TaxesPaidService : ITaxesPaidService
 
     private static ChallanDto ToDto(TaxPaymentChallan c)
         => new(c.Id, c.Kind, c.BsrCode, c.DepositDate, c.ChallanSerial, c.Amount);
+
+    private static TcsEntryDto ToDto(TcsEntry t)
+        => new(t.Id, t.CollectorTan, t.CollectorName, t.TcsCollected);
 }

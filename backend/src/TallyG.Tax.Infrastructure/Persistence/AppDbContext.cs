@@ -45,6 +45,7 @@ public class AppDbContext : DbContext
     public DbSet<BusinessIncome> BusinessIncomes => Set<BusinessIncome>();
     public DbSet<Deduction> Deductions => Set<Deduction>();
     public DbSet<TdsEntry> TdsEntries => Set<TdsEntry>();
+    public DbSet<TcsEntry> TcsEntries => Set<TcsEntry>();
     public DbSet<TaxPaymentChallan> TaxPaymentChallans => Set<TaxPaymentChallan>();
     public DbSet<AssetsLiabilities> AssetsLiabilities => Set<AssetsLiabilities>();
     public DbSet<ImmovablePropertyAL> ImmovablePropertiesAL => Set<ImmovablePropertyAL>();

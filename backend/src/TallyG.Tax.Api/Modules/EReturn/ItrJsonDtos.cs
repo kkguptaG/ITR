@@ -128,6 +128,9 @@ public sealed class ItrFilingContext
     /// <summary>Pass-through income (business trust / investment fund) disclosed in Schedule PTI (ITR-2/3).</summary>
     public IReadOnlyList<PassThroughIncome> PassThroughIncomes { get; init; } = Array.Empty<PassThroughIncome>();
 
+    /// <summary>Collector-wise TCS rows (tax collected at source) disclosed in Schedule TCS.</summary>
+    public IReadOnlyList<TcsEntry> TcsEntries { get; init; } = Array.Empty<TcsEntry>();
+
     /// <summary>Portuguese-Civil-Code spouse apportionment (Schedule 5A); null unless declared.</summary>
     public SpouseIncomeApportionment? SpouseApportionment { get; init; }
 

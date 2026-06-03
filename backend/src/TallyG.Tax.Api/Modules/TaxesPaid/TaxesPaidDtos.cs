@@ -25,6 +25,19 @@ public sealed record UpsertTdsEntryRequest(
     decimal IncomeOffered,
     decimal TaxDeducted);
 
+/// <summary>One collector-wise TCS row (tax collected at source → Schedule TCS).</summary>
+public sealed record TcsEntryDto(
+    Guid Id,
+    string CollectorTan,
+    string CollectorName,
+    decimal TcsCollected);
+
+/// <summary>POST body to add a TCS row.</summary>
+public sealed record UpsertTcsEntryRequest(
+    string CollectorTan,
+    string CollectorName,
+    decimal TcsCollected);
+
 /// <summary>One self-paid tax challan.</summary>
 public sealed record ChallanDto(
     Guid Id,
@@ -52,7 +65,9 @@ public sealed record TaxesPaidSummaryDto(
     decimal TotalTds,
     decimal TotalAdvanceTax,
     decimal TotalSelfAssessmentTax,
-    decimal TotalPrepaid);
+    decimal TotalPrepaid,
+    IReadOnlyList<TcsEntryDto> TcsEntries,
+    decimal TotalTcs);
 
 public sealed class UpsertTdsEntryRequestValidator : AbstractValidator<UpsertTdsEntryRequest>
 {
@@ -73,6 +88,18 @@ public sealed class UpsertTdsEntryRequestValidator : AbstractValidator<UpsertTds
         RuleFor(x => x.TdsSection)
             .NotEmpty().WithMessage("TDS section is required for non-salary TDS.")
             .When(x => x.Head == TdsHead.OtherThanSalary);
+    }
+}
+
+public sealed class UpsertTcsEntryRequestValidator : AbstractValidator<UpsertTcsEntryRequest>
+{
+    public UpsertTcsEntryRequestValidator()
+    {
+        RuleFor(x => x.CollectorTan)
+            .NotEmpty().WithMessage("Collector TAN is required.")
+            .Matches("^[A-Z]{4}[0-9]{5}[A-Z]$").WithMessage("Enter a valid 10-character TAN (e.g. DELH12345A).");
+        RuleFor(x => x.CollectorName).NotEmpty().WithMessage("Collector name is required.").MaximumLength(125);
+        RuleFor(x => x.TcsCollected).GreaterThan(0).WithMessage("TCS amount must be greater than zero.");
     }
 }
 

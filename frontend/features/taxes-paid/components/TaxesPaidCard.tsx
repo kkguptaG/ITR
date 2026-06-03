@@ -33,8 +33,10 @@ import { formatInr } from '@/lib/format';
 import { useApiFormError } from '@/features/auth/use-api-form-error';
 import {
   addChallan,
+  addTcs,
   addTds,
   deleteChallan,
+  deleteTcs,
   deleteTds,
   getTaxesPaid,
   taxesPaidKeys,
@@ -50,7 +52,7 @@ export function TaxesPaidCard({ returnId, editable }: { returnId: string; editab
   const t = useTranslations('taxesPaid');
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
-  const [adding, setAdding] = useState<'tds' | 'challan' | null>(null);
+  const [adding, setAdding] = useState<'tds' | 'challan' | 'tcs' | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const query = useQuery({
@@ -66,6 +68,10 @@ export function TaxesPaidCard({ returnId, editable }: { returnId: string; editab
   });
   const removeChallan = useMutation({
     mutationFn: (id: string) => deleteChallan(returnId, id),
+    onSuccess: async () => { setConfirmId(null); await invalidate(); },
+  });
+  const removeTcs = useMutation({
+    mutationFn: (id: string) => deleteTcs(returnId, id),
     onSuccess: async () => { setConfirmId(null); await invalidate(); },
   });
 
@@ -92,6 +98,7 @@ export function TaxesPaidCard({ returnId, editable }: { returnId: string; editab
               <Stat label={t('totalTds')} value={formatInr(data.totalTds)} />
               <Stat label={t('totalAdvance')} value={formatInr(data.totalAdvanceTax)} />
               <Stat label={t('totalSat')} value={formatInr(data.totalSelfAssessmentTax)} />
+              {data.totalTcs > 0 && <Stat label={t('totalTcs')} value={formatInr(data.totalTcs)} />}
               <Stat label={t('totalPrepaid')} value={formatInr(data.totalPrepaid)} tone="money" />
             </div>
 
@@ -207,6 +214,59 @@ export function TaxesPaidCard({ returnId, editable }: { returnId: string; editab
 
               {adding === 'challan' && (
                 <AddChallanForm
+                  returnId={returnId}
+                  onDone={() => setAdding(null)}
+                  onSaved={async () => { setAdding(null); await invalidate(); }}
+                />
+              )}
+            </section>
+
+            {/* TCS section */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-ink-800">{t('tcsTitle')}</h4>
+                {editable && adding !== 'tcs' && (
+                  <Button variant="ghost" size="sm" onClick={() => setAdding('tcs')}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {t('addTcs')}
+                  </Button>
+                )}
+              </div>
+
+              {data.tcsEntries.length === 0 && adding !== 'tcs' ? (
+                <p className="rounded-lg border border-dashed border-ink-200 px-3 py-3 text-center text-xs text-ink-500">
+                  {t('noTcs')}
+                </p>
+              ) : (
+                <ul className="divide-y divide-ink-200 overflow-hidden rounded-xl border border-ink-200">
+                  {data.tcsEntries.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900">{e.collectorName}</p>
+                        <p className="truncate text-xs text-ink-500">{e.collectorTan}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm font-medium text-ink-900">{formatInr(e.tcsCollected)}</span>
+                        {editable && (
+                          <DeleteControl
+                            id={e.id}
+                            confirmId={confirmId}
+                            setConfirmId={setConfirmId}
+                            pending={removeTcs.isPending}
+                            onConfirm={() => removeTcs.mutate(e.id)}
+                            label={tc('delete')}
+                            confirmLabel={t('removeConfirm')}
+                            cancelLabel={tc('cancel')}
+                          />
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {adding === 'tcs' && (
+                <AddTcsForm
                   returnId={returnId}
                   onDone={() => setAdding(null)}
                   onSaved={async () => { setAdding(null); await invalidate(); }}
@@ -424,6 +484,69 @@ function AddChallanForm({ returnId, onDone, onSaved }: { returnId: string; onDon
         </Field>
         <Field label={t('serial')} error={errors.challanSerial?.message}>
           <Input type="number" inputMode="numeric" {...register('challanSerial')} />
+        </Field>
+      </div>
+      <FormButtons saving={save.isPending} onCancel={onDone} saveLabel={tc('save')} cancelLabel={tc('cancel')} />
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------- add TCS form
+const tcsSchema = z.object({
+  collectorName: z.string().trim().min(1, 'Collector name is required.').max(125),
+  collectorTan: z.string().trim().regex(TAN_RE, 'Enter a valid 10-character TAN (e.g. DELH12345A).'),
+  tcsCollected: z.coerce.number().positive('TCS amount must be greater than zero.'),
+});
+type TcsFormValues = z.infer<typeof tcsSchema>;
+
+function AddTcsForm({ returnId, onDone, onSaved }: { returnId: string; onDone: () => void; onSaved: () => void }) {
+  const t = useTranslations('taxesPaid');
+  const tc = useTranslations('common');
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm<TcsFormValues>({
+    resolver: zodResolver(tcsSchema),
+    defaultValues: { collectorName: '', collectorTan: '', tcsCollected: 0 },
+  });
+  const { formError, handleError, reset } = useApiFormError<TcsFormValues>(setError);
+
+  const tanReg = register('collectorTan');
+  const save = useMutation({
+    mutationFn: (v: TcsFormValues) =>
+      addTcs(returnId, {
+        collectorName: v.collectorName.trim(),
+        collectorTan: v.collectorTan.trim().toUpperCase(),
+        tcsCollected: v.tcsCollected,
+      }),
+    onSuccess: onSaved,
+    onError: (e) => handleError(e, ['collectorName', 'collectorTan', 'tcsCollected']),
+  });
+
+  return (
+    <form
+      onSubmit={handleSubmit((v) => { reset(); save.mutate(v); })}
+      className="space-y-3 rounded-xl border border-ink-200 bg-ink-50/50 p-3.5"
+      noValidate
+    >
+      {formError && <Alert variant="error">{formError}</Alert>}
+      <Field label={t('collectorName')} error={errors.collectorName?.message}>
+        <Input {...register('collectorName')} placeholder={t('collectorNamePh')} maxLength={125} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t('tan')} error={errors.collectorTan?.message}>
+          <Input
+            {...tanReg}
+            onChange={(e) => { e.target.value = e.target.value.toUpperCase(); void tanReg.onChange(e); }}
+            placeholder="DELH12345A"
+            className="font-mono tracking-wide"
+            maxLength={10}
+          />
+        </Field>
+        <Field label={t('amount')} error={errors.tcsCollected?.message}>
+          <Input type="number" inputMode="numeric" {...register('tcsCollected')} />
         </Field>
       </div>
       <FormButtons saving={save.isPending} onCancel={onDone} saveLabel={tc('save')} cancelLabel={tc('cancel')} />

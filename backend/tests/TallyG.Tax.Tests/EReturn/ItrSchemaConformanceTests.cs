@@ -498,6 +498,38 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_tcs_in_scheduleTCS()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withTcs: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule TCS must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var tcs = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleTCS");
+        tcs.GetProperty("TotalSchTCS").GetInt64().Should().Be(25_000);
+        var row = tcs.GetProperty("TCS")[0];
+        row.GetProperty("TCSCreditOwner").GetString().Should().Be("1");   // self / own hands
+        row.GetProperty("EmployerOrDeductorOrCollectTAN").GetString().Should().Be("MUMA09876B");
+        row.GetProperty("TCSClaimedThisYearDtls").GetProperty("TCSAmtCollOwnHand").GetInt64().Should().Be(25_000);
+    }
+
+    [Fact]
+    public void Itr3_reports_tcs_in_scheduleTCS()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withTcs: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule TCS must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleTCS")
+            .GetProperty("TotalSchTCS").GetInt64().Should().Be(25_000);
+    }
+
+    [Fact]
     public void Itr2_reports_amt_and_amt_credit_in_scheduleAMT_AMTC()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withAmt: true);
@@ -916,7 +948,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false)
     {
         var user = new User
         {
@@ -1167,6 +1199,13 @@ public class ItrSchemaConformanceTests
                 new TaxPaymentChallan { Kind = ChallanKind.Advance, BsrCode = "1234567", DepositDate = new DateOnly(2025, 12, 15), ChallanSerial = 12345, Amount = 15_000m },
                 new TaxPaymentChallan { Kind = ChallanKind.SelfAssessment, BsrCode = "0011223", DepositDate = new DateOnly(2026, 3, 25), ChallanSerial = 678, Amount = 5_000m },
             },
+            // Collector-wise TCS so the gate exercises Schedule TCS (own-hands, claimed this year).
+            TcsEntries = withTcs
+                ? new[]
+                {
+                    new TcsEntry { CollectorTan = "MUMA09876B", CollectorName = "HDFC Bank Ltd (LRS remittance)", TcsCollected = 25_000m },
+                }
+                : Array.Empty<TcsEntry>(),
         };
     }
 

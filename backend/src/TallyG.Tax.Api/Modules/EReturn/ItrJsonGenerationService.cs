@@ -2632,6 +2632,46 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         }
 
         AddChallanSchedule(form, ctx, "ScheduleIT");
+        AddScheduleTcs(form, ctx);
+    }
+
+    // ----------------------------------------------------------------- Schedule TCS (tax collected at source)
+    // Collector-wise TCS (26AS / Form 27D) — e.g. TCS on LRS foreign remittance, a motor-vehicle purchase.
+    // Captured in the assessee's own hands and claimed in full this year. The own-hands row shape is identical
+    // across ITR-2/3 (the ITR-3-specific nesting only applies to the spouse/other-hands split we don't emit).
+    private static void AddScheduleTcs(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.TcsEntries.Count == 0)
+        {
+            return;
+        }
+
+        var rows = new List<Dictionary<string, object?>>();
+        decimal total = 0m;
+        foreach (var t in ctx.TcsEntries)
+        {
+            var amount = TaxMath0(t.TcsCollected);
+            if (amount <= 0m)
+            {
+                continue;
+            }
+
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["TCSCreditOwner"] = "1",   // 1 = self (own hands)
+                ["EmployerOrDeductorOrCollectTAN"] = Trunc(t.CollectorTan.Trim().ToUpperInvariant(), 10),
+                ["BroughtFwdTDSAmt"] = R(0m),
+                ["TCSCurrFYDtls"] = new Dictionary<string, object?> { ["TCSAmtCollOwnHand"] = R(amount) },
+                ["TCSClaimedThisYearDtls"] = new Dictionary<string, object?> { ["TCSAmtCollOwnHand"] = R(amount) },
+                ["AmtCarriedFwd"] = R(0m),
+            });
+            total += amount;
+        }
+
+        if (rows.Count > 0)
+        {
+            form["ScheduleTCS"] = new Dictionary<string, object?> { ["TCS"] = rows, ["TotalSchTCS"] = R(total) };
+        }
     }
 
     // ----------------------------------------------------------------- Schedule S (salary, itemised)
