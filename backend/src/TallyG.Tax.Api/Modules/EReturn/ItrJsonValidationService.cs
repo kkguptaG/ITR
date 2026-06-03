@@ -406,6 +406,27 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- Form 10BA reminder for s.80GG (rent paid deduction) ---
+        // 80GG requires the assessee to file Form 10BA (a declaration that no HRA is received and the
+        // assessee / spouse / minor child doesn't own a residential property) separately on the portal
+        // before the return is filed. Remind filers who have claimed 80GG.
+        if (ctx.Deductions.Any(d => string.Equals(d.Section.Trim(), "80GG", StringComparison.OrdinalIgnoreCase)))
+        {
+            Warn("DEDUCTION.80GG_FORM10BA", "$..DeductUndChapVIA",
+                "s.80GG (rent-paid deduction) requires Form 10BA to be filed on the income-tax portal before uploading this return.",
+                "Log in to incometax.gov.in → e-File → Income Tax Forms → Form 10BA, furnish the declaration (no HRA received, no owned residential property), and submit. Only then claim 80GG in the return.");
+        }
+
+        // --- s.89(1) arrears relief requires Form 10E ---
+        // Form 10E must be filed on the portal BEFORE the return claiming s.89(1) relief, otherwise
+        // the department disallows the relief and raises a demand. Remind filers with a non-zero Relief89.
+        if ((c?.Relief89 ?? 0m) > 0m)
+        {
+            Warn("TAX.89_RELIEF_FORM10E", "$..ComputationOfTaxLiability.TaxRelief",
+                "s.89(1) arrears relief is claimed. Form 10E (the supporting computation) must be filed on the portal BEFORE submitting this return, otherwise the relief is disallowed and a demand is raised.",
+                "Log in to incometax.gov.in → e-File → Income Tax Forms → Form 10E, enter the year-wise income and tax figures, and submit. The Form 10E calculator on the Help page can help estimate the relief amount.");
+        }
+
         // --- Schedule 5A (Portuguese Civil Code) jurisdiction check ---
         if (ctx.SpouseApportionment is not null && ctx.Profile is { StateCode: { } stateCode }
             && stateCode.Trim() is not ("07" or "08" or "10"))

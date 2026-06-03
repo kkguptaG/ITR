@@ -288,6 +288,29 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Claiming_80GG_warns_about_form_10BA_requirement()
+    {
+        var ded = new[] { Deduct("80GG", 40_000m) };
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: ded), StubJson), "DEDUCTION.80GG_FORM10BA").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Claiming_section89_relief_warns_about_form_10E_requirement()
+    {
+        var comp = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 900_000m, TaxableIncome = 825_000m, Relief89 = 28_600m, TotalTax = 50_000m };
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25" },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = comp,
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
+        };
+        Has(Svc.Validate(ctx, StubJson), "TAX.89_RELIEF_FORM10E").Should().BeTrue();
+    }
+
+    [Fact]
     public void Itr1_with_multiple_house_properties_is_a_hard_error()
     {
         var houses = new[]
