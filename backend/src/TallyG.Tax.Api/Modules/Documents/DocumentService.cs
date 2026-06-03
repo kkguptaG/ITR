@@ -484,7 +484,110 @@ public sealed class DocumentService : IDocumentService
             income += await MapForm16SalaryAndTdsAsync(taxReturn, document, fields, ct);
         }
 
+        // Form 26AS carries the TDS/TCS credits and self-paid challans — map them onto the return's
+        // TdsEntry/TcsEntry rows and update the prepaid-tax rollups (TdsPaid, TcsPaid, AdvanceTaxPaid,
+        // SelfAssessmentTaxPaid). These drive the refund/payable calculation and every Schedule IT / TDS
+        // schedule, so not wiring them makes 26AS upload functionally useless for the user.
+        if (document.Kind == DocumentKind.Form26AS)
+        {
+            await Map26ASTaxCreditsAsync(taxReturn, document, fields, ct);
+        }
+
         return (income, deductions);
+    }
+
+    /// <summary>
+    /// Form 26AS → TDS salary + non-salary credit rows, a TCS credit row, and advance/self-assessment tax
+    /// rollup updates. The 26AS extraction gives totals-only (not per-deductor rows), so a single
+    /// consolidated entry tagged by the source document is upserted per head and the return's prepaid-tax
+    /// rollups are re-derived from live DB rows (same pattern as the Form 16 path). Idempotent.
+    /// </summary>
+    private async Task Map26ASTaxCreditsAsync(
+        TaxReturn taxReturn, Document document, IReadOnlyDictionary<string, StoredField> fields, CancellationToken ct)
+    {
+        decimal Money(string key) => fields.TryGetValue(key, out var f) && TryParseMoney(f.Value, out var amt) ? Math.Max(0m, amt) : 0m;
+
+        var tdsSalary = Money("form26as.tds_salary");
+        var tdsOther = Money("form26as.tds_interest");   // "interest" is the most common non-salary TDS; generalize
+        var tcs = Money("form26as.tcs");
+        var advanceTax = Money("form26as.advance_tax");
+        var selfAssessment = Money("form26as.self_assessment_tax");
+        // The consolidated 26AS row is tagged by embedding the document id in the deductor TAN field as
+        // "26AS|{docId}" (TAN is just an identifier string here, not sent to the ITD — the real per-deductor
+        // rows from the taxpayer's own Form 16 / 16A remain). No schema change needed.
+        var tag = $"26AS|{document.Id:N}";
+
+        // Salary TDS row (head = Salary).
+        if (tdsSalary > 0m)
+        {
+            var entry = await _db.TdsEntries.FirstOrDefaultAsync(
+                t => t.TaxReturnId == taxReturn.Id && t.Head == TdsHead.Salary && t.DeductorTan == tag, ct);
+            if (entry is null)
+            {
+                entry = new TdsEntry
+                {
+                    TenantId = taxReturn.TenantId, UserId = taxReturn.UserId, TaxReturnId = taxReturn.Id,
+                    Head = TdsHead.Salary, DeductorTan = tag, DeductorName = "Form 26AS (consolidated)",
+                };
+                _db.TdsEntries.Add(entry);
+            }
+            entry.TaxDeducted = tdsSalary;
+        }
+
+        // Non-salary TDS row (head = OtherThanSalary).
+        if (tdsOther > 0m)
+        {
+            var tag2 = $"26ASO|{document.Id:N}";
+            var entry = await _db.TdsEntries.FirstOrDefaultAsync(
+                t => t.TaxReturnId == taxReturn.Id && t.Head == TdsHead.OtherThanSalary && t.DeductorTan == tag2, ct);
+            if (entry is null)
+            {
+                entry = new TdsEntry
+                {
+                    TenantId = taxReturn.TenantId, UserId = taxReturn.UserId, TaxReturnId = taxReturn.Id,
+                    Head = TdsHead.OtherThanSalary, DeductorTan = tag2, DeductorName = "Form 26AS (consolidated)",
+                    TdsSection = "94A",
+                };
+                _db.TdsEntries.Add(entry);
+            }
+            entry.TaxDeducted = tdsOther;
+        }
+
+        // TCS row.
+        if (tcs > 0m)
+        {
+            var tcsTag = $"26ASC|{document.Id:N}";
+            var entry = await _db.TcsEntries.FirstOrDefaultAsync(
+                t => t.TaxReturnId == taxReturn.Id && t.CollectorTan == tcsTag, ct);
+            if (entry is null)
+            {
+                entry = new TcsEntry
+                {
+                    TenantId = taxReturn.TenantId, UserId = taxReturn.UserId, TaxReturnId = taxReturn.Id,
+                    CollectorTan = tcsTag, CollectorName = "Form 26AS (consolidated)",
+                };
+                _db.TcsEntries.Add(entry);
+            }
+            entry.TcsCollected = tcs;
+        }
+
+        // Re-derive the prepaid-tax rollups from ALL entries for this return (including other documents'
+        // already-persisted rows) PLUS the entries we just added to the change tracker. Since the new
+        // entries aren't saved yet, use the pattern from Form 16: query "all except this document's tag"
+        // and add the current values on top so multiple documents accumulate correctly.
+        var salTag = $"26AS|{document.Id:N}";
+        var othTag = $"26ASO|{document.Id:N}";
+        var tcsTag2 = $"26ASC|{document.Id:N}";
+        var tdsFromOthers = await _db.TdsEntries
+            .Where(t => t.TaxReturnId == taxReturn.Id && t.DeductorTan != salTag && t.DeductorTan != othTag)
+            .SumAsync(t => (decimal?)t.TaxDeducted, ct) ?? 0m;
+        var tcsFromOthers = await _db.TcsEntries
+            .Where(t => t.TaxReturnId == taxReturn.Id && t.CollectorTan != tcsTag2)
+            .SumAsync(t => (decimal?)t.TcsCollected, ct) ?? 0m;
+        taxReturn.TdsPaid = tdsFromOthers + tdsSalary + tdsOther;
+        taxReturn.TcsPaid = tcsFromOthers + tcs;
+        taxReturn.AdvanceTaxPaid = advanceTax > 0m ? advanceTax : taxReturn.AdvanceTaxPaid;
+        taxReturn.SelfAssessmentTaxPaid = selfAssessment > 0m ? selfAssessment : taxReturn.SelfAssessmentTaxPaid;
     }
 
     /// <summary>
