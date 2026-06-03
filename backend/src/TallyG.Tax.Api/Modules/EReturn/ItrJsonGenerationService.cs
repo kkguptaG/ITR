@@ -168,6 +168,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSpi(root, ctx);
         AddSchedulePti(root, ctx);
         AddSchedule5A(root, ctx);
+        AddScheduleAmt(root, ctx);
         AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
@@ -205,6 +206,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleSpi(skel, ctx);
         AddSchedulePti(skel, ctx);
         AddSchedule5A(skel, ctx);
+        AddScheduleAmt(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1457,6 +1459,98 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         form["Schedule5A2014"] = node;
     }
+
+    // ----------------------------------------------------------------- Schedule AMT + AMTC (s.115JC / 115JD)
+    // Alternate Minimum Tax: when profit-linked deductions (Ch VI-A Part-C / s.10AA / s.35AD) are claimed,
+    // they are added back to total income → adjusted total income (ATI), and AMT = 18.5% of ATI. The engine
+    // (AmtCalculator) already computes ATI, the AMT and the s.115JD credit; this surfaces them as Schedule AMT
+    // (the s.115JC computation) and, when AMT is payable, Schedule AMTC (the credit ledger). ITR-2/3 only.
+    // The credit ledger is a documented simplification pending CA review (mirrors the engine's AMT stance);
+    // the per-AY ScheduleAMTCDtls breakdown is omitted (optional) pending per-year credit capture.
+    private static void AddScheduleAmt(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        var c = ctx.Computation;
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3) || c is null)
+        {
+            return;
+        }
+
+        var taxable = TaxMath0(c.TaxableIncome);
+        var ati = TaxMath0(c.AdjustedTotalIncome);
+        var addBack = TaxMath0(ati - taxable);
+        if (addBack <= 0m)
+        {
+            return;   // no profit-linked add-back ⇒ AMT does not apply ⇒ Schedule AMT/AMTC not required
+        }
+
+        var amt = TaxMath0(c.AlternativeMinimumTax);
+
+        // Schedule AMT — the s.115JC adjusted-total-income computation (form-aware).
+        if (ctx.ItrType == ItrType.ITR3)
+        {
+            // ITR-3 splits the add-back by section (10AA / 35AD / the Part-C remainder under "6A").
+            var sec10AA = TaxMath0(ctx.Deductions.Where(d => DeductionSectionContains(d.Section, "10AA")).Sum(d => d.Amount));
+            var sec35AD = TaxMath0(ctx.Deductions.Where(d => DeductionSectionContains(d.Section, "35AD")).Sum(d => d.Amount));
+            var sec6A = TaxMath0(addBack - sec10AA - sec35AD);
+            form["ScheduleAMT"] = new Dictionary<string, object?>
+            {
+                ["TotalIncItem11"] = R(taxable),
+                ["AdjustmentSec115JC"] = new Dictionary<string, object?>
+                {
+                    ["DeductClaimSec6A"] = R(sec6A),
+                    ["DeductClaimSec10AA"] = R(sec10AA),
+                    ["DeductClaimSec35AD"] = R(sec35AD),
+                    ["Total"] = R(addBack),
+                },
+                ["AdjustedUnderSec115JC"] = R(ati),
+                ["AdjustedUnderSec115JCIFSC"] = R(0m),     // no IFSC-unit income captured
+                ["AdjustedUnderSec115JCOther"] = R(ati),
+                ["TaxPayableUnderSec115JC"] = R(amt),
+            };
+        }
+        else
+        {
+            form["ScheduleAMT"] = new Dictionary<string, object?>
+            {
+                ["TotalIncItemPartBTI"] = R(taxable),
+                ["DeductionClaimUndrAnySec"] = R(addBack),
+                ["AdjustedUnderSec115JC"] = R(ati),
+                ["TaxPayableUnderSec115JC"] = R(amt),
+            };
+        }
+
+        // Schedule AMTC — the s.115JD AMT-credit ledger. Emitted only when there is credit activity. When AMT
+        // is payable (credit generated this year) the regular tax is exactly AMT − creditGenerated.
+        var generated = TaxMath0(c.AmtCreditGenerated);
+        var setOff = TaxMath0(c.AmtCreditSetOff);
+        var broughtFwd = TaxMath0(ctx.Return.BroughtForwardAmtCredit);
+        if (generated <= 0m && setOff <= 0m && broughtFwd <= 0m)
+        {
+            return;
+        }
+
+        var regular = generated > 0m ? TaxMath0(amt - generated) : TaxMath0(c.TotalTax + setOff);
+        var closingCredit = TaxMath0(broughtFwd - setOff + generated);
+        var amtc = new Dictionary<string, object?>
+        {
+            ["TaxSection115JC"] = R(amt),
+            ["TaxOthProvisions"] = R(regular),
+            ["AmtTaxCreditAvailable"] = R(generated),
+            ["CurrYrAmtCreditFwd"] = R(generated),
+            ["CurrYrCreditCarryFwd"] = R(generated),
+            ["TotAMTGross"] = R(broughtFwd),
+            ["TotSetOffEys"] = R(setOff),
+            ["TotBalBF"] = R(broughtFwd),
+            ["TotAmtCreditUtilisedCY"] = R(setOff),
+            ["TotBalAMTCreditCF"] = R(closingCredit),
+            ["TaxSection115JD"] = R(setOff),
+            ["AmtLiabilityAvailable"] = R(TaxMath0(regular - amt)),
+        };
+        form["ScheduleAMTC"] = amtc;
+    }
+
+    private static bool DeductionSectionContains(string? section, string token)
+        => (section ?? string.Empty).Replace(" ", string.Empty).ToUpperInvariant().Contains(token);
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {

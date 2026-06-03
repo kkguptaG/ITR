@@ -498,6 +498,50 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_amt_and_amt_credit_in_scheduleAMT_AMTC()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withAmt: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule AMT/AMTC must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        var amt = itr2.GetProperty("ScheduleAMT");
+        amt.GetProperty("TotalIncItemPartBTI").GetInt64().Should().Be(925_000);
+        amt.GetProperty("DeductionClaimUndrAnySec").GetInt64().Should().Be(2_000_000);   // 10AA add-back
+        amt.GetProperty("AdjustedUnderSec115JC").GetInt64().Should().Be(2_925_000);
+        amt.GetProperty("TaxPayableUnderSec115JC").GetInt64().Should().Be(562_770);
+
+        var amtc = itr2.GetProperty("ScheduleAMTC");
+        amtc.GetProperty("TaxSection115JC").GetInt64().Should().Be(562_770);   // AMT
+        amtc.GetProperty("TaxOthProvisions").GetInt64().Should().Be(41_600);   // regular = AMT − credit generated
+        amtc.GetProperty("TotBalAMTCreditCF").GetInt64().Should().Be(521_170); // credit carried forward
+    }
+
+    [Fact]
+    public void Itr3_reports_amt_with_section_split()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule AMT/AMTC must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var amt = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("ScheduleAMT");
+        // ITR-3 splits the add-back by section; with no itemised 10AA/35AD deduction captured, the whole
+        // add-back falls into the Part-C remainder (DeductClaimSec6A) and the section total equals the add-back.
+        var adj = amt.GetProperty("AdjustmentSec115JC");
+        adj.GetProperty("DeductClaimSec6A").GetInt64().Should().Be(2_000_000);
+        adj.GetProperty("Total").GetInt64().Should().Be(2_000_000);
+        amt.GetProperty("AdjustedUnderSec115JC").GetInt64().Should().Be(2_925_000);
+        amt.GetProperty("TaxPayableUnderSec115JC").GetInt64().Should().Be(562_770);
+    }
+
+    [Fact]
     public void Itr2_apportions_income_with_spouse_in_schedule5A()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withHouse: true, withGains: true, withSpouseApportionment: true);
@@ -872,7 +916,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false)
     {
         var user = new User
         {
@@ -908,7 +952,12 @@ public class ItrSchemaConformanceTests
             Surcharge = 0m,
             // A foreign tax credit when the FSI scenario is exercised, so the PartB-TTI TaxRelief node is emitted.
             Relief90And91 = withForeignSourceIncome ? 15_000m : 0m,
-            TotalTax = 41_600m,
+            // AMT scenario: a ₹20L 10AA add-back → ATI ₹29.25L, AMT (18.5% + cess) ₹5,62,770 > regular ₹41,600,
+            // so AMT is payable and ₹5,21,170 credit is generated (Schedule AMT + AMTC).
+            AdjustedTotalIncome = withAmt ? 2_925_000m : 0m,
+            AlternativeMinimumTax = withAmt ? 562_770m : 0m,
+            AmtCreditGenerated = withAmt ? 521_170m : 0m,
+            TotalTax = withAmt ? 562_770m : 41_600m,
             TdsPaid = 50_000m,
             AdvanceTax = 0m,
             InterestPenalty = 0m,
