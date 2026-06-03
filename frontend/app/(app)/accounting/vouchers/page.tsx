@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { FileSpreadsheet } from 'lucide-react';
 import {
@@ -25,7 +26,9 @@ import {
 
 const PAGE_SIZE = 10;
 
-export default function VouchersPage() {
+function VouchersContent() {
+  const searchParams = useSearchParams();
+  const returnId = searchParams.get('returnId');   // optional — passed when navigating from a return
   const [page, setPage] = useState(1);
   const [reviewId, setReviewId] = useState<string | null>(null);
 
@@ -118,7 +121,16 @@ export default function VouchersPage() {
         importId={reviewId}
         open={!!reviewId}
         onClose={() => setReviewId(null)}
+        returnId={returnId}
       />
     </div>
+  );
+}
+
+export default function VouchersPage() {
+  return (
+    <Suspense fallback={<Spinner label="Loading…" />}>
+      <VouchersContent />
+    </Suspense>
   );
 }

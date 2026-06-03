@@ -7,6 +7,7 @@
 // optional to proceed (a user can key figures manually on the Income step).
 // ---------------------------------------------------------------------------
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Alert } from '@/components/ui';
@@ -55,6 +56,17 @@ export function DocumentsStep() {
             />
           ))}
         </div>
+
+        <Alert variant="info">
+          Have bank statements? Import them on the{' '}
+          <Link
+            href={`/accounting/vouchers?returnId=${returnId}`}
+            className="font-semibold underline underline-offset-2 hover:opacity-75"
+          >
+            Bank Statement page
+          </Link>{' '}
+          — interest, dividends and income you approve can be pushed directly to this return.
+        </Alert>
       </WizardStep>
 
       <WizardFooter

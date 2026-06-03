@@ -107,6 +107,20 @@ export function postImport(id: string, body: PostImportBody = {}): Promise<PostI
   return apiPost<PostImportResponse>(`/accounting/bank-imports/${id}:post`, body);
 }
 
+export interface PushToReturnResponse {
+  rowsUpserted: number;
+  message: string;
+}
+
+/** Push posted OtherIncome credit lines from this import to a tax return as income-source rows. */
+export function pushImportToReturn(importId: string, returnId: string): Promise<PushToReturnResponse> {
+  return apiPost<PushToReturnResponse>(
+    `/accounting/bank-imports/${importId}:push-to-return`,
+    undefined,
+    { params: { returnId } },
+  );
+}
+
 export function deleteImport(id: string): Promise<void> {
   return apiDelete<void>(`/accounting/bank-imports/${id}`);
 }

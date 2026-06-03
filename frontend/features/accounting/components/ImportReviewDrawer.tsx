@@ -7,7 +7,8 @@ import { Alert, Badge, Button, Select, Spinner } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { formatDate, formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { accountingKeys, getImport, listLedgers, postImport } from '../api';
+import { accountingKeys, getImport, listLedgers, postImport, pushImportToReturn } from '../api';
+import type { PushToReturnResponse } from '../api';
 import {
   confidenceTone,
   formatConfidence,
@@ -26,12 +27,15 @@ interface Props {
   importId: string | null;
   open: boolean;
   onClose: () => void;
+  /** When provided, a "Push to return" CTA appears after posting so income sources are created. */
+  returnId?: string | null;
 }
 
-export function ImportReviewDrawer({ importId, open, onClose }: Props) {
+export function ImportReviewDrawer({ importId, open, onClose, returnId }: Props) {
   const queryClient = useQueryClient();
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [result, setResult] = useState<PostImportResponse | null>(null);
+  const [pushResult, setPushResult] = useState<PushToReturnResponse | null>(null);
 
   const detailQuery = useQuery({
     queryKey: accountingKeys.import(importId ?? ''),
@@ -81,6 +85,11 @@ export function ImportReviewDrawer({ importId, open, onClose }: Props) {
       setResult(res);
       void queryClient.invalidateQueries({ queryKey: accountingKeys.all });
     },
+  });
+
+  const push = useMutation({
+    mutationFn: () => pushImportToReturn(importId ?? '', returnId ?? ''),
+    onSuccess: (res) => setPushResult(res),
   });
 
   const willPost = pendingLines.filter((l) => (choices[l.id] ?? ACCEPT) !== SKIP).length;
@@ -156,14 +165,38 @@ export function ImportReviewDrawer({ importId, open, onClose }: Props) {
           )}
 
           {result ? (
-            <Alert variant="success" title="Posted to your books">
-              {`Created ${result.vouchersPosted} voucher${result.vouchersPosted === 1 ? '' : 's'}`}
-              {result.ledgersCreated > 0
-                ? ` and ${result.ledgersCreated} new ledger${result.ledgersCreated === 1 ? '' : 's'} (E).`
-                : '.'}
-              {result.skipped > 0 ? ` Skipped ${result.skipped}.` : ''}{' '}
-              You can rename or regroup the (E) ledgers on the Chart of Accounts page.
-            </Alert>
+            <div className="space-y-3">
+              <Alert variant="success" title="Posted to your books">
+                {`Created ${result.vouchersPosted} voucher${result.vouchersPosted === 1 ? '' : 's'}`}
+                {result.ledgersCreated > 0
+                  ? ` and ${result.ledgersCreated} new ledger${result.ledgersCreated === 1 ? '' : 's'} (E).`
+                  : '.'}
+                {result.skipped > 0 ? ` Skipped ${result.skipped}.` : ''}{' '}
+                You can rename or regroup the (E) ledgers on the Chart of Accounts page.
+              </Alert>
+
+              {returnId && !pushResult && (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3.5">
+                  <p className="text-sm text-brand-800">
+                    Interest, dividends and other income in this statement can be pushed directly to your tax return as income sources.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 bg-white"
+                    loading={push.isPending}
+                    onClick={() => push.mutate()}
+                  >
+                    Push to return
+                  </Button>
+                </div>
+              )}
+              {pushResult && (
+                <Alert variant="success" title="Income pushed to return">
+                  {pushResult.message}
+                </Alert>
+              )}
+            </div>
           ) : (
             <p className="text-sm text-ink-500">
               Each line is mapped to its best-fit ledger. Accept the suggestion, redirect it to one of
