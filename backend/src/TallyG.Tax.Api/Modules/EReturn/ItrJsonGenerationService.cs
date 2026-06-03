@@ -11,10 +11,11 @@ namespace TallyG.Tax.Api.Modules.EReturn;
 /// <summary>
 /// Maps the common return model + the engine's computation to the ITD-format ITR JSON.
 ///
-/// <b>ITR-1 &amp; ITR-4 (AY2026-27)</b> are validated against the OFFICIAL ITD JSON schema — the
-/// conformance test (ItrSchemaConformanceTests) fails the build if the output drifts from the notified
-/// schema bundled under tests/Schemas/. <b>ITR-2 &amp; ITR-3 remain demo-shape</b> (not yet reconciled —
-/// they are not AY2026-27-notified). Headline totals (GrossTotIncome, TotalIncome, taxes, refund) are
+/// <b>All four forms (ITR-1/2/3/4)</b> are validated against the OFFICIAL ITD JSON schema —
+/// the conformance gate (ItrSchemaConformanceTests) fails the build if any form drifts from the notified
+/// schema. ITR-1/4 are validated on AY2026-27; ITR-2/3 are validated on AY2025-26 (not yet notified for
+/// AY2026-27 at time of writing — the gate will automatically pick up new schemas when they are added).
+/// Headline totals (GrossTotIncome, TotalIncome, taxes, refund) are
 /// taken verbatim from the engine's <see cref="TaxComputation"/> (single source of truth); the per-head
 /// breakdown is derived and anchored so the heads sum to the engine's GTI. Money is emitted as integer
 /// rupees (s.288A/B rounding) to match the schema's integer types.
