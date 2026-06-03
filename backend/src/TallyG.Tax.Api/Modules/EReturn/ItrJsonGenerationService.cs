@@ -95,7 +95,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var business = ctx.Businesses.Sum(PresumptiveIncome);
         var hp = HousePropertyIncome(ctx.Houses);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = gti - hp - other - business;            // anchored to the engine's GTI
+        // Anchored to the engine's GTI; clamped to ≥0 so a missing/zero computation (or business income
+        // exceeding GTI) can't drive IncomeFromSal negative (the schema requires ≥0).
+        var salaryNet = TaxMath0(gti - hp - other - business);
         var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);
         var us16 = Math.Max(0m, grossSalary - salExempt - salaryNet);
