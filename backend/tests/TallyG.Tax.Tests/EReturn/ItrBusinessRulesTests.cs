@@ -101,6 +101,38 @@ public class ItrBusinessRulesTests
         Has(Svc.Validate(Ctx(spouseApportionment: spouse, stateCode: "10"), StubJson), "SCHEDULE5A.JURISDICTION").Should().BeFalse();
     }
 
+    [Fact]
+    public void Vda_loss_is_flagged_as_ring_fenced_no_setoff_or_carry_forward()
+    {
+        // Bought ₹2L, sold ₹80k → a ₹1.2L VDA loss that s.115BBH(2) ring-fences.
+        var gains = new[] { Vda(salePrice: 80_000m, cost: 200_000m) };
+        Has(Svc.Validate(Ctx(gains: gains), StubJson), "VDA.LOSS_IGNORED").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Vda_with_improvement_or_transfer_expenses_warns_they_are_disallowed()
+    {
+        var gains = new[] { Vda(salePrice: 500_000m, cost: 200_000m, expenses: 5_000m) };
+        Has(Svc.Validate(Ctx(gains: gains), StubJson), "VDA.DEDUCTION_DISALLOWED").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Vda_income_on_itr1_is_a_wrong_form_error()
+    {
+        var gains = new[] { Vda(salePrice: 500_000m, cost: 200_000m) };
+        Has(Svc.Validate(Ctx(itrType: ItrType.ITR1, gains: gains), StubJson), "VDA.WRONG_FORM").Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_profitable_vda_on_itr2_raises_no_vda_issue()
+    {
+        var gains = new[] { Vda(salePrice: 500_000m, cost: 200_000m) };
+        var report = Svc.Validate(Ctx(gains: gains), StubJson);
+        Has(report, "VDA.LOSS_IGNORED").Should().BeFalse();
+        Has(report, "VDA.WRONG_FORM").Should().BeFalse();
+        Has(report, "VDA.DEDUCTION_DISALLOWED").Should().BeFalse();
+    }
+
     // ----------------------------------------------------------------- builders
     private static ItrFilingContext Ctx(
         decimal refundOrPayable = 0m,
@@ -111,11 +143,13 @@ public class ItrBusinessRulesTests
         IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null,
         SpouseIncomeApportionment? spouseApportionment = null,
         decimal relief90And91 = 0m,
-        string stateCode = "27")
+        string stateCode = "27",
+        ItrType itrType = ItrType.ITR2,
+        IReadOnlyList<CapitalGain>? gains = null)
         => new()
         {
             // AY2024-25 has no bundled schema → SchemaAvailable=false → no conformance noise.
-            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = regime, RuleSetVersion = "AY2024-25" },
+            Return = new TaxReturn { ItrType = itrType, Regime = regime, RuleSetVersion = "AY2024-25" },
             User = new User { FullName = "Demo Taxpayer", Email = "demo@itrhelp.com", MobileE164 = "+919000000002", PanMasked = "ABCDE1234F" },
             Profile = new UserProfile { City = "Pune", StateCode = stateCode, Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
             Ay = new AssessmentYear { Code = "AY2024-25" },
@@ -126,7 +160,18 @@ public class ItrBusinessRulesTests
             Businesses = businesses ?? Array.Empty<BusinessIncome>(),
             ForeignSourceIncomes = foreignSourceIncomes ?? Array.Empty<ForeignSourceIncome>(),
             SpouseApportionment = spouseApportionment,
+            Gains = gains ?? Array.Empty<CapitalGain>(),
         };
+
+    private static CapitalGain Vda(decimal salePrice, decimal cost, decimal expenses = 0m) => new()
+    {
+        AssetType = CapitalGainAssetType.CryptoVda,
+        Term = CapitalGainTerm.Short,
+        TaxSection = "115BBH",
+        SalePrice = salePrice,
+        CostOfAcquisition = cost,
+        ExpensesOnTransfer = expenses,
+    };
 
     private static BankAccountDetail Bank(bool useForRefund) => new()
     {

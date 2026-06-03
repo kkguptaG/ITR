@@ -212,6 +212,41 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- virtual digital assets (s.115BBH) cross-checks ---
+        var vdaGains = ctx.Gains
+            .Where(g => g.AssetType == CapitalGainAssetType.CryptoVda
+                        || (g.TaxSection ?? string.Empty).Contains("115BBH"))
+            .ToList();
+        if (vdaGains.Count > 0)
+        {
+            // ITR-1/ITR-4 have no Schedule VDA — VDA income forces ITR-2/3.
+            if (ctx.ItrType is ItrType.ITR1 or ItrType.ITR4)
+            {
+                Err("VDA.WRONG_FORM", "$..ScheduleVDA",
+                    "Income from virtual digital assets (s.115BBH) cannot be reported on ITR-1 / ITR-4.",
+                    "Switch to ITR-2 (or ITR-3 if you trade VDA as a business) — Schedule VDA exists only on those forms.");
+            }
+
+            // A VDA loss is ring-fenced: no set-off against ANY income (not even another VDA gain) and no
+            // carry-forward (s.115BBH(2)). Flag it so the user doesn't expect it to reduce other tax.
+            var losses = vdaGains.Where(g => g.SalePrice - g.CostOfAcquisition < 0m).ToList();
+            if (losses.Count > 0)
+            {
+                var totalLoss = losses.Sum(g => g.CostOfAcquisition - g.SalePrice);
+                Warn("VDA.LOSS_IGNORED", "$..ScheduleVDA",
+                    $"A virtual-digital-asset loss of ₹{totalLoss:N0} is present. A VDA loss can't be set off against any income — not even a gain on another VDA — and can't be carried forward (s.115BBH(2)); it is simply ignored.",
+                    "Each VDA transfer is taxed on its own gain at a flat 30%. Don't net this loss against other gains or expect a carry-forward.");
+            }
+
+            // s.115BBH allows ONLY the cost of acquisition — improvement / transfer expenses are disallowed.
+            if (vdaGains.Any(g => g.CostOfImprovement > 0m || g.ExpensesOnTransfer > 0m))
+            {
+                Warn("VDA.DEDUCTION_DISALLOWED", "$..ScheduleVDA",
+                    "Cost of improvement or transfer expenses are entered against a virtual-digital-asset transfer, but s.115BBH allows only the cost of acquisition.",
+                    "Remove those amounts — they don't reduce VDA income; only the acquisition cost is deductible.");
+            }
+        }
+
         // --- Schedule 5A (Portuguese Civil Code) jurisdiction check ---
         if (ctx.SpouseApportionment is not null && ctx.Profile is { StateCode: { } stateCode }
             && stateCode.Trim() is not ("07" or "08" or "10"))
