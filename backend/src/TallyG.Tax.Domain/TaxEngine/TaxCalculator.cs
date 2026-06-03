@@ -60,6 +60,17 @@ public sealed class TaxCalculator : ITaxCalculator
         var (businessIncome, speculativeIncome) = ComputeBusinessHead(input, trace);
         var (otherIncome, casual115BB, agriculturalIncome) = ComputeOtherSourcesHead(input, trace);
 
+        // Book-vs-tax depreciation reconciliation (Schedule BP): add back the book depreciation in the P&L and
+        // allow the s.32 depreciation instead. Folded into business income BEFORE any loss set-off. Nil when
+        // books and tax depreciation match.
+        if (input.BusinessDepreciationAdjustment != 0m)
+        {
+            businessIncome += input.BusinessDepreciationAdjustment;
+            trace.Add(new TraceLine("Business.DepreciationReconciliation",
+                "Business income adjusted: book depreciation added back less depreciation allowable u/s 32",
+                input.BusinessDepreciationAdjustment, "s.32"));
+        }
+
         // Brought-forward (earlier-year) losses set off against the SAME head's current income.
         housePropertyIncome = SetOffBroughtForwardLoss(housePropertyIncome, input.BroughtForwardHousePropertyLoss, "HouseProperty", trace);
         businessIncome = SetOffBroughtForwardLoss(businessIncome, input.BroughtForwardBusinessLoss, "Business", trace);

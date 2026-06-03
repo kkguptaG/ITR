@@ -99,6 +99,14 @@ public sealed record TaxComputationInput
     /// </summary>
     public decimal BroughtForwardUnabsorbedDepreciation { get; init; }
 
+    /// <summary>
+    /// Book-vs-tax depreciation adjustment to business income (Schedule BP): book depreciation debited to the
+    /// P&amp;L is added back and the s.32 (Income-tax Act) depreciation is allowed instead, so this equals
+    /// (book depreciation − tax depreciation). Positive raises taxable business income, negative lowers it;
+    /// nil when books and tax depreciation match. Folded into the business head before set-off.
+    /// </summary>
+    public decimal BusinessDepreciationAdjustment { get; init; }
+
     // --- Alternate Minimum Tax (s.115JC/JD) + reliefs (s.89/90/91) ---
 
     /// <summary>Brought-forward AMT credit u/s 115JD; set off in a year where regular tax exceeds AMT.</summary>

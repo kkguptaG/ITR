@@ -19,6 +19,7 @@ export interface DepreciableAssetDto {
   additionsAbove180Days: number;
   additionsBelow180Days: number;
   saleProceeds: number;
+  bookDepreciation: number;
 }
 
 export interface UpsertDepreciableAssetBody {
@@ -27,6 +28,7 @@ export interface UpsertDepreciableAssetBody {
   additionsAbove180Days: number;
   additionsBelow180Days: number;
   saleProceeds: number;
+  bookDepreciation: number;
 }
 
 export interface UnabsorbedDepreciationDto {

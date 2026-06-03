@@ -38,6 +38,15 @@ internal static class TaxComputationInputFactory
         // gain u/s 50 (slab rate). Fed in as a synthetic STCG so the engine taxes it (Schedule DCG discloses it).
         var deemedStcg = depreciableAssets is { Count: > 0 } da ? DepreciationCalculator.TotalDeemedCapitalGain(da) : 0m;
 
+        // Schedule BP book-vs-tax depreciation reconciliation: add back the book depreciation debited to the
+        // P&L and allow the s.32 depreciation instead, so the engine taxes the reconciled business income.
+        // ONLY for regular-books (non-presumptive) business — under 44AD/44ADA presumptive, depreciation is
+        // deemed already allowed, so there is nothing to reconcile.
+        var depAssets = depreciableAssets ?? Array.Empty<DepreciableAsset>();
+        var businessDepAdjustment = depAssets.Count > 0 && businesses.Any(b => !b.IsPresumptive)
+            ? depAssets.Sum(a => a.BookDepreciation) - DepreciationCalculator.TotalDepreciation(depAssets)
+            : 0m;
+
         // Foreign-source income (Schedule FSI/TR) is the canonical source of the doubly-taxed income +
         // foreign tax paid that drive the s.90/91 foreign-tax-credit; when present it overrides the
         // return's manual fields so the engine credits the relief (and the credit reconciles with TR1).
@@ -93,6 +102,7 @@ internal static class TaxComputationInputFactory
             // (vs any head except salary, indefinite c/f), so sum them into one figure the engine absorbs.
             BroughtForwardUnabsorbedDepreciation = (unabsorbedDepreciations ?? Array.Empty<UnabsorbedDepreciation>())
                 .Sum(u => Math.Max(0m, u.UnabsorbedDepreciationAmount) + Math.Max(0m, u.UnabsorbedAllowanceAmount)),
+            BusinessDepreciationAdjustment = businessDepAdjustment,
             // AMT credit (s.115JD) + reliefs (s.89/90/91).
             BroughtForwardAmtCredit = ret.BroughtForwardAmtCredit,
             Relief89 = ret.Relief89,

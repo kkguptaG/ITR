@@ -1428,7 +1428,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var cg = TaxMath0(cgShort + cgLong);
         var os = TaxMath0(ctx.OtherIncomes.Sum(o => o.Amount));
-        var business = isItr3 ? TaxMath0(ctx.Businesses.Sum(PresumptiveIncome)) : 0m;
+        var business = isItr3 ? TaxMath0(BusinessIncomeForReturn(ctx)) : 0m;
 
         // The 50% statutory spouse share (Portuguese Civil Code). TDS apportionment is not captured (0).
         static Dictionary<string, object?> Head(decimal inc) => new()
@@ -2429,7 +2429,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var c = ctx.Computation;
         var hpRaw = HousePropertyIncome(ctx.Houses);
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
-        var businessRaw = ctx.Businesses.Sum(PresumptiveIncome);
+        var businessRaw = BusinessIncomeForReturn(ctx);
         var otherRaw = ctx.OtherIncomes.Sum(o => o.Amount);
         var gtiRaw = c?.GrossTotalIncome ?? 0m;
         // GTI is net of the s.32(2) unabsorbed-depreciation set-off, which isn't attributable to one head —
@@ -2492,12 +2492,51 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             }
         }
 
-        if (skel["ITR3ScheduleBP"] is Dictionary<string, object?> bp)
+        OverlayItr3ScheduleBpDepreciation(skel, ctx);
+        OverlayItr3FinancialStatements(skel, ctx.FinancialStatements);
+    }
+
+    // Schedule BP — book-vs-tax depreciation reconciliation worksheet (BusinessIncOthThanSpec). Chains book
+    // profit → add back the depreciation debited to the books → allow the s.32 depreciation instead → taxable
+    // business income, matching the engine's BusinessDepreciationAdjustment. Populated for ITR-3 when the
+    // return has depreciable blocks; nil-effect (book == tax) still shows both lines. Other BP adjustments
+    // (disallowances, deemed income) stay at the zero skeleton.
+    private static void OverlayItr3ScheduleBpDepreciation(Dictionary<string, object?> skel, ItrFilingContext ctx)
+    {
+        // Regular-books (non-presumptive) business with depreciable blocks only — presumptive income (44AD/ADA)
+        // already subsumes depreciation, so there is no book-vs-tax reconciliation to show.
+        if (ctx.ItrType != ItrType.ITR3 || ctx.DepreciableAssets.Count == 0 || !ctx.Businesses.Any(b => !b.IsPresumptive))
         {
-            SetIfInt(bp, "BusinessIncOthThanSpec", R(businessRaw));
+            return;
         }
 
-        OverlayItr3FinancialStatements(skel, ctx.FinancialStatements);
+        if (skel["ITR3ScheduleBP"] is not Dictionary<string, object?> bpRoot
+            || bpRoot["BusinessIncOthThanSpec"] is not Dictionary<string, object?> bp)
+        {
+            return;
+        }
+
+        var bookProfit = ctx.Businesses.Sum(PresumptiveIncome);   // profit before tax per P&L (after book depreciation)
+        var bookDep = BookDepreciationTotal(ctx);                 // depreciation debited to the books (added back)
+        var taxDep = TotalTaxDepreciation(ctx);                   // depreciation allowable u/s 32 (allowed instead)
+        var reconciled = bookProfit + bookDep - taxDep;           // taxable business income
+
+        SetIfInt(bp, "ProfBfrTaxPL", R(bookProfit));
+        SetIfInt(bp, "BalancePLOthThanSpecBus", R(bookProfit));
+        SetIfInt(bp, "AdjustedPLOthThanSpecBus", R(bookProfit));
+        SetIfInt(bp, "DepreciationDebPLCosAct", R(bookDep));
+        if (bp["DepreciationAllowITAct32"] is Dictionary<string, object?> d32)
+        {
+            SetIfInt(d32, "DepreciationAllowUs32_1_ii", R(taxDep));
+            SetIfInt(d32, "TotDeprAllowITAct", R(taxDep));
+        }
+
+        SetIfInt(bp, "AdjustPLAfterDeprOthSpecInc", R(reconciled));
+        SetIfInt(bp, "TotAfterAddToPLDeprOthSpecInc", R(reconciled));
+        SetIfInt(bp, "PLAftAdjDedBusOthThanSpec", R(reconciled));
+        SetIfInt(bp, "NetPLAftAdjBusOthThanSpec", R(reconciled));
+        SetIfInt(bp, "NetPLBusOthThanSpec7A7B7C", R(reconciled));
+        SetIfInt(bp, "IncomeOtherThanRule", R(reconciled));
     }
 
     // Overlay the books-derived Balance Sheet + P&L (FinancialStatementsService) onto the ITR-3
@@ -2617,6 +2656,28 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var carried = TaxMath0(ctx.Computation?.UnabsorbedDepreciationCarriedForward ?? 0m);
         return TaxMath0(totalBf - carried);
     }
+
+    /// <summary>Total s.32 depreciation allowable on the return's depreciable blocks (ITR-3 only).</summary>
+    private static decimal TotalTaxDepreciation(ItrFilingContext ctx)
+        => ctx.ItrType == ItrType.ITR3 ? DepreciationCalculator.TotalDepreciation(ctx.DepreciableAssets) : 0m;
+
+    /// <summary>Total depreciation charged in the books on the return's depreciable blocks (ITR-3 only).</summary>
+    private static decimal BookDepreciationTotal(ItrFilingContext ctx)
+        => ctx.ItrType == ItrType.ITR3 ? ctx.DepreciableAssets.Sum(a => TaxMath0(a.BookDepreciation)) : 0m;
+
+    /// <summary>Schedule BP book-vs-tax depreciation adjustment: book depreciation added back less the s.32
+    /// depreciation allowed. Positive raises taxable business income, negative lowers it; nil when equal.
+    /// Only for regular-books (non-presumptive) business — presumptive income already includes depreciation.</summary>
+    private static decimal BpDepreciationAdjustment(ItrFilingContext ctx)
+        => ctx.Businesses.Any(b => !b.IsPresumptive) ? BookDepreciationTotal(ctx) - TotalTaxDepreciation(ctx) : 0m;
+
+    /// <summary>
+    /// Business income as the engine taxes it: the book/presumptive profit plus the Schedule BP book-vs-tax
+    /// depreciation adjustment. Used by the GTI-anchored salary back-out so it stays consistent with the
+    /// engine's GTI (which folds the same adjustment into the business head).
+    /// </summary>
+    private static decimal BusinessIncomeForReturn(ItrFilingContext ctx)
+        => ctx.Businesses.Sum(PresumptiveIncome) + BpDepreciationAdjustment(ctx);
 
     /// <summary>
     /// Capital-gains split (after s.70 set-off) with the deemed STCG u/s 50 folded into the short-term head.
@@ -2973,7 +3034,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var gti = c?.GrossTotalIncome ?? 0m;
         var hp = HousePropertyIncome(ctx.Houses);
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
-        var business = ctx.Businesses.Sum(PresumptiveIncome);
+        var business = BusinessIncomeForReturn(ctx);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other + UnabsorbedDepSetOff(ctx));   // == PartB-TI Salaries
 

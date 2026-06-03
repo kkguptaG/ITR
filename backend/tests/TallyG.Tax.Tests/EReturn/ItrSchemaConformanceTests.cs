@@ -605,6 +605,14 @@ public class ItrSchemaConformanceTests
         udRow.GetProperty("AmtDeprSOCY").GetInt64().Should().Be(300_000);
         udRow.GetProperty("BalCFNY").GetInt64().Should().Be(0);
 
+        // Schedule BP — the book-vs-tax depreciation reconciliation: book profit ₹8L, book depreciation ₹6L
+        // added back, s.32 depreciation ₹5,87,500 allowed instead → taxable business income ₹8,12,500.
+        var bp = itr3.GetProperty("ITR3ScheduleBP").GetProperty("BusinessIncOthThanSpec");
+        bp.GetProperty("ProfBfrTaxPL").GetInt64().Should().Be(800_000);
+        bp.GetProperty("DepreciationDebPLCosAct").GetInt64().Should().Be(600_000);
+        bp.GetProperty("DepreciationAllowITAct32").GetProperty("TotDeprAllowITAct").GetInt64().Should().Be(587_500);
+        bp.GetProperty("AdjustPLAfterDeprOthSpecInc").GetInt64().Should().Be(812_500);
+
         // The deemed STCG now FLOWS into Schedule CG (not just the DCG disclosure): the ₹2L lands as a deemed
         // short-term gain on other assets, taxed at the applicable rate, and ties out through the CG totals.
         var cg = itr3.GetProperty("ScheduleCGFor23");
@@ -1082,9 +1090,13 @@ public class ItrSchemaConformanceTests
             comp.ShortTermCapitalLossCarriedForward = 10_000m;
         }
 
-        var businesses = presumptiveBusiness
-            ? new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m, GrossReceiptsDigital = 2_000_000m } }
-            : Array.Empty<BusinessIncome>();
+        var businesses = withDepreciation
+            // Regular-books (non-presumptive) business so the Schedule BP book-vs-tax depreciation reconciliation
+            // applies (presumptive income would subsume depreciation). Overrides presumptiveBusiness.
+            ? new[] { new BusinessIncome { IsPresumptive = false, NetProfit = 800_000m } }
+            : presumptiveBusiness
+                ? new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m, GrossReceiptsDigital = 2_000_000m } }
+                : Array.Empty<BusinessIncome>();
 
         return new ItrFilingContext
         {
@@ -1238,11 +1250,12 @@ public class ItrSchemaConformanceTests
                 : Array.Empty<PassThroughIncome>(),
             // Depreciable plant & machinery blocks so the ITR-3 gate exercises Schedule DPM + DEP.
             DepreciableAssets = withDepreciation
+                // BookDepreciation totals ₹6,00,000 vs tax (s.32) ₹5,87,500 → a +₹12,500 Schedule BP adjustment.
                 ? new[]
                 {
-                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m, AdditionsBelow180Days = 100_000m },
-                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery40, OpeningWdv = 500_000m },
-                    new DepreciableAsset { Category = DepreciableAssetCategory.Building10, OpeningWdv = 2_000_000m },
+                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m, AdditionsBelow180Days = 100_000m, BookDepreciation = 200_000m },
+                    new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery40, OpeningWdv = 500_000m, BookDepreciation = 150_000m },
+                    new DepreciableAsset { Category = DepreciableAssetCategory.Building10, OpeningWdv = 2_000_000m, BookDepreciation = 250_000m },
                     // A 30% block (₹4L) sold for ₹6L → block ceases: deemed STCG ₹2L (Schedule DCG), no depreciation.
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery30, OpeningWdv = 400_000m, SaleProceeds = 600_000m },
                 }

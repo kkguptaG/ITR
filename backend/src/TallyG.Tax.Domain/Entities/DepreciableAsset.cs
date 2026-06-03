@@ -31,5 +31,10 @@ public class DepreciableAsset : BaseEntity, ITenantScoped
     /// these exceed the block's value the excess is a deemed short-term capital gain u/s 50.</summary>
     public decimal SaleProceeds { get; set; }
 
+    /// <summary>Depreciation charged on this block in the BOOKS (the P&amp;L expense). It is added back and
+    /// replaced by the s.32 (Income-tax Act) depreciation when reconciling book profit to taxable business
+    /// income (Schedule BP). When books and tax depreciation are equal the adjustment is nil.</summary>
+    public decimal BookDepreciation { get; set; }
+
     public TaxReturn? TaxReturn { get; set; }
 }

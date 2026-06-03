@@ -525,16 +525,20 @@ public static class DbInitializer
         });
 
         // Depreciable assets (Schedule DPM / DOA / DEP): a 15% plant & machinery block + a 10% building block.
+        // BookDepreciation equals the s.32 figure (15%×₹12L = ₹1.8L; 10%×₹30L = ₹3L) so the Schedule BP
+        // book-vs-tax reconciliation is nil-effect for the demo — both lines show, business income unchanged.
         db.DepreciableAssets.AddRange(
             new DepreciableAsset
             {
                 TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
                 Category = DepreciableAssetCategory.PlantMachinery15, OpeningWdv = 1_000_000m, AdditionsAbove180Days = 200_000m,
+                BookDepreciation = 180_000m,
             },
             new DepreciableAsset
             {
                 TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
                 Category = DepreciableAssetCategory.Building10, OpeningWdv = 3_000_000m,
+                BookDepreciation = 300_000m,
             });
 
         // Interest in a partnership firm (Schedule AL — ITR-3 InterestHeldInaAsset).

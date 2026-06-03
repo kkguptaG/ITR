@@ -10,14 +10,16 @@ public sealed record DepreciableAssetDto(
     decimal OpeningWdv,
     decimal AdditionsAbove180Days,
     decimal AdditionsBelow180Days,
-    decimal SaleProceeds);
+    decimal SaleProceeds,
+    decimal BookDepreciation);
 
 public sealed record UpsertDepreciableAssetRequest(
     DepreciableAssetCategory Category,
     decimal OpeningWdv,
     decimal AdditionsAbove180Days,
     decimal AdditionsBelow180Days,
-    decimal SaleProceeds);
+    decimal SaleProceeds,
+    decimal BookDepreciation);
 
 public sealed class UpsertDepreciableAssetRequestValidator : AbstractValidator<UpsertDepreciableAssetRequest>
 {
@@ -29,6 +31,7 @@ public sealed class UpsertDepreciableAssetRequestValidator : AbstractValidator<U
         RuleFor(r => r.AdditionsAbove180Days).InclusiveBetween(0m, max);
         RuleFor(r => r.AdditionsBelow180Days).InclusiveBetween(0m, max);
         RuleFor(r => r.SaleProceeds).InclusiveBetween(0m, max);
+        RuleFor(r => r.BookDepreciation).InclusiveBetween(0m, max);
         RuleFor(r => r).Must(r => r.OpeningWdv + r.AdditionsAbove180Days + r.AdditionsBelow180Days > 0m)
             .WithMessage("A depreciation block must have an opening WDV or additions.");
     }
