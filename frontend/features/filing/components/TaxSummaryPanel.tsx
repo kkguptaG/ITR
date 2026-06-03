@@ -95,9 +95,17 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
           {comp.unabsorbedDepreciationCarriedForward > 0 && <Line label="Unabsorbed depreciation carried forward (s.32(2))" value={comp.unabsorbedDepreciationCarriedForward} tone="muted" indent />}
         </div>
         <div className="py-1.5">
-          <Line label={t('tdsPaid')} value={comp.tdsPaid} tone="subtract" />
+          {/* Prepaid taxes — each shown separately when non-zero.
+              tdsPaid = TDS+TCS combined (the engine math); show TDS-only = tdsPaid − tcsPaid,
+              then TCS as its own line so the total still equals tdsPaid. */}
+          <Line label="TDS credit" value={comp.tdsPaid - comp.tcsPaid} tone="subtract" />
           {comp.tcsPaid > 0 && <Line label="TCS credit (26AS)" value={comp.tcsPaid} tone="subtract" />}
-          {comp.advanceTax > 0 && <Line label={t('advanceTax')} value={comp.advanceTax} tone="subtract" />}
+          {(comp.advanceTax - comp.selfAssessmentTaxPaid) > 0 && (
+            <Line label={t('advanceTax')} value={comp.advanceTax - comp.selfAssessmentTaxPaid} tone="subtract" />
+          )}
+          {comp.selfAssessmentTaxPaid > 0 && (
+            <Line label="Self-assessment tax" value={comp.selfAssessmentTaxPaid} tone="subtract" />
+          )}
         </div>
       </div>
 

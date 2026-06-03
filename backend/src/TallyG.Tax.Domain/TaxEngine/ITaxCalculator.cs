@@ -201,9 +201,14 @@ public sealed record ComputationResult
     /// <summary>Total tax liability after rebate, surcharge and cess.</summary>
     public decimal TotalTax { get; init; }
 
+    /// <summary>Combined TDS+TCS credit used in the refund/payable math.</summary>
     public decimal TdsPaid { get; init; }
+    /// <summary>TCS component of <see cref="TdsPaid"/> — shown separately in the summary.</summary>
     public decimal TcsPaid { get; init; }
+    /// <summary>Combined advance tax + self-assessment tax paid.</summary>
     public decimal AdvanceTax { get; init; }
+    /// <summary>Self-assessment-tax component of <see cref="AdvanceTax"/> — shown separately.</summary>
+    public decimal SelfAssessmentTaxPaid { get; init; }
     public decimal InterestPenalty { get; init; }
 
     /// <summary>Per-section split of <see cref="InterestPenalty"/>: interest u/s 234A / 234B / 234C.</summary>

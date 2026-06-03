@@ -258,9 +258,14 @@ export interface TaxComputationResultDto {
   surcharge: number;
   cess: number;
   totalTax: number;
+  /** TDS + TCS combined (used for refund/payable math). */
   tdsPaid: number;
+  /** TCS component of tdsPaid — shown separately in the summary. */
   tcsPaid: number;
+  /** Advance tax + self-assessment tax combined. */
   advanceTax: number;
+  /** Self-assessment-tax component of advanceTax — shown separately. */
+  selfAssessmentTaxPaid: number;
   interestPenalty: number;
   interest234A: number;
   interest234B: number;

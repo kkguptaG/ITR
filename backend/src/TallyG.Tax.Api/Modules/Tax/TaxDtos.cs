@@ -117,6 +117,7 @@ public sealed record TaxComputationResultDto(
     decimal TdsPaid,
     decimal TcsPaid,
     decimal AdvanceTax,
+    decimal SelfAssessmentTaxPaid,
     decimal InterestPenalty,
     decimal Interest234A,
     decimal Interest234B,

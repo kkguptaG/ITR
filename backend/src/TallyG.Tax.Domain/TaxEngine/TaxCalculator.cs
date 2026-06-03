@@ -212,9 +212,10 @@ public sealed class TaxCalculator : ITaxCalculator
             Surcharge = surcharge,
             Cess = cess,
             TotalTax = finalTax,
-            TdsPaid = input.TdsPaid + input.TcsPaid,   // combined TDS+TCS credit (kept for backwards compat)
-            TcsPaid = input.TcsPaid,                    // TCS separately (for disclosure in the summary)
-            AdvanceTax = input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid,
+            TdsPaid = input.TdsPaid + input.TcsPaid,            // combined TDS+TCS for refund/payable math
+            TcsPaid = input.TcsPaid,                            // TCS separately (for summary display)
+            AdvanceTax = input.AdvanceTaxPaid + input.SelfAssessmentTaxPaid,  // combined for math
+            SelfAssessmentTaxPaid = input.SelfAssessmentTaxPaid,              // SAT separately (for summary)
             InterestPenalty = interest.Total,
             Interest234A = interest.S234A,
             Interest234B = interest.S234B,
