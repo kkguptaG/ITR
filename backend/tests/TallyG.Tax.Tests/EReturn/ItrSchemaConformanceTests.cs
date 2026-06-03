@@ -1212,6 +1212,43 @@ public class ItrSchemaConformanceTests
         s.GetProperty("DeductionUS16").GetInt64().Should().Be(75_000);
         // Income under the head must equal the salary figure carried into PartB-TI (GTI-anchored).
         s.GetProperty("TotIncUnderHeadSalaries").GetInt64().Should().Be(875_000);
+        // A single Form 16 still produces a one-row per-employer breakup.
+        s.GetProperty("Salaries").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public void Itr2_breaks_salary_per_employer_with_the_s17_split()
+    {
+        // A mid-year job change → two Form 16s, each a separate ScheduleS.Salaries row.
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withTwoEmployers: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with a per-employer Schedule S must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var s = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleS");
+
+        var employers = s.GetProperty("Salaries");
+        employers.GetArrayLength().Should().Be(2);
+
+        // The second employer carries the s.17 split: ₹6L salary (s.17(1)) + ₹50k perquisites (s.17(2)).
+        var globex = employers.EnumerateArray().Single(e => e.GetProperty("NameOfEmployer").GetString() == "Globex Pvt Ltd");
+        globex.GetProperty("NatureOfEmployment").GetString().Should().Be("OTH");
+        globex.GetProperty("TANofEmployer").GetString().Should().Be("MUMB12345K");
+        var pay = globex.GetProperty("Salarys");
+        pay.GetProperty("Salary").GetInt64().Should().Be(600_000);             // s.17(1)
+        pay.GetProperty("ValueOfPerquisites").GetInt64().Should().Be(50_000);  // s.17(2)
+        pay.GetProperty("ProfitsinLieuOfSalary").GetInt64().Should().Be(0);    // s.17(3)
+        pay.GetProperty("GrossSalary").GetInt64().Should().Be(650_000);
+
+        // The per-employer grosses reconcile with the headline total (₹9.5L + ₹6.5L).
+        var sumGross = employers.EnumerateArray().Sum(e => e.GetProperty("Salarys").GetProperty("GrossSalary").GetInt64());
+        sumGross.Should().Be(1_600_000);
+        s.GetProperty("TotalGrossSalary").GetInt64().Should().Be(1_600_000);
+        // The s.16 plug stays the ₹75k standard deduction (GTI absorbed the extra salary).
+        s.GetProperty("DeductionUnderSection16ia").GetInt64().Should().Be(75_000);
+        s.GetProperty("TotIncUnderHeadSalaries").GetInt64().Should().Be(1_525_000);
     }
 
     [Fact]
@@ -1253,7 +1290,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false)
     {
         var user = new User
         {
@@ -1288,9 +1325,11 @@ public class ItrSchemaConformanceTests
             // SaleofLandBuild detail reconciles with the capital-gains head + the salary plug.
             // withVda: a ₹3L crypto gain (s.115BBH) is part of GTI so Schedule VDA + the 115BBH CG leaf reconcile.
             // withWinnings: ₹1.5L lottery (s.115BB) + ₹50k online-gaming (s.115BBJ) winnings — part of GTI, taxed flat 30%.
-            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m),
+            // withTwoEmployers: a second Form 16 (₹6L salary + ₹50k perquisites) is part of GTI so the
+            // per-employer Schedule S grosses reconcile and the s.16 plug stays the ₹75k standard deduction.
+            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m) + (withTwoEmployers ? 650_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m),
+            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m) + (withTwoEmployers ? 650_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,
@@ -1344,7 +1383,13 @@ public class ItrSchemaConformanceTests
             Computation = comp,
             // Gross 9.5L − 75k standard deduction = 8.75L net, which (with 50k other) reconciles to the
             // fixture's GTI so Schedule S's TotIncUnderHeadSalaries == PartB-TI Salaries.
-            Salaries = new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 950_000m } },
+            Salaries = withTwoEmployers
+                ? new[]
+                {
+                    new SalaryDetail { Employer = "Acme Corp", Gross = 950_000m },
+                    new SalaryDetail { Employer = "Globex Pvt Ltd", Tan = "MUMB12345K", Gross = 600_000m, Perquisites = 50_000m },
+                }
+                : new[] { new SalaryDetail { Employer = "Acme Corp", Gross = 950_000m } },
             Businesses = businesses,
             // A let-out property so the ITR-2/3 gate can exercise the per-property Schedule HP.
             Houses = withHouse

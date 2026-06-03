@@ -3237,8 +3237,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     // The salary breakup for ITR-2/ITR-3: gross → exempt-u/s-10 → net → s.16 deductions → income under
     // the head. Anchored to the engine's GTI (TotIncUnderHeadSalaries == PartB-TI "Salaries") exactly as
     // the ITR-1/4 income node does, so the schedules reconcile. The s.16 deduction is split into 16ia
-    // (standard deduction, ≤₹75k) and 16iii (professional tax, ≤₹5k). The optional per-employer Salaries
-    // array (needs employer address + s.17(1)/(2)/(3) split) is deferred. ITR-1/4 stay totals-only.
+    // (standard deduction, ≤₹75k) and 16iii (professional tax, ≤₹5k), plus the per-employer Salaries array
+    // (one row per Form 16, with the s.17(1)/(2)/(3) split) so a mid-year job change files both employers
+    // separately and the per-employer GrossSalary sums to TotalGrossSalary. ITR-1/4 stay totals-only.
     private static void AddScheduleS(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
         if (ctx.Salaries.Count == 0)
@@ -3264,6 +3265,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         form["ScheduleS"] = new Dictionary<string, object?>
         {
+            ["Salaries"] = ctx.Salaries.Select(s => SalaryEmployerItem(s, ctx)).ToList(),
             ["TotalGrossSalary"] = R(grossSalary),
             ["AllwncExtentExemptUs10"] = R(salExempt),
             ["NetSalary"] = R(netSalary),
@@ -3274,6 +3276,50 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["TotIncUnderHeadSalaries"] = R(salaryNet),
         };
     }
+
+    // One ScheduleS.Salaries row per employer (Form 16), with the s.17 split: Salary = s.17(1) basic+allowances,
+    // ValueOfPerquisites = s.17(2), ProfitsinLieuOfSalary = s.17(3); GrossSalary = their sum (so the per-employer
+    // grosses add up to TotalGrossSalary). Employer address isn't captured separately yet, so it falls back to the
+    // assessee's address (best available); TANofEmployer is emitted only when a valid TAN is on the Form 16.
+    private static Dictionary<string, object?> SalaryEmployerItem(SalaryDetail s, ItrFilingContext ctx)
+    {
+        var perquisites = Math.Max(0m, s.Perquisites);
+        var profitsInLieu = Math.Max(0m, s.ProfitsInLieu);
+        var salary17 = Math.Max(0m, s.Gross);                 // s.17(1) — basic + allowances (excl. perquisites)
+        var grossSalary = salary17 + perquisites + profitsInLieu;
+
+        var item = new Dictionary<string, object?>
+        {
+            ["NameOfEmployer"] = Trunc(NonEmpty(s.Employer, "Employer"), 100),
+            ["NatureOfEmployment"] = "OTH",   // other / private sector (refine when employer category is captured)
+            ["AddressDetail"] = new Dictionary<string, object?>
+            {
+                ["AddrDetail"] = Trunc(NonEmpty(ctx.Profile?.AddressLine1, "NA"), 50),
+                ["CityOrTownOrDistrict"] = Trunc(NonEmpty(ctx.Profile?.City, "NA"), 50),
+                ["StateCode"] = ValidStateCode(ctx.Profile?.StateCode),
+            },
+            ["Salarys"] = new Dictionary<string, object?>
+            {
+                ["GrossSalary"] = R(grossSalary),
+                ["Salary"] = R(salary17),
+                ["ValueOfPerquisites"] = R(perquisites),
+                ["ProfitsinLieuOfSalary"] = R(profitsInLieu),
+                ["IncomeNotified89A"] = 0L,
+                ["IncomeNotifiedOther89A"] = 0L,
+            },
+        };
+
+        if (IsTanIdentifier(s.Tan))
+        {
+            item["TANofEmployer"] = s.Tan!.Trim().ToUpperInvariant();
+        }
+
+        return item;
+    }
+
+    /// <summary>True when an identifier is a valid TAN (4 letters + 5 digits + 1 letter).</summary>
+    private static bool IsTanIdentifier(string? id)
+        => System.Text.RegularExpressions.Regex.IsMatch((id ?? string.Empty).Trim().ToUpperInvariant(), "^[A-Z]{4}[0-9]{5}[A-Z]$");
 
     // ----------------------------------------------------------------- Schedule HP (house property, per-property)
     // Per-property breakup for ITR-2/3: annual letable value → municipal tax → NAV → 30% std deduction
