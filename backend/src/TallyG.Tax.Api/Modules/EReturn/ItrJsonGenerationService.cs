@@ -405,6 +405,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleVia(skel, ctx);
         AddScheduleCfl(skel, ctx);
         AddScheduleAl(skel, ctx);
+        AddScheduleIf(skel, ctx);
         AddScheduleSi(skel, ctx);
         AddScheduleVda(skel, ctx);
         AddSchedule80G(skel, ctx);
@@ -1025,6 +1026,43 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["AddressAL"] = AddressAlNode(f.FlatDoorNo, f.Locality, f.City, f.StateCode, f.Pincode),
         ["AssesseInvestment"] = R(Math.Max(0m, f.Investment)),
     };
+
+    /// <summary>
+    /// Schedule IF — information about the partnership firms in which the assessee is a partner (ITR-3 only).
+    /// Each firm: PAN, profit-share %, the (exempt u/s 10(2A)) profit-share amount, the year-end capital
+    /// balance, and the s.44AB audit flag. Also flips FilingStatus.PartnerInFirmFlg to "Y".
+    /// </summary>
+    private static void AddScheduleIf(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType != ItrType.ITR3 || ctx.FirmInterestsAL.Count == 0)
+        {
+            return;
+        }
+
+        var firms = ctx.FirmInterestsAL;
+        form["ScheduleIF"] = new Dictionary<string, object?>
+        {
+            ["PartnerFirmDetails"] = firms.Select(f => new Dictionary<string, object?>
+            {
+                ["FirmName"] = Trunc(NonEmpty(f.FirmName, "NA"), 125),
+                ["FirmPAN"] = ValidPan(f.FirmPan),
+                ["IsLiableToAudit"] = f.FirmLiableToAudit ? "Y" : "N",
+                ["Sec92EFirmFlag"] = "N",
+                ["ProfitSharePercent"] = (double)decimal.Round(Math.Clamp(f.ProfitSharePercent, 0m, 100m), 2),
+                ["ProfitShareAmt"] = R(Math.Max(0m, f.ProfitShareAmount)),
+                ["FirmCapBalOn31Mar"] = R(Math.Max(0m, f.Investment)),
+            }).ToList(),
+            ["TotalProfitShareAmt"] = R(firms.Sum(f => Math.Max(0m, f.ProfitShareAmount))),
+            ["TotalFirmCapBalOn31Mar"] = R(firms.Sum(f => Math.Max(0m, f.Investment))),
+        };
+
+        // Flip the partner-in-firm flag on FilingStatus (PartA_GEN1.FilingStatus).
+        if (form["PartA_GEN1"] is Dictionary<string, object?> gen1
+            && gen1["FilingStatus"] is Dictionary<string, object?> fs)
+        {
+            fs["PartnerInFirmFlg"] = "Y";
+        }
+    }
 
     // The Schedule AL AddressAL node (shared by immovable property + firm/AOP interest). Domestic assets,
     // so CountryCode is India ("91").

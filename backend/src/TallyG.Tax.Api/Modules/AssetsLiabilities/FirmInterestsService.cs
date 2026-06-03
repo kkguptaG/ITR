@@ -49,6 +49,9 @@ public sealed class FirmInterestsService : IFirmInterestsService
             StateCode = r.StateCode.Trim(),
             Pincode = r.Pincode.Trim(),
             Investment = Clamp(r.Investment),
+            ProfitSharePercent = Math.Clamp(r.ProfitSharePercent, 0m, 100m),
+            ProfitShareAmount = Clamp(r.ProfitShareAmount),
+            FirmLiableToAudit = r.FirmLiableToAudit,
         };
         _db.FirmInterestsAL.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -86,5 +89,6 @@ public sealed class FirmInterestsService : IFirmInterestsService
     private static decimal Clamp(decimal v) => Math.Clamp(v, 0m, 99_999_999_999_999m);
 
     private static FirmInterestAlDto ToDto(FirmInterestAL f) => new(
-        f.Id, f.FirmName, f.FirmPan, f.FlatDoorNo, f.Locality, f.City, f.StateCode, f.Pincode, f.Investment);
+        f.Id, f.FirmName, f.FirmPan, f.FlatDoorNo, f.Locality, f.City, f.StateCode, f.Pincode, f.Investment,
+        f.ProfitSharePercent, f.ProfitShareAmount, f.FirmLiableToAudit);
 }

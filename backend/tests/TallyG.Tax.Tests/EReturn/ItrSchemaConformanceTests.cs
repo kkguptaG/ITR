@@ -325,6 +325,31 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr3_partner_firm_emits_scheduleIF_and_sets_partner_flag()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withFirmInterest: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule IF (partner-in-firm) must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+        itr3.GetProperty("PartA_GEN1").GetProperty("FilingStatus").GetProperty("PartnerInFirmFlg").GetString().Should().Be("Y");
+
+        var sif = itr3.GetProperty("ScheduleIF");
+        var firm = sif.GetProperty("PartnerFirmDetails")[0];
+        firm.GetProperty("FirmName").GetString().Should().Be("Acme Partners LLP");
+        firm.GetProperty("FirmPAN").GetString().Should().Be("AABFA1234R");
+        firm.GetProperty("IsLiableToAudit").GetString().Should().Be("Y");
+        firm.GetProperty("ProfitSharePercent").GetDouble().Should().Be(40.0);
+        firm.GetProperty("ProfitShareAmt").GetInt64().Should().Be(800_000);
+        firm.GetProperty("FirmCapBalOn31Mar").GetInt64().Should().Be(1_500_000);
+        sif.GetProperty("TotalProfitShareAmt").GetInt64().Should().Be(800_000);
+        sif.GetProperty("TotalFirmCapBalOn31Mar").GetInt64().Should().Be(1_500_000);
+    }
+
+    [Fact]
     public void Itr3_declares_immovable_property_in_scheduleAL()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withImmovable: true);
@@ -1531,7 +1556,7 @@ public class ItrSchemaConformanceTests
                 : Array.Empty<ImmovablePropertyAL>(),
             // A firm/AOP interest so the ITR-3 gate exercises Schedule AL's InterestHeldInaAsset list.
             FirmInterestsAL = withFirmInterest
-                ? new[] { new FirmInterestAL { FirmName = "Acme Partners LLP", FirmPan = "AABFA1234R", FlatDoorNo = "Unit 5", Locality = "BKC", City = "Mumbai", StateCode = "27", Pincode = "400051", Investment = 1_500_000m } }
+                ? new[] { new FirmInterestAL { FirmName = "Acme Partners LLP", FirmPan = "AABFA1234R", FlatDoorNo = "Unit 5", Locality = "BKC", City = "Mumbai", StateCode = "27", Pincode = "400051", Investment = 1_500_000m, ProfitSharePercent = 40m, ProfitShareAmount = 800_000m, FirmLiableToAudit = true } }
                 : Array.Empty<FirmInterestAL>(),
             // A foreign bank account so the ITR-2/3 gate exercises Schedule FA (DetailsForiegnBank).
             ForeignBankAccounts = withForeignBank

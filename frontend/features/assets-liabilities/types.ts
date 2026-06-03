@@ -47,6 +47,9 @@ export interface FirmInterestAlDto {
   stateCode: string;
   pincode: string;
   investment: number;
+  profitSharePercent: number;
+  profitShareAmount: number;
+  firmLiableToAudit: boolean;
 }
 
 export interface UpsertFirmInterestAlBody {
@@ -58,4 +61,7 @@ export interface UpsertFirmInterestAlBody {
   stateCode: string;
   pincode: string;
   investment: number;
+  profitSharePercent?: number;
+  profitShareAmount?: number;
+  firmLiableToAudit?: boolean;
 }

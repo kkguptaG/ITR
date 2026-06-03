@@ -31,5 +31,15 @@ public class FirmInterestAL : BaseEntity, ITenantScoped
     /// <summary>The assessee's investment in the firm / AOP (AssesseInvestment), at cost.</summary>
     public decimal Investment { get; set; }
 
+    // --- Schedule IF (Information about partnership firms in which the assessee is a partner) ---
+    /// <summary>The assessee's profit-sharing percentage in the firm (Schedule IF ProfitSharePercent).</summary>
+    public decimal ProfitSharePercent { get; set; }
+
+    /// <summary>The assessee's share of the firm's profit, exempt u/s 10(2A) (ProfitShareAmt).</summary>
+    public decimal ProfitShareAmount { get; set; }
+
+    /// <summary>True if the firm is liable to tax audit u/s 44AB (IsLiableToAudit = "Y").</summary>
+    public bool FirmLiableToAudit { get; set; }
+
     public TaxReturn? TaxReturn { get; set; }
 }

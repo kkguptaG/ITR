@@ -543,13 +543,15 @@ public static class DbInitializer
                 BookDepreciation = 300_000m,
             });
 
-        // Interest in a partnership firm (Schedule AL — ITR-3 InterestHeldInaAsset).
+        // Interest in a partnership firm (Schedule AL — ITR-3 InterestHeldInaAsset) + Schedule IF
+        // (partner-in-firm info: 40% profit share = ₹8L exempt u/s 10(2A), firm liable to audit).
         db.FirmInterestsAL.Add(new FirmInterestAL
         {
             TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
             FirmName = "Sharma & Associates LLP", FirmPan = "AABFS1234K",
             FlatDoorNo = "3rd Floor, Tower B", Locality = "Cyber City", City = "Gurugram",
             StateCode = "06", Pincode = "122002", Investment = 1_500_000m,
+            ProfitSharePercent = 40m, ProfitShareAmount = 800_000m, FirmLiableToAudit = true,
         });
 
         // Exempt income (Schedule EI): tax-free PPF interest.

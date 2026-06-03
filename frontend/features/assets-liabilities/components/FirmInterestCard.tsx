@@ -21,6 +21,7 @@ import type { UpsertFirmInterestAlBody } from '../types';
 
 const EMPTY: UpsertFirmInterestAlBody = {
   firmName: '', firmPan: '', flatDoorNo: '', locality: '', city: '', stateCode: '', pincode: '', investment: 0,
+  profitSharePercent: 0, profitShareAmount: 0, firmLiableToAudit: false,
 };
 
 export function FirmInterestCard({ returnId, editable }: { returnId: string; editable: boolean }) {
@@ -106,6 +107,21 @@ export function FirmInterestCard({ returnId, editable }: { returnId: string; edi
                   <Field label="State code" hint="ITD 2-digit code, e.g. 27 = Maharashtra"><Input {...register('stateCode')} placeholder="27" /></Field>
                   <Field label="PIN code"><Input {...register('pincode')} placeholder="400051" /></Field>
                   <Field label="Investment at cost (₹)"><Controller control={control} name="investment" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} /></Field>
+                </div>
+                {/* Schedule IF — partner-in-firm info */}
+                <div className="grid gap-3 border-t border-ink-100 pt-3 sm:grid-cols-3">
+                  <Field label="Profit share %" hint="Your share in the firm's profit">
+                    <Input type="number" step="0.01" min="0" max="100" {...register('profitSharePercent', { valueAsNumber: true })} placeholder="40" />
+                  </Field>
+                  <Field label="Profit share amount (₹)" hint="Exempt u/s 10(2A)">
+                    <Controller control={control} name="profitShareAmount" render={({ field }) => <CurrencyInput value={field.value ?? null} onValueChange={(v) => field.onChange(v ?? 0)} onBlur={field.onBlur} />} />
+                  </Field>
+                  <Field label="Firm liable to audit?">
+                    <select className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm" {...register('firmLiableToAudit', { setValueAs: (v) => v === 'true' })}>
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </Field>
                 </div>
                 {addMut.isError ? <Alert variant="error">Could not add. Check the PAN, PIN and investment.</Alert> : null}
                 <div className="flex justify-end gap-2">

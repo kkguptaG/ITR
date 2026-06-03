@@ -12,7 +12,11 @@ public sealed record FirmInterestAlDto(
     string City,
     string StateCode,
     string Pincode,
-    decimal Investment);
+    decimal Investment,
+    // Schedule IF (partner-in-firm info) — optional.
+    decimal ProfitSharePercent = 0m,
+    decimal ProfitShareAmount = 0m,
+    bool FirmLiableToAudit = false);
 
 public sealed record UpsertFirmInterestAlRequest(
     string FirmName,
@@ -22,7 +26,10 @@ public sealed record UpsertFirmInterestAlRequest(
     string City,
     string StateCode,
     string Pincode,
-    decimal Investment);
+    decimal Investment,
+    decimal ProfitSharePercent = 0m,
+    decimal ProfitShareAmount = 0m,
+    bool FirmLiableToAudit = false);
 
 public sealed class UpsertFirmInterestAlRequestValidator : AbstractValidator<UpsertFirmInterestAlRequest>
 {
@@ -38,5 +45,7 @@ public sealed class UpsertFirmInterestAlRequestValidator : AbstractValidator<Ups
         RuleFor(r => r.StateCode).NotEmpty().MaximumLength(2);
         RuleFor(r => r.Pincode).NotEmpty().Matches("^[1-9][0-9]{5}$").WithMessage("PIN code must be 6 digits.");
         RuleFor(r => r.Investment).GreaterThan(0m).LessThanOrEqualTo(max);
+        RuleFor(r => r.ProfitSharePercent).InclusiveBetween(0m, 100m).WithMessage("Profit share must be between 0 and 100%.");
+        RuleFor(r => r.ProfitShareAmount).GreaterThanOrEqualTo(0m).LessThanOrEqualTo(max);
     }
 }
