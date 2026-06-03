@@ -31,6 +31,7 @@ import { useWizard } from '../WizardContext';
 import { useInvalidateReturn } from '../useReturn';
 import { WizardStep, WizardFooter } from '../components/WizardStep';
 import { ItrJsonPanel } from '../components/ItrJsonPanel';
+import { ReconciliationCard } from '@/features/reconciliation';
 
 export function FileStep() {
   const t = useTranslations('wizard');
@@ -179,6 +180,10 @@ export function FileStep() {
         <Alert variant="info">
           {mode === 'self' ? t('selfFileNote') : t('caReviewNote')}
         </Alert>
+
+        {/* Pre-filing cross-check against the department's AIS / 26AS — under-reporting is the top
+            cause of a §143(1) notice, so surface it right before the taxpayer commits to filing. */}
+        <ReconciliationCard returnId={returnId} />
 
         <ItrJsonPanel returnId={returnId} />
       </WizardStep>
