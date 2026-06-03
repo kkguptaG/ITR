@@ -80,13 +80,25 @@ public sealed class TaxCalculator : ITaxCalculator
         var slabRateCgIncome = TaxMath.NonNegative(specialBuckets.SlabRateGains);
         var specialRateIncome = specialBuckets.TotalSpecialRateIncome;
 
+        // --- Stage 3c: brought-forward unabsorbed depreciation (s.32(2)) ---
+        // Set off against income under ANY head EXCEPT salary (business, house property, slab-rate capital
+        // gains, other sources), AFTER the current-year inter-head set-off and the b/f business loss. The
+        // unused balance carries forward INDEFINITELY (no time limit). Special-rate and casual (s.115BB)
+        // income are excluded — a conservative simplification: they are taxed separately and casual winnings
+        // cannot absorb any loss (s.58(4)); unabsorbed amounts simply carry forward instead.
+        var nonSalaryNormal = setOff.HousePropertyAfter + slabRateCgIncome + setOff.BusinessAfter + setOff.OtherSourcesAfter;
+        var udAvailable = TaxMath.NonNegative(input.BroughtForwardUnabsorbedDepreciation);
+        var unabsorbedDepSetOff = Math.Min(udAvailable, TaxMath.NonNegative(nonSalaryNormal));
+        var unabsorbedDepCarried = udAvailable - unabsorbedDepSetOff;
+        if (unabsorbedDepSetOff > 0m)
+        {
+            trace.Add(new TraceLine("UnabsorbedDepreciation.SetOff",
+                "Less: brought-forward unabsorbed depreciation set off (s.32(2), against any head except salary)",
+                unabsorbedDepSetOff, "s.32(2)"));
+        }
+
         // --- Stage 4: Gross Total Income (normal, slab-taxed portion), after all set-offs ---
-        var normalGti =
-            setOff.SalaryAfter +
-            setOff.HousePropertyAfter +
-            slabRateCgIncome +
-            setOff.BusinessAfter +
-            setOff.OtherSourcesAfter;
+        var normalGti = setOff.SalaryAfter + TaxMath.NonNegative(nonSalaryNormal - unabsorbedDepSetOff);
 
         var grossTotalIncome = normalGti + specialRateIncome + casual115BB;
         trace.Add(new TraceLine("GrossTotalIncome",
@@ -207,6 +219,7 @@ public sealed class TaxCalculator : ITaxCalculator
             SpeculativeLossCarriedForward = setOff.SpeculativeLossCarried,
             ShortTermCapitalLossCarriedForward = capitalGains.CurrentShortTermLossCarried,
             LongTermCapitalLossCarriedForward = capitalGains.CurrentLongTermLossCarried,
+            UnabsorbedDepreciationCarriedForward = unabsorbedDepCarried,
             Trace = trace,
         };
     }

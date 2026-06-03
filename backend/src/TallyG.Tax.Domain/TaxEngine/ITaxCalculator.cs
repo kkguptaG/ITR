@@ -92,6 +92,13 @@ public sealed record TaxComputationInput
     /// <summary>Brought-forward long-term capital loss (sets off ONLY vs current LTCG; 8-year c/f).</summary>
     public decimal BroughtForwardLongTermCapitalLoss { get; init; }
 
+    /// <summary>
+    /// Brought-forward unabsorbed depreciation / allowance (s.32(2)). Unlike a business loss it sets off
+    /// against income under ANY head except salary, and carries forward INDEFINITELY. Set off after the
+    /// current-year inter-head set-off and the brought-forward business loss.
+    /// </summary>
+    public decimal BroughtForwardUnabsorbedDepreciation { get; init; }
+
     // --- Alternate Minimum Tax (s.115JC/JD) + reliefs (s.89/90/91) ---
 
     /// <summary>Brought-forward AMT credit u/s 115JD; set off in a year where regular tax exceeds AMT.</summary>
@@ -234,6 +241,10 @@ public sealed record ComputationResult
 
     /// <summary>Current-year long-term capital loss carried forward u/s 74 (8 years, vs LTCG only). 0 if none.</summary>
     public decimal LongTermCapitalLossCarriedForward { get; init; }
+
+    /// <summary>Brought-forward unabsorbed depreciation (s.32(2)) NOT set off this year — carried forward
+    /// indefinitely. 0 when none b/f or fully absorbed.</summary>
+    public decimal UnabsorbedDepreciationCarriedForward { get; init; }
 
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();

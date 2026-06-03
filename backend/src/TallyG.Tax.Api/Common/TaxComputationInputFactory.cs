@@ -29,7 +29,8 @@ internal static class TaxComputationInputFactory
         IReadOnlyList<Donation80G>? donations80G = null,
         IReadOnlyList<ExemptIncome>? exemptIncomes = null,
         IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null,
-        IReadOnlyList<DepreciableAsset>? depreciableAssets = null)
+        IReadOnlyList<DepreciableAsset>? depreciableAssets = null,
+        IReadOnlyList<UnabsorbedDepreciation>? unabsorbedDepreciations = null)
     {
         var ay = ret.AssessmentYear;
 
@@ -88,6 +89,10 @@ internal static class TaxComputationInputFactory
             BroughtForwardBusinessLoss = ret.BroughtForwardBusinessLoss,
             BroughtForwardShortTermCapitalLoss = ret.BroughtForwardShortTermCapitalLoss,
             BroughtForwardLongTermCapitalLoss = ret.BroughtForwardLongTermCapitalLoss,
+            // Brought-forward unabsorbed depreciation/allowance (s.32(2)) — both behave the same for set-off
+            // (vs any head except salary, indefinite c/f), so sum them into one figure the engine absorbs.
+            BroughtForwardUnabsorbedDepreciation = (unabsorbedDepreciations ?? Array.Empty<UnabsorbedDepreciation>())
+                .Sum(u => Math.Max(0m, u.UnabsorbedDepreciationAmount) + Math.Max(0m, u.UnabsorbedAllowanceAmount)),
             // AMT credit (s.115JD) + reliefs (s.89/90/91).
             BroughtForwardAmtCredit = ret.BroughtForwardAmtCredit,
             Relief89 = ret.Relief89,

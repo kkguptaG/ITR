@@ -1088,9 +1088,10 @@ public sealed class ReturnService : IReturnService
         var exemptIncomes = await _db.ExemptIncomes.Where(e => e.TaxReturnId == ret.Id).ToListAsync(ct);
         var foreignSourceIncomes = await _db.ForeignSourceIncomes.Where(f => f.TaxReturnId == ret.Id).ToListAsync(ct);
         var depreciableAssets = await _db.DepreciableAssets.Where(a => a.TaxReturnId == ret.Id).ToListAsync(ct);
+        var unabsorbedDepreciations = await _db.UnabsorbedDepreciations.Where(u => u.TaxReturnId == ret.Id).ToListAsync(ct);
 
         // Ensure a computation exists for the chosen regime; persist one if the engine can produce it.
-        var computation = await EnsureComputationAsync(ret, ayCode, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, ct);
+        var computation = await EnsureComputationAsync(ret, ayCode, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, unabsorbedDepreciations, ct);
 
         return new
         {
@@ -1138,6 +1139,7 @@ public sealed class ReturnService : IReturnService
         IReadOnlyList<ExemptIncome> exemptIncomes,
         IReadOnlyList<ForeignSourceIncome> foreignSourceIncomes,
         IReadOnlyList<DepreciableAsset> depreciableAssets,
+        IReadOnlyList<UnabsorbedDepreciation> unabsorbedDepreciations,
         CancellationToken ct)
     {
         var regime = ret.Regime ?? Regime.New;
@@ -1165,7 +1167,7 @@ public sealed class ReturnService : IReturnService
             return null;
         }
 
-        var input = BuildComputationInput(ret, ayCode, rulesJson, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets);
+        var input = BuildComputationInput(ret, ayCode, rulesJson, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, unabsorbedDepreciations);
 
         ComputationResult result;
         try
@@ -1210,6 +1212,7 @@ public sealed class ReturnService : IReturnService
             SpeculativeLossCarriedForward = result.SpeculativeLossCarriedForward,
             ShortTermCapitalLossCarriedForward = result.ShortTermCapitalLossCarriedForward,
             LongTermCapitalLossCarriedForward = result.LongTermCapitalLossCarriedForward,
+            UnabsorbedDepreciationCarriedForward = result.UnabsorbedDepreciationCarriedForward,
             IsRecommended = true,
             TraceJson = JsonSerializer.Serialize(result.Trace, SnapshotJsonOptions),
             ComputedAt = _clock.UtcNow
@@ -1233,11 +1236,12 @@ public sealed class ReturnService : IReturnService
         IReadOnlyList<Donation80G> donations80G,
         IReadOnlyList<ExemptIncome> exemptIncomes,
         IReadOnlyList<ForeignSourceIncome> foreignSourceIncomes,
-        IReadOnlyList<DepreciableAsset> depreciableAssets)
+        IReadOnlyList<DepreciableAsset> depreciableAssets,
+        IReadOnlyList<UnabsorbedDepreciation> unabsorbedDepreciations)
         => TaxComputationInputFactory.FromReturn(
             // Age defaults to an adult slab on this snapshot path (resolved from UserProfile on /tax/compute).
             ret, ayCode, rulesJson, 30, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
-            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets);
+            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, unabsorbedDepreciations);
 
     private async Task<int> NextVersionNoAsync(Guid taxReturnId, CancellationToken ct)
     {

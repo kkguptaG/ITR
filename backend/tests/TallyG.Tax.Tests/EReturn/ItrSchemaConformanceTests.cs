@@ -594,13 +594,16 @@ public class ItrSchemaConformanceTests
         r30.GetProperty("RealizationTotalPeriod").GetInt64().Should().Be(600_000);
         r30.GetProperty("TotalDepreciation").GetInt64().Should().Be(0);
 
-        // Schedule UD: ₹3L unabsorbed depreciation b/f from AY2023-24, carried forward unchanged.
+        // Schedule UD: ₹3L unabsorbed depreciation b/f from AY2023-24, now SET OFF u/s 32(2) against current
+        // income (the fixture comp carries nil forward) — so it reconciles with the computation.
         var ud = itr3.GetProperty("ITR3ScheduleUD");
         ud.GetProperty("TotBFUDepritAmt").GetInt64().Should().Be(300_000);
-        ud.GetProperty("TotalBalCFNY").GetInt64().Should().Be(300_000);
+        ud.GetProperty("TotCurYrdepritSetoffInc").GetInt64().Should().Be(300_000);
+        ud.GetProperty("TotalBalCFNY").GetInt64().Should().Be(0);
         var udRow = ud.GetProperty("ScheduleUD")[0];
         udRow.GetProperty("AssYr").GetString().Should().Be("2023-24");
-        udRow.GetProperty("BalCFNY").GetInt64().Should().Be(300_000);
+        udRow.GetProperty("AmtDeprSOCY").GetInt64().Should().Be(300_000);
+        udRow.GetProperty("BalCFNY").GetInt64().Should().Be(0);
 
         // The deemed STCG now FLOWS into Schedule CG (not just the DCG disclosure): the ₹2L lands as a deemed
         // short-term gain on other assets, taxed at the applicable rate, and ties out through the CG totals.
@@ -1036,12 +1039,13 @@ public class ItrSchemaConformanceTests
         var comp = new TaxComputation
         {
             Regime = Regime.New,
-            // The deemed STCG u/s 50 (₹2L: the 30% block sold ₹6L, ₹2L above its ₹4L value) is part of GTI when
-            // the depreciation scenario runs — the engine taxes it as a slab-rate STCG, so GTI/taxable include it
-            // and the salary plug (GTI − CG − other heads) stays consistent with Schedule CG.
-            GrossTotalIncome = 925_000m + (withDepreciation ? 200_000m : 0m),
+            // withDepreciation nets two depreciation flows into GTI: +₹2L deemed STCG u/s 50 (the 30% block
+            // sold ₹2L above its value, taxed as a slab-rate STCG) and −₹3L brought-forward unabsorbed
+            // depreciation set off u/s 32(2) — net −₹1L. The salary plug (GTI − heads + UD set-off) and
+            // Schedules CG / UD both reconcile to this.
+            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m + (withDepreciation ? 200_000m : 0m),
+            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,

@@ -563,9 +563,13 @@ public static class DbInitializer
         db.TaxComputations.Add(new TaxComputation
         {
             TenantId = RetailTenantId, TaxReturnId = returnId, Regime = Regime.New, IsRecommended = true,
-            GrossTotalIncome = 2_500_000m, TotalDeductions = 0m, TaxableIncome = 2_500_000m,
-            TaxBeforeCess = 440_000m, Surcharge = 0m, Cess = 17_600m, TotalTax = 457_600m,
-            AdvanceTax = 460_000m, RefundOrPayable = 2_400m,
+            // ₹3L brought-forward unabsorbed depreciation (s.32(2)) is set off against the ₹25L business
+            // income → GTI ₹22L; new-regime tax on ₹22L = ₹3,50,000 + 4% cess = ₹3,64,000; the b/f UD is
+            // fully absorbed (nil carried forward). Refund = advance ₹4.6L − ₹3,64,000 = ₹96,000.
+            GrossTotalIncome = 2_200_000m, TotalDeductions = 0m, TaxableIncome = 2_200_000m,
+            TaxBeforeCess = 350_000m, Surcharge = 0m, Cess = 14_000m, TotalTax = 364_000m,
+            UnabsorbedDepreciationCarriedForward = 0m,
+            AdvanceTax = 460_000m, RefundOrPayable = 96_000m,
         });
     }
 

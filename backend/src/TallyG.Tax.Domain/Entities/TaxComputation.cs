@@ -53,6 +53,7 @@ public class TaxComputation : BaseEntity, ITenantScoped
     public decimal SpeculativeLossCarriedForward { get; set; }     // s.73 (4 years, vs speculative income)
     public decimal ShortTermCapitalLossCarriedForward { get; set; } // s.74 (8 years, vs STCG/LTCG)
     public decimal LongTermCapitalLossCarriedForward { get; set; }  // s.74 (8 years, vs LTCG only)
+    public decimal UnabsorbedDepreciationCarriedForward { get; set; } // s.32(2) (indefinite, vs any head exc. salary)
 
     public bool IsRecommended { get; set; }
 

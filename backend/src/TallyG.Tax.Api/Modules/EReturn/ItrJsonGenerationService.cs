@@ -1728,9 +1728,10 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     };
 
     // ----------------------------------------------------------------- Schedule UD (unabsorbed depreciation)
-    // Brought-forward unabsorbed depreciation / allowance (s.32(2)) by prior AY. We DISCLOSE the b/f amounts
-    // and carry them forward unchanged; setting them off against current income (which reduces taxable income)
-    // is a documented follow-up, like the DCG deemed gain. ITR-3 only; emitted only when b/f amounts exist.
+    // Brought-forward unabsorbed depreciation / allowance (s.32(2)) by prior AY. The engine sets it off
+    // against current income (vs any head except salary) and reports the residual carried forward; we
+    // distribute that set-off across the prior-year rows OLDEST-FIRST (depreciation component before
+    // allowance) so Schedule UD reconciles with the computation. ITR-3 only; emitted only when b/f exists.
     private static void AddScheduleUd(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
         if (ctx.ItrType != ItrType.ITR3 || ctx.UnabsorbedDepreciations.Count == 0)
@@ -1738,9 +1739,14 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             return;
         }
 
+        var ordered = ctx.UnabsorbedDepreciations.OrderBy(u => u.AssessmentYearLabel).ToList();
+        var totalBf = ordered.Sum(u => TaxMath0(u.UnabsorbedDepreciationAmount) + TaxMath0(u.UnabsorbedAllowanceAmount));
+        var carried = TaxMath0(ctx.Computation?.UnabsorbedDepreciationCarriedForward ?? 0m);
+        var remainingSetOff = TaxMath0(totalBf - carried);   // total absorbed against current income this year
+
         var rows = new List<Dictionary<string, object?>>();
-        decimal totDep = 0m, totAllow = 0m;
-        foreach (var u in ctx.UnabsorbedDepreciations.OrderBy(u => u.AssessmentYearLabel))
+        decimal totDep = 0m, totAllow = 0m, totDepSO = 0m, totAllowSO = 0m;
+        foreach (var u in ordered)
         {
             var dep = TaxMath0(u.UnabsorbedDepreciationAmount);
             var allow = TaxMath0(u.UnabsorbedAllowanceAmount);
@@ -1748,18 +1754,26 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             {
                 continue;
             }
+
+            var depSO = Math.Min(remainingSetOff, dep);
+            remainingSetOff -= depSO;
+            var allowSO = Math.Min(remainingSetOff, allow);
+            remainingSetOff -= allowSO;
+
             rows.Add(new Dictionary<string, object?>
             {
                 ["AssYr"] = Trunc(u.AssessmentYearLabel.Trim(), 7),
                 ["AmtBFUD"] = R(dep),
-                ["AmtDeprSOCY"] = R(0m),   // set off against current income — deferred (disclosure only)
-                ["BalCFNY"] = R(dep),
+                ["AmtDeprSOCY"] = R(depSO),       // set off against current income (s.32(2))
+                ["BalCFNY"] = R(dep - depSO),
                 ["AmtBFUAllow"] = R(allow),
-                ["AmtAllowSOCY"] = R(0m),
-                ["AllowBalCFNY"] = R(allow),
+                ["AmtAllowSOCY"] = R(allowSO),
+                ["AllowBalCFNY"] = R(allow - allowSO),
             });
             totDep += dep;
             totAllow += allow;
+            totDepSO += depSO;
+            totAllowSO += allowSO;
         }
         if (rows.Count == 0)
         {
@@ -1773,11 +1787,11 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["CurBalCFNY"] = R(0m),               // current-year unabsorbed depreciation c/f — not computed
             ["CurAllowBalCFNY"] = R(0m),
             ["TotBFUDepritAmt"] = R(totDep),
-            ["TotCurYrdepritSetoffInc"] = R(0m),
-            ["TotDepritBalCFNY"] = R(totDep),
+            ["TotCurYrdepritSetoffInc"] = R(totDepSO),
+            ["TotDepritBalCFNY"] = R(totDep - totDepSO),
             ["TotBFUAllowAmt"] = R(totAllow),
-            ["TotCurYrAllowSetoffInc"] = R(0m),
-            ["TotalBalCFNY"] = R(totDep + totAllow),
+            ["TotCurYrAllowSetoffInc"] = R(totAllowSO),
+            ["TotalBalCFNY"] = R((totDep - totDepSO) + (totAllow - totAllowSO)),
         };
     }
 
@@ -2418,7 +2432,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var businessRaw = ctx.Businesses.Sum(PresumptiveIncome);
         var otherRaw = ctx.OtherIncomes.Sum(o => o.Amount);
         var gtiRaw = c?.GrossTotalIncome ?? 0m;
-        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw;
+        // GTI is net of the s.32(2) unabsorbed-depreciation set-off, which isn't attributable to one head —
+        // add it back so salary (the plug) stays anchored to the engine's GTI.
+        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw + UnabsorbedDepSetOff(ctx);
 
         var gti = R(gtiRaw);
         var taxable = R(c?.TaxableIncome ?? 0m);
@@ -2583,6 +2599,24 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     /// </summary>
     private static decimal DeemedStcgUs50(ItrFilingContext ctx)
         => ctx.ItrType == ItrType.ITR3 ? DepreciationCalculator.TotalDeemedCapitalGain(ctx.DepreciableAssets) : 0m;
+
+    /// <summary>
+    /// Brought-forward unabsorbed depreciation (s.32(2)) the engine set off against current income this year
+    /// (total b/f less the residual carried forward). The set-off reduces GTI but does not belong to any one
+    /// head, so the salary plug (GTI − other heads) must ADD IT BACK to stay anchored to the engine's GTI.
+    /// ITR-3 only.
+    /// </summary>
+    private static decimal UnabsorbedDepSetOff(ItrFilingContext ctx)
+    {
+        if (ctx.ItrType != ItrType.ITR3)
+        {
+            return 0m;
+        }
+
+        var totalBf = ctx.UnabsorbedDepreciations.Sum(u => TaxMath0(u.UnabsorbedDepreciationAmount) + TaxMath0(u.UnabsorbedAllowanceAmount));
+        var carried = TaxMath0(ctx.Computation?.UnabsorbedDepreciationCarriedForward ?? 0m);
+        return TaxMath0(totalBf - carried);
+    }
 
     /// <summary>
     /// Capital-gains split (after s.70 set-off) with the deemed STCG u/s 50 folded into the short-term head.
@@ -2941,7 +2975,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var business = ctx.Businesses.Sum(PresumptiveIncome);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other);   // == PartB-TI Salaries
+        var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other + UnabsorbedDepSetOff(ctx));   // == PartB-TI Salaries
 
         var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);

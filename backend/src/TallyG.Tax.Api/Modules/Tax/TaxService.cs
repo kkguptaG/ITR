@@ -220,12 +220,13 @@ public sealed class TaxService : ITaxService
         var exemptIncomes = await _db.ExemptIncomes.Where(e => e.TaxReturnId == ret.Id).ToListAsync(ct);
         var foreignSourceIncomes = await _db.ForeignSourceIncomes.Where(f => f.TaxReturnId == ret.Id).ToListAsync(ct);
         var depreciableAssets = await _db.DepreciableAssets.Where(a => a.TaxReturnId == ret.Id).ToListAsync(ct);
+        var unabsorbedDepreciations = await _db.UnabsorbedDepreciations.Where(u => u.TaxReturnId == ret.Id).ToListAsync(ct);
 
         var age = await ResolveAgeAsync(ret, ct);
 
         return TaxComputationInputFactory.FromReturn(
             ret, ayCode, rulesJson, age, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
-            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets);
+            salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, unabsorbedDepreciations);
     }
 
     private static TaxComputationInput BuildInputFromAdHoc(
