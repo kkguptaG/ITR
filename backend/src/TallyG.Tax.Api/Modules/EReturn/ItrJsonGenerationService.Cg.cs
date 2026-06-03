@@ -26,11 +26,12 @@ public sealed partial class ItrJsonGenerationService
             return;
         }
 
-        var cg = ComputeCgSetOff(ctx.Gains);
+        var cg = ComputeCgSetOff(ctx.Gains);      // VDA (s.115BBH) is excluded — it has its own special-rate head
         var cgShortCaptured = cg.ShortGain;       // net captured current-year STCG (after intra-short set-off)
         var cgShort = cgShortCaptured + deemed;   // total current-year STCG incl. the deemed s.50 gain
         var cgLong = cg.LongGainAfterSetoff;      // net LTCG after the cross-term STCL set-off (s.70(2))
-        if (cgShort <= 0m && cg.LongGrossGain <= 0m)
+        var vda = VdaIncome(ctx);                 // s.115BBH VDA income (reported in IncmFromVDATrnsf)
+        if (cgShort <= 0m && cg.LongGrossGain <= 0m && vda <= 0m)
         {
             return;   // no positive current-year gain to report (a net loss carries via Schedule CFL)
         }
@@ -107,8 +108,13 @@ public sealed partial class ItrJsonGenerationService
             D(D(D(skel["AccruOrRecOfCG"])["LongTermUnder12_5Per"])["DateRange"])["Up16Of3To31Of3"] = R(cgLong);
         }
 
-        skel["SumOfCGIncm"] = R(cgShort + cgLong);
-        skel["TotScheduleCGFor23"] = R(cgShort + cgLong);
+        if (vda > 0m)
+        {
+            skel["IncmFromVDATrnsf"] = R(vda);   // income from transfer of virtual digital assets (s.115BBH)
+        }
+
+        skel["SumOfCGIncm"] = R(cgShort + cgLong + vda);
+        skel["TotScheduleCGFor23"] = R(cgShort + cgLong + vda);
 
         // ITR-3's ScheduleCGFor23 requires a few sub-objects that ITR-2 doesn't (slump sale STCG/LTCG, sale
         // of other unquoted assets, the VDA accrual quarter). The shared skeleton is ITR-2-shaped, so add

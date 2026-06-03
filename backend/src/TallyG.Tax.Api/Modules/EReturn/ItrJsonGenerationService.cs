@@ -136,10 +136,11 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var c = ctx.Computation;
         var gti = c?.GrossTotalIncome ?? 0m;
         var hp = HousePropertyIncome(ctx.Houses);
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);   // normal-rate STCG/LTCG (VDA excluded)
         var cgTotal = cgShort + cgLong;
+        var vda = VdaIncome(ctx);                               // s.115BBH special-rate CG head
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = TaxMath0(gti - hp - cgTotal - other);   // anchored to the engine's GTI
+        var salaryNet = TaxMath0(gti - hp - cgTotal - vda - other);   // anchored to the engine's GTI
 
         var root = new Dictionary<string, object?>
         {
@@ -151,7 +152,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 ["FilingStatus"] = FilingStatusItr2(ctx),
             },
             ["ScheduleCYLA"] = ScheduleCylaNode(hp, cgShort, cgLong),
-            ["ScheduleBFLA"] = ScheduleBflaNode(salaryNet, cgShort, cgLong),
+            ["ScheduleBFLA"] = ScheduleBflaNode(salaryNet, cgShort, cgLong, vda),
             ["PartB-TI"] = PartBTiNode(ctx, salaryNet, hp, cgShort, cgLong, other),
             ["PartB_TTI"] = PartBTtiNode(ctx, c),
             ["Verification"] = VerificationNonItr1(ctx),
@@ -164,6 +165,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleCfl(root, ctx);
         AddScheduleAl(root, ctx);
         AddScheduleSi(root, ctx);
+        AddScheduleVda(root, ctx);
         AddSchedule80G(root, ctx);
         AddScheduleEI(root, ctx);
         AddScheduleSpi(root, ctx);
@@ -202,6 +204,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleCfl(skel, ctx);
         AddScheduleAl(skel, ctx);
         AddScheduleSi(skel, ctx);
+        AddScheduleVda(skel, ctx);
         AddSchedule80G(skel, ctx);
         AddScheduleEI(skel, ctx);
         AddScheduleSpi(skel, ctx);
@@ -847,7 +850,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var stcg111A = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Short && Sec(g, "111A")).Sum(GainOf);
         var ltcg112A = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112A")).Sum(GainOf);
         var ltcg112 = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112") && !Sec(g, "112A")).Sum(GainOf);
-        var vda = ctx.Gains.Where(g => Sec(g, "115BBH")).Sum(GainOf);
+        var vda = VdaIncome(ctx);   // s.115BBH: consideration − cost only (no improvement/expense/exemption)
         var lottery = ctx.OtherIncomes.Where(o => OsNature(o) == "lottery_115bb").Sum(o => o.Amount);
 
         var rows = new List<object?>();
@@ -888,6 +891,66 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["TotSplRateInc"] = R(totInc),
             ["TotSplRateIncTax"] = R(totTax),
         };
+    }
+
+    // ----------------------------------------------------------------- Schedule VDA (virtual digital assets, s.115BBH)
+    // Per-transfer detail of every virtual-digital-asset (crypto / NFT) sale. A VDA gain is taxed at a flat
+    // 30% u/s 115BBH with NO deduction except cost of acquisition and NO set-off of any loss (a loss on one
+    // VDA can't even offset a gain on another), so income per row = max(0, consideration − cost). Emitted for
+    // ITR-2/3 only, when a VDA transfer exists; it reconciles with the 5BBH row in Schedule SI. A VDA gain is
+    // identified the way the engine taxes it (AssetType = CryptoVda) OR the way Schedule SI buckets it
+    // (TaxSection contains "115BBH"), so the disclosure can never miss a gain that was taxed at 30%. ITR-3
+    // carries the extra TotIncBusiness head (a VDA trader may offer the gain as business income) — we model
+    // investor gains under capital gains, so TotIncBusiness is 0 and the whole total lands in TotIncCapGain.
+    private static void AddScheduleVda(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3))
+        {
+            return;
+        }
+
+        var vdaGains = ctx.Gains.Where(IsVdaGain).ToList();
+        if (vdaGains.Count == 0)
+        {
+            return;
+        }
+
+        // The financial year of the assessment year (AY start − 1) — the window a transfer falls in when the
+        // captured row carries no explicit date, so the schema's date fields are always present and valid.
+        var fyStartYear = int.TryParse(AyStartYear(ctx.AyCode), out var ay) ? ay - 1 : 2024;
+        var fallbackTransfer = new DateOnly(fyStartYear, 6, 30);   // inside the FY
+        var fallbackAcq = new DateOnly(fyStartYear - 1, 4, 1);     // a prior year
+
+        var rows = new List<object?>();
+        decimal totCapGain = 0m;
+        foreach (var g in vdaGains)
+        {
+            var cost = Math.Max(0m, g.CostOfAcquisition);
+            var consid = Math.Max(0m, g.SalePrice);
+            var income = Math.Max(0m, consid - cost);   // s.115BBH(2): gains only, no loss set-off
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["DateofAcquisition"] = (g.AcquisitionDate ?? fallbackAcq).ToString("yyyy-MM-dd"),
+                ["DateofTransfer"] = (g.TransferDate ?? fallbackTransfer).ToString("yyyy-MM-dd"),
+                ["HeadUndIncTaxed"] = "CG",
+                ["AcquisitionCost"] = R(cost),
+                ["ConsidReceived"] = R(consid),
+                ["IncomeFromVDA"] = R(income),
+            });
+            totCapGain += income;
+        }
+
+        var vda = new Dictionary<string, object?>
+        {
+            ["ScheduleVDADtls"] = rows,
+            ["TotIncCapGain"] = R(totCapGain),
+        };
+        if (ctx.ItrType == ItrType.ITR3)
+        {
+            vda["TotIncBusiness"] = 0L;   // ITR-3-only head; investor VDA gains are offered as capital gains
+        }
+
+        form["ScheduleVDA"] = vda;
     }
 
     // ----------------------------------------------------------------- Schedule EI (exempt income)
@@ -2212,7 +2275,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         },
     };
 
-    private static Dictionary<string, object?> ScheduleBflaNode(decimal salary, decimal cgShort, decimal cgLong) => new()
+    private static Dictionary<string, object?> ScheduleBflaNode(decimal salary, decimal cgShort, decimal cgLong, decimal vda = 0m) => new()
     {
         ["Salary"] = new Dictionary<string, object?>
         {
@@ -2232,7 +2295,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["LTCG20Per"] = BflaCgBucket(0m),
         ["LTCGDTAARate"] = BflaCgBucket(0m),
         ["TotalBFLossSetOff"] = new Dictionary<string, object?> { ["TotBFLossSetoff"] = R(0m) },
-        ["IncomeOfCurrYrAftCYLABFLA"] = R(TaxMath0(salary + cgShort + cgLong)),
+        // VDA (s.115BBH) bypasses the per-rate BFLA buckets (no loss may be set off against it) but is still
+        // part of the current-year income carried out of CYLA/BFLA, so it joins the bottom-line total.
+        ["IncomeOfCurrYrAftCYLABFLA"] = R(TaxMath0(salary + cgShort + cgLong + vda)),
     };
 
     private static Dictionary<string, object?> PartBTiNode(
@@ -2243,7 +2308,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var gti = c?.GrossTotalIncome ?? 0m;
         var taxable = c?.TaxableIncome ?? 0m;
         var via = TaxMath0(gti - taxable);
-        var cgTotal = cgShort + cgLong;
+        var cgTotal = cgShort + cgLong;          // normal-rate STCG + LTCG
+        var vda = VdaIncome(ctx);                // s.115BBH VDA — its own special-rate CG leaf
+        var capGainsTotal = cgTotal + vda;       // total under the capital-gains head
         var cf = (c?.HousePropertyLossCarriedForward ?? 0m) + (c?.BusinessLossCarriedForward ?? 0m)
                + (c?.SpeculativeLossCarriedForward ?? 0m) + (c?.ShortTermCapitalLossCarriedForward ?? 0m)
                + (c?.LongTermCapitalLossCarriedForward ?? 0m);
@@ -2264,8 +2331,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     ["LongTermSplRateDTAA"] = R(0m), ["TotalLongTerm"] = R(cgLong),
                 },
                 ["ShortTermLongTermTotal"] = R(cgTotal),
-                ["CapGains30Per115BBH"] = R(0m),
-                ["TotalCapGains"] = R(cgTotal),
+                ["CapGains30Per115BBH"] = R(vda),
+                ["TotalCapGains"] = R(capGainsTotal),
             },
             ["IncFromOS"] = new Dictionary<string, object?>
             {
@@ -2431,11 +2498,12 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var businessRaw = BusinessIncomeForReturn(ctx);
         var otherRaw = ctx.OtherIncomes.Sum(o => o.Amount);
+        var vda = VdaIncome(ctx);                               // s.115BBH special-rate CG head (excluded from cgShort/cgLong)
         var gtiRaw = c?.GrossTotalIncome ?? 0m;
         // GTI is net of the s.32(2) unabsorbed-depreciation set-off, which isn't attributable to one head —
         // add it back so salary (the plug) stays anchored to the engine's GTI.
         var udSetOff = UnabsorbedDepSetOff(ctx);
-        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - businessRaw - otherRaw + udSetOff;
+        var salaryNet = gtiRaw - hpRaw - cgShort - cgLong - vda - businessRaw - otherRaw + udSetOff;
 
         var gti = R(gtiRaw);
         var taxable = R(c?.TaxableIncome ?? 0m);
@@ -2475,7 +2543,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     SetIfInt(lt, "TotalLongTerm", R(cgLong));
                 }
                 SetIfInt(cgNode, "ShortTermLongTermTotal", R(cgShort + cgLong));
-                SetIfInt(cgNode, "TotalCapGains", R(cgShort + cgLong));
+                SetIfInt(cgNode, "CapGains30Per115BBH", R(vda));   // VDA s.115BBH (no loss set-off; own rate)
+                SetIfInt(cgNode, "TotalCapGains", R(cgShort + cgLong + vda));
             }
             if (ti["IncFromOS"] is Dictionary<string, object?> osNode)
             {
@@ -2683,6 +2752,18 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         return (s.ShortGain, s.LongGainAfterSetoff);
     }
 
+    /// <summary>True when a capital-gain row is a virtual digital asset (crypto / NFT) taxed u/s 115BBH — by
+    /// the asset class the engine keys on (CryptoVda) OR the section Schedule SI buckets it under ("115BBH").</summary>
+    private static bool IsVdaGain(CapitalGain g)
+        => g.AssetType == CapitalGainAssetType.CryptoVda || (g.TaxSection ?? string.Empty).Contains("115BBH");
+
+    /// <summary>Net VDA income u/s 115BBH = Σ max(0, consideration − cost). Gains only — s.115BBH(2) bars any
+    /// loss set-off (a loss on one VDA can't reduce a gain on another) and no deduction other than cost of
+    /// acquisition is allowed, so each row is floored at zero. Kept OUT of the ordinary STCG/LTCG set-off
+    /// (<see cref="ComputeCgSetOff"/>) and surfaced as its own special-rate CG head, mirroring the engine.</summary>
+    private static decimal VdaIncome(ItrFilingContext ctx)
+        => ctx.Gains.Where(IsVdaGain).Sum(g => Math.Max(0m, g.SalePrice - g.CostOfAcquisition));
+
     /// <summary>
     /// Deemed short-term capital gain u/s 50 on depreciable business blocks sold above their value (ITR-3
     /// only; rate-independent). Single source of truth shared with the tax-input factory, which feeds it to
@@ -2756,6 +2837,11 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         decimal shortNet = 0m, longNet = 0m;
         foreach (var g in gains)
         {
+            if (IsVdaGain(g))
+            {
+                continue;   // VDA (s.115BBH) is special-rate: never part of the s.70 STCG/LTCG set-off
+            }
+
             var gain = g.SalePrice - GrandfatheredCost(g) - g.CostOfImprovement - g.ExpensesOnTransfer - g.ExemptionAmount;
             if (g.Term == CapitalGainTerm.Short)
             {
@@ -3086,9 +3172,10 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var gti = c?.GrossTotalIncome ?? 0m;
         var hp = HousePropertyIncome(ctx.Houses);
         var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
+        var vda = VdaIncome(ctx);                                    // s.115BBH special-rate CG head
         var business = BusinessIncomeForReturn(ctx);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
-        var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other + UnabsorbedDepSetOff(ctx));   // == PartB-TI Salaries
+        var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - vda - business - other + UnabsorbedDepSetOff(ctx));   // == PartB-TI Salaries
 
         var grossSalary = ctx.Salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu);
         var salExempt = ctx.Salaries.Sum(s => s.ExemptAllowances + s.HraExemption);

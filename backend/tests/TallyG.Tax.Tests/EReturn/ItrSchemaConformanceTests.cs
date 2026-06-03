@@ -680,6 +680,75 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_vda_per_transaction_in_scheduleVDA()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withVda: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule VDA must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        // Schedule VDA: one crypto transfer — bought ₹2L, sold ₹5L → ₹3L income (consideration − cost), head "CG".
+        var vda = itr2.GetProperty("ScheduleVDA");
+        var row = vda.GetProperty("ScheduleVDADtls")[0];
+        row.GetProperty("DateofAcquisition").GetString().Should().Be("2023-08-10");
+        row.GetProperty("DateofTransfer").GetString().Should().Be("2024-11-20");
+        row.GetProperty("HeadUndIncTaxed").GetString().Should().Be("CG");
+        row.GetProperty("AcquisitionCost").GetInt64().Should().Be(200_000);
+        row.GetProperty("ConsidReceived").GetInt64().Should().Be(500_000);
+        row.GetProperty("IncomeFromVDA").GetInt64().Should().Be(300_000);
+        vda.GetProperty("TotIncCapGain").GetInt64().Should().Be(300_000);
+        // ITR-2's ScheduleVDA has no business head (additionalProperties:false forbids TotIncBusiness).
+        vda.TryGetProperty("TotIncBusiness", out _).Should().BeFalse();
+
+        // The ₹3L VDA income lands in Schedule CG's dedicated VDA line — NOT the slab-rate STCG buckets —
+        // and flows into the CG totals.
+        var cg = itr2.GetProperty("ScheduleCGFor23");
+        cg.GetProperty("IncmFromVDATrnsf").GetInt64().Should().Be(300_000);
+        cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(0);
+        cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(300_000);
+
+        // Schedule SI taxes it at the flat 30% (s.115BBH, code 5BBH) → ₹90k.
+        var bbh = itr2.GetProperty("ScheduleSI").GetProperty("SplCodeRateTax")
+            .EnumerateArray().Single(r => r.GetProperty("SecCode").GetString() == "5BBH");
+        bbh.GetProperty("SplRateInc").GetInt64().Should().Be(300_000);
+        bbh.GetProperty("SplRateIncTax").GetInt64().Should().Be(90_000);
+
+        // PartB-TI carries the VDA under its own 115BBH leaf (the normal STCG/LTCG total stays nil).
+        var partBCg = itr2.GetProperty("PartB-TI").GetProperty("CapGain");
+        partBCg.GetProperty("CapGains30Per115BBH").GetInt64().Should().Be(300_000);
+        partBCg.GetProperty("ShortTermLongTermTotal").GetInt64().Should().Be(0);
+        partBCg.GetProperty("TotalCapGains").GetInt64().Should().Be(300_000);
+        // Salary is the GTI plug: ₹12.25L GTI − ₹3L VDA − ₹50k other = ₹8.75L (the base salary is undisturbed).
+        itr2.GetProperty("PartB-TI").GetProperty("Salaries").GetInt64().Should().Be(875_000);
+    }
+
+    [Fact]
+    public void Itr3_reports_vda_with_the_business_head()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withVda: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with Schedule VDA must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+
+        var vda = itr3.GetProperty("ScheduleVDA");
+        vda.GetProperty("ScheduleVDADtls")[0].GetProperty("IncomeFromVDA").GetInt64().Should().Be(300_000);
+        vda.GetProperty("TotIncCapGain").GetInt64().Should().Be(300_000);
+        // ITR-3 REQUIRES the business head — zero here, since the investor offers the gain as capital gain.
+        vda.GetProperty("TotIncBusiness").GetInt64().Should().Be(0);
+
+        itr3.GetProperty("ScheduleCGFor23").GetProperty("IncmFromVDATrnsf").GetInt64().Should().Be(300_000);
+        itr3.GetProperty("PartB-TI").GetProperty("CapGain").GetProperty("CapGains30Per115BBH").GetInt64().Should().Be(300_000);
+    }
+
+    [Fact]
     public void Itr3_reports_amt_with_section_split()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
@@ -1074,7 +1143,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false)
     {
         var user = new User
         {
@@ -1107,9 +1176,10 @@ public class ItrSchemaConformanceTests
             // Schedules CG / UD both reconcile to this.
             // withPropertySale: a ₹17L STCG + ₹43L LTCG immovable sale (₹60L) is part of GTI so the
             // SaleofLandBuild detail reconciles with the capital-gains head + the salary plug.
-            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m),
+            // withVda: a ₹3L crypto gain (s.115BBH) is part of GTI so Schedule VDA + the 115BBH CG leaf reconcile.
+            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m),
+            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,
@@ -1209,6 +1279,13 @@ public class ItrSchemaConformanceTests
                 {
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Short, TaxSection = "111A", SalePrice = 200_000m, CostOfAcquisition = 150_000m },
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 300_000m, Isin = "INE002A01018" },
+                }
+                : withVda
+                ? new[]
+                {
+                    // A single crypto/VDA sale (s.115BBH): bought ₹2L, sold ₹5L → ₹3L income taxed at a flat 30%.
+                    // No improvement / expense / loss set-off is allowed, so income = consideration − cost only.
+                    new CapitalGain { AssetType = CapitalGainAssetType.CryptoVda, Term = CapitalGainTerm.Short, TaxSection = "115BBH", SalePrice = 500_000m, CostOfAcquisition = 200_000m, AcquisitionDate = new DateOnly(2023, 8, 10), TransferDate = new DateOnly(2024, 11, 20) },
                 }
                 : Array.Empty<CapitalGain>(),
             // A s.194-IA buyer on the long-term property sale so the gate exercises Schedule CG TrnsfImmblPrprty.
