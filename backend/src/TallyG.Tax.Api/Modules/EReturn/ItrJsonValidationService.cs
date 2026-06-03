@@ -152,6 +152,30 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Cap the 80CCD(1B) claim at ₹50,000.");
         }
 
+        var sec80D = ctx.Deductions.Where(d => NormSection(d.Section) == "80D").Sum(d => d.Amount);
+        if (sec80D > 100_000m)
+        {
+            Warn("DEDUCTION.80D_CAP", "$..Section80D",
+                $"80D health-insurance deduction (₹{sec80D:N0}) exceeds the ₹1,00,000 statutory maximum.",
+                "The absolute s.80D ceiling is ₹1,00,000 (self+family ₹25k/₹50k + parents ₹25k/₹50k at senior-citizen rates, incl. the ₹5k preventive-checkup sub-limit). Trim the claim.");
+        }
+
+        var sec80TTA = ctx.Deductions.Where(d => NormSection(d.Section) == "80TTA").Sum(d => d.Amount);
+        if (sec80TTA > 10_000m)
+        {
+            Warn("DEDUCTION.80TTA_CAP", "$..Section80TTA",
+                $"80TTA savings-interest deduction (₹{sec80TTA:N0}) exceeds the ₹10,000 ceiling.",
+                "80TTA is capped at ₹10,000 (savings-bank interest only). Senior citizens claim 80TTB (₹50,000, also covers deposit interest) instead.");
+        }
+
+        var sec80TTB = ctx.Deductions.Where(d => NormSection(d.Section) == "80TTB").Sum(d => d.Amount);
+        if (sec80TTB > 50_000m)
+        {
+            Warn("DEDUCTION.80TTB_CAP", "$..Section80TTB",
+                $"80TTB interest deduction (₹{sec80TTB:N0}) exceeds the ₹50,000 senior-citizen ceiling.",
+                "80TTB (senior citizens) is capped at ₹50,000 across savings + deposit interest. Trim the claim.");
+        }
+
         // --- presumptive-scheme eligibility (s.44AD / 44ADA): turnover ceilings + minimum declared margin ---
         foreach (var b in ctx.Businesses.Where(x => x.IsPresumptive))
         {

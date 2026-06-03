@@ -60,6 +60,29 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Health_insurance_80D_over_the_absolute_max_warns()
+    {
+        var ded = new[] { Deduct("80D", 120_000m) };   // > the ₹1,00,000 absolute s.80D maximum
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: ded), StubJson), "DEDUCTION.80D_CAP").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Interest_deductions_80TTA_and_80TTB_over_their_caps_warn()
+    {
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: new[] { Deduct("80TTA", 15_000m) }), StubJson), "DEDUCTION.80TTA_CAP").Should().BeTrue();
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: new[] { Deduct("80TTB", 60_000m) }), StubJson), "DEDUCTION.80TTB_CAP").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Deductions_within_their_caps_raise_no_cap_warning()
+    {
+        var ded = new[] { Deduct("80D", 50_000m), Deduct("80TTB", 40_000m) };
+        var report = Svc.Validate(Ctx(regime: Regime.Old, deductions: ded), StubJson);
+        Has(report, "DEDUCTION.80D_CAP").Should().BeFalse();
+        Has(report, "DEDUCTION.80TTB_CAP").Should().BeFalse();
+    }
+
+    [Fact]
     public void Presumptive_44AD_turnover_over_the_cap_is_an_error()
     {
         var biz = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 35_000_000m, GrossReceiptsCash = 0m, NetProfit = 3_000_000m } };
