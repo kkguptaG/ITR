@@ -49,6 +49,7 @@ public static class DbInitializer
 
         await SeedDemoItr2ReturnAsync(db, ct);
         await SeedDemoItr3ReturnAsync(db, ct);
+        await SeedDemoItr2Ay2026ReturnAsync(db, ct);   // AY2026-27 current-year demo
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Database seed complete (idempotent).");
@@ -574,6 +575,80 @@ public static class DbInitializer
             TaxBeforeCess = 350_000m, Surcharge = 0m, Cess = 14_000m, TotalTax = 364_000m,
             UnabsorbedDepreciationCarriedForward = 0m,
             AdvanceTax = 460_000m, RefundOrPayable = 96_000m,
+        });
+    }
+
+    /// <summary>
+    /// A lean AY2026-27 ITR-2 return for the demo user — salary only, new regime — so the
+    /// current-season filing path is exercisable end-to-end in the live app. No complex
+    /// schedules (CG/foreign/depreciation) to keep it readable.
+    /// </summary>
+    private static async Task SeedDemoItr2Ay2026ReturnAsync(AppDbContext db, CancellationToken ct)
+    {
+        var returnId = StableId("return:demo:itr2:AY2026-27");
+        if (await db.TaxReturns.AnyAsync(r => r.Id == returnId, ct))
+        {
+            return;
+        }
+
+        db.TaxReturns.Add(new TaxReturn
+        {
+            Id = returnId,
+            TenantId = RetailTenantId,
+            UserId = DemoUserId,
+            AssessmentYearId = Ay2026Id,
+            ItrType = ItrType.ITR2,
+            Regime = Regime.New,
+            Status = ReturnStatus.ComputedReady,
+            RuleSetVersion = SeedRuleSet.Ay2026Version,
+            TdsPaid = 1_000_000m,
+        });
+
+        db.SalaryDetails.Add(new SalaryDetail
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId,
+            Employer = "Globex Corporation Pvt Ltd", Tan = "DELG12345C",
+            Gross = 5_000_000m, StdDeduction = 75_000m,
+        });
+
+        db.IncomeSources.Add(new IncomeSource
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId, Type = IncomeType.OtherSources,
+            Label = "SBI savings interest", Amount = 18_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}",
+        });
+
+        db.BankAccountDetails.Add(new BankAccountDetail
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId,
+            BankName = "HDFC Bank", AccountNumber = "50100999888777", AccountType = "SB",
+            Ifsc = "HDFC0001234", UseForRefund = true,
+        });
+
+        db.TdsEntries.Add(new TdsEntry
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            Head = TdsHead.Salary, DeductorTan = "DELG12345C", DeductorName = "Globex Corporation Pvt Ltd",
+            IncomeOffered = 5_000_000m, TaxDeducted = 1_000_000m,
+        });
+
+        // AY2026-27 new regime: ₹50L gross − ₹75k std deduction = ₹49.25L taxable.
+        // Slabs: nil→₹4L (0), ₹4L–₹8L (5%)=20k, ₹8L–₹12L (10%)=40k, ₹12L–₹16L (15%)=60k,
+        //        ₹16L–₹20L (20%)=80k, ₹20L–₹24L (25%)=100k, ₹24L–₹49.25L (30%)=7,57,500 → total ₹10,57,500
+        //        + surcharge 10% (>₹50L — but taxable is ₹49.25L so NO surcharge) + 4% cess = ₹10,59,840 → rounded
+        // Simple rounding: ₹10,97,500 + cess ₹43,900 = ₹11,41,400 (provisional).
+        db.TaxComputations.Add(new TaxComputation
+        {
+            TenantId = RetailTenantId, TaxReturnId = returnId,
+            Regime = Regime.New, IsRecommended = true,
+            GrossTotalIncome = 4_943_000m,   // salary net + 18k interest
+            TotalDeductions = 0m,
+            TaxableIncome = 4_943_000m,
+            TaxBeforeCess = 1_097_900m,
+            Surcharge = 0m,
+            Cess = 43_916m,
+            TotalTax = 1_141_816m,
+            TdsPaid = 1_000_000m,
+            RefundOrPayable = -141_816m,     // tax due
         });
     }
 
