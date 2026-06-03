@@ -125,6 +125,7 @@ export const businessIncomeSchema = z
     isPresumptive: z.boolean().default(true),
     presumptiveSection: z.enum(['44AD', '44ADA', '44AE']).optional(),
     natureOfBusinessCode: z.string().trim().max(10).optional().or(z.literal('')),
+    accountingMethod: z.enum(['mercantile', 'cash']).default('mercantile'),
     turnover: optionalMoney,
     grossReceiptsDigital: optionalMoney,
     grossReceiptsCash: optionalMoney,

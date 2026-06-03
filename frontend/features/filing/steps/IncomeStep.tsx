@@ -315,6 +315,7 @@ export function IncomeStep() {
                           isPresumptive: item.isPresumptive,
                           presumptiveSection: (item.presumptiveSection as '44AD' | '44ADA' | '44AE') ?? '44AD',
                           natureOfBusinessCode: item.natureOfBusinessCode ?? '',
+                          accountingMethod: (item.accountingMethod as 'mercantile' | 'cash') ?? 'mercantile',
                           turnover: item.turnover,
                           grossReceiptsDigital: item.grossReceiptsDigital,
                           grossReceiptsCash: item.grossReceiptsCash,

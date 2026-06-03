@@ -479,6 +479,7 @@ export function BusinessIncomeForm({
       presumptiveSection: '44AD',
       turnover: 0, grossReceiptsDigital: 0, grossReceiptsCash: 0, netProfit: 0,
       speculativeFlag: false, gstTurnoverReported: 0, natureOfBusinessCode: '',
+      accountingMethod: 'mercantile',
       partnerCapital: 0, securedLoans: 0, unsecuredLoans: 0, sundryCreditors: 0,
       fixedAssets: 0, inventory: 0, sundryDebtors: 0, bankBalance: 0, cashBalance: 0,
       goodsCarriage: [],
@@ -501,6 +502,11 @@ export function BusinessIncomeForm({
         </Field>
       )}
 
+      {/* Nature-of-business code applies to both presumptive and regular-books businesses. */}
+      <Field label={t('natureCode')} hint={t('natureCodeHint')}>
+        <Input placeholder="e.g. 09028" {...register('natureOfBusinessCode')} />
+      </Field>
+
       {isPresumptive ? (
         <>
           <Field label={t('presumptiveSection')} error={errors.presumptiveSection?.message} required>
@@ -509,9 +515,6 @@ export function BusinessIncomeForm({
               <option value="44ADA">44ADA — {t('section44ADA')}</option>
               <option value="44AE">44AE — {t('section44AE')}</option>
             </Select>
-          </Field>
-          <Field label={t('natureCode')} hint={t('natureCodeHint')}>
-            <Input placeholder="e.g. 09028" {...register('natureOfBusinessCode')} />
           </Field>
           {section !== '44AE' && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -562,10 +565,18 @@ export function BusinessIncomeForm({
           )}
         </>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <MoneyField control={control} name="turnover" label={t('turnover')} />
-          <MoneyField control={control} name="netProfit" label={t('netProfit')} hint={t('netProfitHint')} error={errors.netProfit?.message} allowNegative />
-        </div>
+        <>
+          <Field label={t('accountingMethod')} hint={t('accountingMethodHint')}>
+            <Select {...register('accountingMethod')}>
+              <option value="mercantile">{t('mercantile')}</option>
+              <option value="cash">{t('cashMethod')}</option>
+            </Select>
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MoneyField control={control} name="turnover" label={t('turnover')} />
+            <MoneyField control={control} name="netProfit" label={t('netProfit')} hint={t('netProfitHint')} error={errors.netProfit?.message} allowNegative />
+          </div>
+        </>
       )}
 
       {/* Financial particulars (ITR-4 no-account case + ITR-3 books) */}
