@@ -30,6 +30,25 @@ public class BusinessIncome : BaseEntity, ITenantScoped
 
     public decimal GstTurnoverReported { get; set; }
 
+    // --- Financial particulars of business (ITR-4 Sugam "FinanclPartclrOfBusiness", ITR-3 no-account case) ---
+    // The "no-account case" balance-sheet minimums the ITD requires even from presumptive filers.
+    /// <summary>Proprietor / partner own capital (liabilities side).</summary>
+    public decimal PartnerCapital { get; set; }
+    public decimal SecuredLoans { get; set; }
+    public decimal UnsecuredLoans { get; set; }
+    public decimal SundryCreditors { get; set; }
+    public decimal FixedAssets { get; set; }
+    public decimal Inventory { get; set; }            // closing stock
+    public decimal SundryDebtors { get; set; }
+    public decimal BankBalance { get; set; }
+    public decimal CashBalance { get; set; }
+
+    /// <summary>
+    /// 44AE goods-carriage vehicles (JSON list). Each item: {regNo, ownership(O|L|H), tonnage, months, income}.
+    /// Empty "[]" when not a 44AE business.
+    /// </summary>
+    public string GoodsCarriageJson { get; set; } = "[]";
+
     /// <summary>Sparse ITR-3 schedules (jsonb on Postgres, text on Sqlite).</summary>
     public string BalanceSheetJson { get; set; } = "{}";
     public string PlJson { get; set; } = "{}";

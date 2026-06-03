@@ -126,9 +126,211 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["Refund"] = RefundConformant(ctx),
             ["Verification"] = Verification(ctx)
         };
+        AddScheduleBpItr4(root, ctx);
         AddTaxesPaidSchedulesItr4(root, ctx);
         return root;
     }
+
+    // Default ITD nature-of-business codes per presumptive section, used when the user hasn't picked one.
+    private const string DefaultCode44AD = "09028";   // Wholesale and retail trade
+    private const string DefaultCode44ADA = "16013";  // Other professional services
+    private const string DefaultCode44AE = "11011";   // Transport by road
+
+    /// <summary>
+    /// Schedule BP for ITR-4 (Sugam): the presumptive-income breakdown (44AD digital-vs-cash 6%/8%,
+    /// 44ADA 50%, 44AE per-vehicle), the goods-carriage vehicle list, the nature-of-business codes, and
+    /// the "FinanclPartclrOfBusiness" no-account-case balance sheet. Totals are anchored to the engine's
+    /// PresumptiveIncome so the schedule sums to the taxed business income.
+    /// </summary>
+    private static void AddScheduleBpItr4(Dictionary<string, object?> root, ItrFilingContext ctx)
+    {
+        var presumptive = ctx.Businesses.Where(b => b.IsPresumptive).ToList();
+        if (presumptive.Count == 0)
+        {
+            return;
+        }
+
+        var bp = new Dictionary<string, object?>();
+
+        // --- s.44AD (business) ---
+        var ad = presumptive.Where(b => (b.PresumptiveSection ?? "44AD") == "44AD").ToList();
+        if (ad.Count > 0)
+        {
+            bp["NatOfBus44AD"] = ad.Select(b => new Dictionary<string, object?>
+            {
+                ["NameOfBusiness"] = "Business (presumptive u/s 44AD)",
+                ["CodeAD"] = ValidNatureCode(b.NatureOfBusinessCode, DefaultCode44AD),
+            }).ToList();
+
+            var digital = ad.Sum(b => b.GrossReceiptsDigital);
+            var cashTurn = ad.Sum(b => b.Turnover - b.GrossReceiptsDigital);   // cash + any other mode → 8% bucket
+            cashTurn = Math.Max(0m, cashTurn);
+            var inc6 = Math.Round(0.06m * digital, MidpointRounding.AwayFromZero);
+            var inc8 = Math.Round(0.08m * cashTurn, MidpointRounding.AwayFromZero);
+            bp["PersumptiveInc44AD"] = new Dictionary<string, object?>
+            {
+                ["GrsTotalTrnOver"] = R(digital + cashTurn),
+                ["GrsTrnOverBank"] = R(digital),
+                ["GrsTotalTrnOverInCash"] = R(cashTurn),
+                ["GrsTrnOverAnyOthMode"] = 0L,
+                ["PersumptiveInc44AD6Per"] = R(inc6),
+                ["PersumptiveInc44AD8Per"] = R(inc8),
+                ["TotPersumptiveInc44AD"] = R(inc6 + inc8),
+            };
+        }
+
+        // --- s.44ADA (profession) ---
+        var ada = presumptive.Where(b => (b.PresumptiveSection ?? "") == "44ADA").ToList();
+        if (ada.Count > 0)
+        {
+            bp["NatOfBus44ADA"] = ada.Select(b => new Dictionary<string, object?>
+            {
+                ["NameOfBusiness"] = "Profession (presumptive u/s 44ADA)",
+                ["CodeADA"] = ValidNatureCode(b.NatureOfBusinessCode, DefaultCode44ADA),
+            }).ToList();
+
+            var receipts = ada.Sum(b => b.Turnover);
+            var digital = ada.Sum(b => b.GrossReceiptsDigital);
+            var cash = Math.Max(0m, receipts - digital);
+            var presInc = ada.Sum(PresumptiveIncome);   // 50% (engine)
+            bp["PersumptiveInc44ADA"] = new Dictionary<string, object?>
+            {
+                ["GrsReceipt"] = R(receipts),
+                ["GrsTrnOverBank44ADA"] = R(digital),
+                ["GrsTotalTrnOverInCash44ADA"] = R(cash),
+                ["GrsTrnOverAnyOthMode44ADA"] = 0L,
+                ["TotPersumptiveInc44ADA"] = R(presInc),
+            };
+        }
+
+        // --- s.44AE (goods carriage) ---
+        var ae = presumptive.Where(b => (b.PresumptiveSection ?? "") == "44AE").ToList();
+        if (ae.Count > 0)
+        {
+            bp["NatOfBus44AE"] = ae.Select(b => new Dictionary<string, object?>
+            {
+                ["NameOfBusiness"] = "Goods carriage (presumptive u/s 44AE)",
+                ["CodeAE"] = ValidNatureCode(b.NatureOfBusinessCode, DefaultCode44AE),
+            }).ToList();
+
+            var vehicles = ae.SelectMany(GoodsCarriageVehicles).ToList();
+            if (vehicles.Count > 0)
+            {
+                bp["GoodsDtlsUs44AE"] = vehicles.Select(v => new Dictionary<string, object?>
+                {
+                    ["RegNumberGoodsCarriage"] = v.RegNo,
+                    ["OwnedLeasedHiredFlag"] = v.Ownership,
+                    ["TonnageCapacity"] = v.Tonnage,
+                    ["HoldingPeriod"] = v.Months,
+                    ["PresumptiveIncome"] = R(v.Income),
+                }).ToList();
+            }
+
+            var totalAe = vehicles.Count > 0 ? vehicles.Sum(v => v.Income) : ae.Sum(b => b.NetProfit);
+            bp["PersumptiveInc44AE"] = new Dictionary<string, object?>
+            {
+                ["TotPersumInc44AE"] = R(totalAe),
+                ["SalInterestByFirm"] = 0L,
+                ["TotalPersumptiveInc"] = R(totalAe),
+                ["IncChargeableUnderBus"] = R(totalAe),
+            };
+        }
+
+        // --- FinanclPartclrOfBusiness (no-account-case balance sheet) ---
+        var capital = presumptive.Sum(b => b.PartnerCapital);
+        var secured = presumptive.Sum(b => b.SecuredLoans);
+        var unsecured = presumptive.Sum(b => b.UnsecuredLoans);
+        var creditors = presumptive.Sum(b => b.SundryCreditors);
+        var fixedAssets = presumptive.Sum(b => b.FixedAssets);
+        var inventory = presumptive.Sum(b => b.Inventory);
+        var debtors = presumptive.Sum(b => b.SundryDebtors);
+        var bank = presumptive.Sum(b => b.BankBalance);
+        var cashBal = presumptive.Sum(b => b.CashBalance);
+
+        var totLiab = capital + secured + unsecured + creditors;
+        var totAssets = fixedAssets + inventory + debtors + bank + cashBal;
+        if (totLiab > 0m || totAssets > 0m)
+        {
+            bp["FinanclPartclrOfBusiness"] = new Dictionary<string, object?>
+            {
+                ["PartnerMemberOwnCapital"] = R(capital),
+                ["SecuredLoans"] = R(secured),
+                ["UnSecuredLoans"] = R(unsecured),
+                ["Advances"] = 0L,
+                ["SundryCreditors"] = R(creditors),
+                ["OthrCurrLiab"] = 0L,
+                ["TotCapLiabilities"] = R(totLiab),
+                ["FixedAssets"] = R(fixedAssets),
+                ["Investments"] = 0L,
+                ["Inventories"] = R(inventory),
+                ["SundryDebtors"] = R(debtors),
+                ["BalWithBanks"] = R(bank),
+                ["CashInHand"] = R(cashBal),
+                ["LoansAndAdvances"] = 0L,
+                ["OtherAssets"] = 0L,
+                ["TotalAssets"] = R(totAssets),
+            };
+        }
+
+        if (bp.Count > 0)
+        {
+            root["ScheduleBP"] = bp;
+        }
+    }
+
+    /// <summary>A parsed 44AE goods-carriage vehicle with its computed presumptive income.</summary>
+    private readonly record struct GoodsVehicle(string RegNo, string Ownership, long Tonnage, int Months, decimal Income);
+
+    /// <summary>
+    /// Parse the BusinessIncome.GoodsCarriageJson into vehicles and compute each vehicle's s.44AE
+    /// presumptive income: ₹1,000 per ton of gross weight per month (heavy goods vehicle &gt; 12t), with a
+    /// statutory floor of ₹7,500 per month. Tonnage 0 ⇒ light vehicle ⇒ flat ₹7,500/month.
+    /// </summary>
+    private static IEnumerable<GoodsVehicle> GoodsCarriageVehicles(BusinessIncome b)
+    {
+        if (string.IsNullOrWhiteSpace(b.GoodsCarriageJson) || b.GoodsCarriageJson.Trim() is "[]" or "{}")
+        {
+            yield break;
+        }
+
+        List<GoodsCarriageDto>? items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<GoodsCarriageDto>>(b.GoodsCarriageJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException)
+        {
+            yield break;
+        }
+
+        if (items is null)
+        {
+            yield break;
+        }
+
+        foreach (var v in items)
+        {
+            var months = Math.Clamp(v.Months <= 0 ? 12 : v.Months, 1, 12);
+            var tonnage = Math.Max(0, v.Tonnage);
+            var perMonth = tonnage > 12 ? 1000m * tonnage : 7500m;   // heavy vs light goods vehicle
+            var income = Math.Max(7500m, perMonth) * months;
+            var ownership = (v.Ownership ?? "OWN").ToUpperInvariant() switch
+            {
+                "LEASE" or "LEASED" => "LEASE",
+                "HIRED" or "HIRE" => "HIRED",
+                _ => "OWN",
+            };
+            var reg = string.IsNullOrWhiteSpace(v.RegNo) ? "NA" : v.RegNo.Trim();
+            if (reg.Length > 11) reg = reg[..11];
+            yield return new GoodsVehicle(reg, ownership, tonnage, months, income);
+        }
+    }
+
+    private sealed record GoodsCarriageDto(string? RegNo, string? Ownership, int Tonnage, int Months);
+
+    private static string ValidNatureCode(string? code, string fallback)
+        => string.IsNullOrWhiteSpace(code) ? fallback : code.Trim();
 
     // ----------------------------------------------------------------- ITR-2 (no business) — schema-conformant
     private static Dictionary<string, object?> BuildItr2(ItrFilingContext ctx)

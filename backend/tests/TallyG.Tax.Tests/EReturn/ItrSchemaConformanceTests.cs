@@ -51,6 +51,44 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr4_2026_with_financial_particulars_conforms_and_emits_schedule_bp()
+    {
+        var ctx = BuildContext(ItrType.ITR4, presumptiveBusiness: true, withFinancialParticulars: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR4, json);
+        result.Errors.Should().BeEmpty("ITR-4 with FinanclPartclrOfBusiness must conform. Violations:\n" + Format(result));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var bp = doc.RootElement.GetProperty("ITR").GetProperty("ITR4").GetProperty("ScheduleBP");
+        bp.GetProperty("PersumptiveInc44AD").GetProperty("TotPersumptiveInc44AD").GetInt64().Should().Be(120_000);
+        var fin = bp.GetProperty("FinanclPartclrOfBusiness");
+        fin.GetProperty("PartnerMemberOwnCapital").GetInt64().Should().Be(1_000_000);
+        fin.GetProperty("SundryDebtors").GetInt64().Should().Be(120_000);
+        // Assets = fixed(0)+inventory(300k)+debtors(120k)+bank(400k)+cash(60k) = 880k
+        fin.GetProperty("TotalAssets").GetInt64().Should().Be(880_000);
+    }
+
+    [Fact]
+    public void Itr4_2026_with_44AE_goods_carriage_conforms_and_lists_vehicles()
+    {
+        var ctx = BuildContext(ItrType.ITR4, withGoodsCarriage: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR4, json);
+        result.Errors.Should().BeEmpty("ITR-4 with GoodsDtlsUs44AE must conform. Violations:\n" + Format(result));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var bp = doc.RootElement.GetProperty("ITR").GetProperty("ITR4").GetProperty("ScheduleBP");
+        var vehicles = bp.GetProperty("GoodsDtlsUs44AE");
+        vehicles.GetArrayLength().Should().Be(2);
+        // Vehicle 1: 15t > 12t → ₹1000×15×12 = ₹1,80,000. Vehicle 2: 10t ≤ 12t → ₹7,500×6 = ₹45,000.
+        vehicles[0].GetProperty("PresumptiveIncome").GetInt64().Should().Be(180_000);
+        vehicles[1].GetProperty("PresumptiveIncome").GetInt64().Should().Be(45_000);
+        bp.GetProperty("PersumptiveInc44AE").GetProperty("TotPersumInc44AE").GetInt64().Should().Be(225_000);
+    }
+
+    [Fact]
     public void Itr2_2025_json_conforms_to_official_schema()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
@@ -1290,7 +1328,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false)
     {
         var user = new User
         {
@@ -1370,9 +1408,31 @@ public class ItrSchemaConformanceTests
             // Regular-books (non-presumptive) business so the Schedule BP book-vs-tax depreciation reconciliation
             // applies (presumptive income would subsume depreciation). Overrides presumptiveBusiness.
             ? new[] { new BusinessIncome { IsPresumptive = false, NetProfit = 800_000m } }
-            : presumptiveBusiness
-                ? new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m, GrossReceiptsDigital = 2_000_000m } }
-                : Array.Empty<BusinessIncome>();
+            : withGoodsCarriage
+                // s.44AE goods carriage with a per-vehicle list — exercises the GoodsDtlsUs44AE schedule.
+                ? new[] { new BusinessIncome
+                    {
+                        IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 270_000m,
+                        NatureOfBusinessCode = "11011",
+                        GoodsCarriageJson = "[{\"regNo\":\"DL01AB1234\",\"ownership\":\"OWN\",\"tonnage\":15,\"months\":12}," +
+                                            "{\"regNo\":\"DL02CD5678\",\"ownership\":\"LEASE\",\"tonnage\":10,\"months\":6}]",
+                        PartnerCapital = withFinancialParticulars ? 500_000m : 0m,
+                        CashBalance = withFinancialParticulars ? 50_000m : 0m,
+                    } }
+                : presumptiveBusiness
+                    ? new[] { new BusinessIncome
+                        {
+                            IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m, GrossReceiptsDigital = 2_000_000m,
+                            NatureOfBusinessCode = "09028",
+                            // Exercise FinanclPartclrOfBusiness when requested.
+                            PartnerCapital = withFinancialParticulars ? 1_000_000m : 0m,
+                            SundryCreditors = withFinancialParticulars ? 80_000m : 0m,
+                            Inventory = withFinancialParticulars ? 300_000m : 0m,
+                            SundryDebtors = withFinancialParticulars ? 120_000m : 0m,
+                            BankBalance = withFinancialParticulars ? 400_000m : 0m,
+                            CashBalance = withFinancialParticulars ? 60_000m : 0m,
+                        } }
+                    : Array.Empty<BusinessIncome>();
 
         return new ItrFilingContext
         {
