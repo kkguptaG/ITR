@@ -141,7 +141,95 @@ public sealed partial class ItrJsonGenerationService
             };
         }
 
+        AddImmovablePropertySales(skel, ctx);
+
         form["ScheduleCGFor23"] = skel;
+    }
+
+    // Per-transaction immovable-property (land/building) sale detail — ShortTermCapGainFor23 /
+    // LongTermCapGain23 SaleofLandBuild — built from the captured CapitalGain fields (sale → s.48 deductions
+    // → balance → s.54/54B exemption → net). The 50C stamp value defaults to the sale consideration; the
+    // deductions mirror the engine (actual, non-indexed cost — 12.5% default) so each property's net gain
+    // ties to the rate-bucket totals already set. The optional per-buyer s.194-IA block (TrnsfImmblPrprty)
+    // is a future capture. SaleofLandBuild is optional in the schema, so this is purely additive; ITR-2/3.
+    private static void AddImmovablePropertySales(Dictionary<string, object?> skel, ItrFilingContext ctx)
+    {
+        static Dictionary<string, object?> D(object? o) => (Dictionary<string, object?>)o!;
+        var props = ctx.Gains.Where(g => g.AssetType == CapitalGainAssetType.ImmovableProperty).ToList();
+        if (props.Count == 0)
+        {
+            return;
+        }
+
+        var stcgRows = new List<Dictionary<string, object?>>();
+        var ltcgRows = new List<Dictionary<string, object?>>();
+        var ltcgNetTotal = 0m;
+        foreach (var g in props)
+        {
+            var sale = Math.Max(0m, g.SalePrice);
+            var cost = Math.Max(0m, g.CostOfAcquisition);
+            var improve = Math.Max(0m, g.CostOfImprovement);
+            var exp = Math.Max(0m, g.ExpensesOnTransfer);
+            var exemption = Math.Max(0m, g.ExemptionAmount);
+            var totalDedn = cost + improve + exp;
+            var balance = Math.Max(0m, sale - totalDedn);
+            var net = Math.Max(0m, balance - exemption);
+
+            if (g.Term == CapitalGainTerm.Short)
+            {
+                stcgRows.Add(new Dictionary<string, object?>
+                {
+                    ["FullConsideration"] = R(sale),
+                    ["PropertyValuation"] = R(sale),
+                    ["FullConsideration50C"] = R(sale),
+                    ["AquisitCost"] = R(cost),
+                    ["ImproveCost"] = R(improve),
+                    ["ExpOnTrans"] = R(exp),
+                    ["TotalDedn"] = R(totalDedn),
+                    ["Balance"] = R(balance),
+                    ["DeductionUs54B"] = R(exemption),
+                    ["STCGonImmvblPrprty"] = R(net),
+                });
+            }
+            else
+            {
+                // Improvement is folded into the (non-indexed) acquisition-cost line — the LTCG item has no
+                // separate required improvement leaf — so TotalDedn = AquisitCostIndex + ExpOnTrans stays exact.
+                ltcgRows.Add(new Dictionary<string, object?>
+                {
+                    ["FullConsideration"] = R(sale),
+                    ["PropertyValuation"] = R(sale),
+                    ["FullConsideration50C"] = R(sale),
+                    ["AquisitCost"] = R(cost),
+                    ["AquisitCostIndex"] = R(cost + improve),
+                    ["ExpOnTrans"] = R(exp),
+                    ["TotalDedn"] = R(totalDedn),
+                    ["Balance"] = R(balance),
+                    ["ExemptionOrDednUs54"] = new Dictionary<string, object?> { ["ExemptionGrandTotal"] = R(exemption) },
+                    ["LTCGonImmvblPrprty"] = R(net),
+                });
+                ltcgNetTotal += net;
+            }
+        }
+
+        if (stcgRows.Count > 0)
+        {
+            D(skel["ShortTermCapGainFor23"])["SaleofLandBuild"] = new Dictionary<string, object?> { ["SaleofLandBuildDtls"] = stcgRows };
+        }
+
+        if (ltcgRows.Count > 0)
+        {
+            // The LTCG container requires the net totals; the whole net sits in the "after 23-Jul-2024"
+            // bucket (the 12.5%-without-indexation default), with no grandfathering excess tax.
+            D(skel["LongTermCapGain23"])["SaleofLandBuild"] = new Dictionary<string, object?>
+            {
+                ["SaleofLandBuildDtls"] = ltcgRows,
+                ["TotalLTCGImmblPrprty"] = R(ltcgNetTotal),
+                ["TotalLTCGImmblPrprtyBE"] = 0L,
+                ["TotalLTCGImmblPrprtyAE"] = R(ltcgNetTotal),
+                ["TotalExcessTax"] = 0L,
+            };
+        }
     }
 
     private static Dictionary<string, object?> Zeros(params string[] keys)

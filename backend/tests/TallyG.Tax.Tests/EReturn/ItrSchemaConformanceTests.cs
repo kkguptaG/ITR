@@ -642,6 +642,35 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_immovable_property_sale_per_transaction_in_scheduleCG()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withPropertySale: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with Schedule CG SaleofLandBuild must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var cg = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("ScheduleCGFor23");
+
+        // STCG immovable: sale ₹50L − (₹30L cost + ₹2L improvement + ₹1L expenses) ₹33L = ₹17L, no exemption.
+        var st = cg.GetProperty("ShortTermCapGainFor23").GetProperty("SaleofLandBuild").GetProperty("SaleofLandBuildDtls")[0];
+        st.GetProperty("FullConsideration50C").GetInt64().Should().Be(5_000_000);
+        st.GetProperty("TotalDedn").GetInt64().Should().Be(3_300_000);
+        st.GetProperty("STCGonImmvblPrprty").GetInt64().Should().Be(1_700_000);
+
+        // LTCG immovable u/s 112: sale ₹1Cr − ₹47L deductions − ₹10L s.54 exemption = ₹43L.
+        var lt = cg.GetProperty("LongTermCapGain23").GetProperty("SaleofLandBuild").GetProperty("SaleofLandBuildDtls")[0];
+        lt.GetProperty("TotalDedn").GetInt64().Should().Be(4_700_000);
+        lt.GetProperty("ExemptionOrDednUs54").GetProperty("ExemptionGrandTotal").GetInt64().Should().Be(1_000_000);
+        lt.GetProperty("LTCGonImmvblPrprty").GetInt64().Should().Be(4_300_000);
+
+        // The per-transaction net gains tie to the rate-bucket headline totals.
+        cg.GetProperty("ShortTermCapGainFor23").GetProperty("TotalSTCG").GetInt64().Should().Be(1_700_000);
+        cg.GetProperty("LongTermCapGain23").GetProperty("TotalLTCG").GetInt64().Should().Be(4_300_000);
+    }
+
+    [Fact]
     public void Itr3_reports_amt_with_section_split()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
@@ -1036,7 +1065,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false)
     {
         var user = new User
         {
@@ -1067,9 +1096,11 @@ public class ItrSchemaConformanceTests
             // sold ₹2L above its value, taxed as a slab-rate STCG) and −₹3L brought-forward unabsorbed
             // depreciation set off u/s 32(2) — net −₹1L. The salary plug (GTI − heads + UD set-off) and
             // Schedules CG / UD both reconcile to this.
-            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m),
+            // withPropertySale: a ₹17L STCG + ₹43L LTCG immovable sale (₹60L) is part of GTI so the
+            // SaleofLandBuild detail reconciles with the capital-gains head + the salary plug.
+            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m),
+            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,
@@ -1132,7 +1163,16 @@ public class ItrSchemaConformanceTests
             // An equity STCG (111A) + an equity LTCG (112A) so the ITR-2/3 gate exercises Schedule CG.
             // withGrandfathering: a single pre-01-Feb-2018 112A gain with a 31-Jan-2018 FMV so the gate
             // exercises s.55(2)(ac) grandfathering (cost = max(2L, min(FMV 4L, sale 5L)) = 4L → LTCG ₹1L).
-            Gains = withGrandfathering
+            Gains = withPropertySale
+                ? new[]
+                {
+                    // An immovable-property STCG (sale ₹50L − cost ₹30L − improvement ₹2L − expenses ₹1L = ₹17L)
+                    // and a long-term sale u/s 112 (sale ₹1Cr − cost ₹40L − improvement ₹5L − expenses ₹2L −
+                    // ₹10L s.54 exemption = ₹43L) so the gate exercises Schedule CG SaleofLandBuild.
+                    new CapitalGain { AssetType = CapitalGainAssetType.ImmovableProperty, Term = CapitalGainTerm.Short, SalePrice = 5_000_000m, CostOfAcquisition = 3_000_000m, CostOfImprovement = 200_000m, ExpensesOnTransfer = 100_000m },
+                    new CapitalGain { AssetType = CapitalGainAssetType.ImmovableProperty, Term = CapitalGainTerm.Long, TaxSection = "112", SalePrice = 10_000_000m, CostOfAcquisition = 4_000_000m, CostOfImprovement = 500_000m, ExpensesOnTransfer = 200_000m, ExemptionAmount = 1_000_000m },
+                }
+                : withGrandfathering
                 ? new[]
                 {
                     new CapitalGain { AssetType = CapitalGainAssetType.ListedEquity, Term = CapitalGainTerm.Long, TaxSection = "112A", SalePrice = 500_000m, CostOfAcquisition = 200_000m, AcquisitionDate = new DateOnly(2015, 1, 1), FairMarketValue31Jan2018 = 400_000m, Isin = "INE002A01018" },
