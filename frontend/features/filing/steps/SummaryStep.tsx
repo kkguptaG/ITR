@@ -19,6 +19,7 @@ import { useWizard } from '../WizardContext';
 import { WizardStep, WizardFooter } from '../components/WizardStep';
 import { TaxSummaryPanel } from '../components/TaxSummaryPanel';
 import { PrepaidTaxesCard } from '../components/PrepaidTaxesCard';
+import { ReconciliationCard } from '@/features/reconciliation';
 
 export function SummaryStep() {
   const t = useTranslations('wizard');
@@ -84,6 +85,9 @@ export function SummaryStep() {
         ) : chosen ? (
           <>
             <TaxSummaryPanel comp={chosen} />
+
+            {/* AIS/26AS cross-check here so mismatches are visible before the user locks in the computation */}
+            <ReconciliationCard returnId={returnId} />
 
             {blockers.length > 0 && (
               <FindingList
