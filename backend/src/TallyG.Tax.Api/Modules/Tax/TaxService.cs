@@ -416,4 +416,16 @@ public sealed class TaxService : ITaxService
                 .Select(b => new SurchargeBandDto(b.Above, b.Rate)).ToList());
 
     private static readonly JsonSerializerOptions TraceJsonOptions = new() { WriteIndented = false };
+
+    public Relief89Response ComputeRelief89(Relief89Request request)
+    {
+        var arrears = (request.Arrears ?? Array.Empty<Relief89ArrearYear>())
+            .Select(a => new ArrearYearAllocation(a.FinancialYear, a.TotalIncomeOfThatYear, a.ArrearsForThatYear))
+            .ToList();
+
+        var r = Form10ECalculator.Compute(request.CurrentYearTotalIncome, arrears);
+        return new Relief89Response(
+            r.TaxOnCurrentInclArrears, r.TaxOnCurrentExclArrears,
+            r.AdditionalTaxCurrentYear, r.AdditionalTaxEarlierYears, r.ReliefUs89);
+    }
 }

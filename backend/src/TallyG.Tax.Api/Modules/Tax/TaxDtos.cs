@@ -192,3 +192,20 @@ public sealed record DeductionSuggestionDto(
     int LockInYears,
     decimal Liquidity,
     string UtilityNote);
+
+// ----------------------------------------------------------------- /tax/relief-89 (Form 10E)
+
+/// <summary>POST /tax/relief-89 body — Form 10E s.89(1) salary-arrears relief. CurrentYearTotalIncome
+/// INCLUDES the arrears; each entry allocates a slice of the arrears to the earlier year it relates to.</summary>
+public sealed record Relief89Request(decimal CurrentYearTotalIncome, IReadOnlyList<Relief89ArrearYear>? Arrears);
+
+public sealed record Relief89ArrearYear(string FinancialYear, decimal TotalIncomeOfThatYear, decimal ArrearsForThatYear);
+
+/// <summary>The Form 10E worked result: tax on the current year with/without the arrears, the extra tax this
+/// year vs. across the earlier years, and the resulting s.89(1) relief.</summary>
+public sealed record Relief89Response(
+    decimal TaxOnCurrentInclArrears,
+    decimal TaxOnCurrentExclArrears,
+    decimal AdditionalTaxCurrentYear,
+    decimal AdditionalTaxEarlierYears,
+    decimal ReliefUs89);

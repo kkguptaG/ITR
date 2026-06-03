@@ -59,6 +59,14 @@ public sealed class TaxController : ControllerBase
     [ProducesResponseType(typeof(RecommendationsResponse), StatusCodes.Status200OK)]
     public Task<RecommendationsResponse> Recommendations([FromBody] RecommendationsRequest request, CancellationToken ct)
         => _tax.RecommendAsync(request, ct);
+
+    /// <summary>Form 10E — s.89(1) salary-arrears relief calculator (no persistence). Anonymous, like the
+    /// public tax calculator widget.</summary>
+    [HttpPost("relief-89")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(Relief89Response), StatusCodes.Status200OK)]
+    public Relief89Response Relief89([FromBody] Relief89Request request)
+        => _tax.ComputeRelief89(request);
 }
 
 /// <summary>POST /tax/regime-compare body.</summary>

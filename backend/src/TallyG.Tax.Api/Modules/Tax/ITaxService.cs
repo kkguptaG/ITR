@@ -22,4 +22,7 @@ public interface ITaxService
 
     /// <summary>80C/80D gap-analysis recommendations for a saved return or ad-hoc inputs.</summary>
     Task<RecommendationsResponse> RecommendAsync(RecommendationsRequest request, CancellationToken ct = default);
+
+    /// <summary>Form 10E — s.89(1) salary-arrears relief from inline inputs (pure, NO persistence).</summary>
+    Relief89Response ComputeRelief89(Relief89Request request);
 }
