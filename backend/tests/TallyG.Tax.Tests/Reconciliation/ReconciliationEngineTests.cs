@@ -88,6 +88,42 @@ public class ReconciliationEngineTests
     }
 
     [Fact]
+    public void Return_showing_more_than_department_is_over_reported()
+    {
+        // The return claims ₹50k dividend but AIS only shows ₹8k — the extra is "over-reported"
+        // (often fine, but flagged for awareness).
+        var ais = new Dictionary<string, decimal> { ["ais.dividend_income"] = 8_000m };
+        var r = ReconciliationEngine.BuildReport(Inputs(dividend: 50_000m), ais, Empty);
+
+        Line(r, "Dividend").Status.Should().Be("over_reported");
+    }
+
+    [Fact]
+    public void Differences_within_the_100_rupee_tolerance_are_matched()
+    {
+        // A ₹95 difference (e.g. rounding or timing) should not flag as a mismatch.
+        var ais = new Dictionary<string, decimal> { ["ais.dividend_income"] = 8_095m };
+        var r = ReconciliationEngine.BuildReport(Inputs(dividend: 8_000m), ais, Empty);
+
+        Line(r, "Dividend").Status.Should().Be("matched", "₹95 difference is within the ₹100 tolerance");
+        r.MismatchCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Multiple_mismatches_counted_correctly()
+    {
+        var ais = new Dictionary<string, decimal>
+        {
+            ["ais.salary_gross"] = 1_000_000m,
+            ["ais.dividend_income"] = 40_000m,
+        };
+        var r = ReconciliationEngine.BuildReport(Inputs(grossSalary: 900_000m, dividend: 50_000m), ais, Empty);
+
+        r.MismatchCount.Should().Be(2);
+        r.UnderReportedCount.Should().Be(1, "only the salary is under-reported; dividend is over-reported");
+    }
+
+    [Fact]
     public void Securities_sale_value_below_the_AIS_SFT_is_flagged_under_reported()
     {
         // AIS SFT shows ₹8L of securities sales but the return only declares ₹3L of sale consideration —
