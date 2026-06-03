@@ -85,6 +85,19 @@ export function ReturnsTable({ items }: { items: ReturnSummaryDto[] }) {
               </div>
               <ReturnStatusBadge status={item.status} />
             </div>
+            {item.refundOrPayable != null && (
+              <div className="mt-2">
+                {item.refundOrPayable >= 0 ? (
+                  <span className="text-sm font-semibold tabular-nums text-money-700">
+                    Refund +{formatInr(item.refundOrPayable)}
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold tabular-nums text-payable-700">
+                    Payable {formatInr(-item.refundOrPayable)}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="mt-3 flex items-center justify-between">
               <span className="text-xs text-ink-500">{formatDate(item.createdAt)}</span>
               <ReturnRowActions item={item} />

@@ -1218,7 +1218,7 @@ public sealed class ReturnService : IReturnService
             return existing;
         }
 
-        // No persisted computation — try the engine. Guard against the not-yet-implemented stub.
+        // No persisted computation — try computing fresh from the return's income/deduction data.
         var rulesJson = await _db.TaxRuleSets
             .Where(r => r.AssessmentYearId == ret.AssessmentYearId && r.Version == ret.RuleSetVersion)
             .Select(r => r.RulesJson)
