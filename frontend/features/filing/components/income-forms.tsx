@@ -381,9 +381,13 @@ export function CapitalGainForm({
     } as DefaultValues<CapitalGainFormValues>,
   });
 
+  const assetType = watch('assetType');
   // s.112A grandfathering applies only to listed equity / equity MF held long-term.
   const is112AEligible = watch('term') === 'Long'
-    && (watch('assetType') === 'ListedEquity' || watch('assetType') === 'EquityMutualFund');
+    && (assetType === 'ListedEquity' || assetType === 'EquityMutualFund');
+  // Virtual digital assets (s.115BBH): flat 30%, ONLY cost of acquisition is deductible — no improvement,
+  // transfer expense, exemption or reinvestment relief, and no loss set-off. Hide the inapplicable fields.
+  const isVda = assetType === 'CryptoVda';
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
@@ -414,20 +418,32 @@ export function CapitalGainForm({
         {is112AEligible ? (
           <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
         ) : null}
-        <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
-        <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
-        <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
-        <Field label="Reinvestment exemption section">
-          <Select {...register('exemptionSection')}>
-            <option value="">None / manual amount</option>
-            <option value="54">54 — residential house</option>
-            <option value="54F">54F — any asset (proportionate)</option>
-            <option value="54EC">54EC — bonds (≤ ₹50L)</option>
-          </Select>
-        </Field>
-        <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54F/54EC)" />
+        {!isVda ? (
+          <>
+            <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
+            <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
+            <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
+            <Field label="Reinvestment exemption section">
+              <Select {...register('exemptionSection')}>
+                <option value="">None / manual amount</option>
+                <option value="54">54 — residential house</option>
+                <option value="54F">54F — any asset (proportionate)</option>
+                <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+              </Select>
+            </Field>
+            <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54F/54EC)" />
+          </>
+        ) : null}
       </div>
-      {watch('exemptionSection') ? (
+      {isVda ? (
+        <Alert variant="warning">
+          Virtual digital assets (crypto / NFTs) are taxed at a flat <strong>30%</strong> under s.115BBH on
+          (sale consideration − cost of acquisition). No other deduction — cost of improvement, transfer
+          expenses — and <strong>no exemption or loss set-off</strong> is allowed: a loss on one VDA can&apos;t
+          even offset a gain on another, and VDA losses can&apos;t be carried forward.
+        </Alert>
+      ) : null}
+      {!isVda && watch('exemptionSection') ? (
         <Alert variant="warning">
           Reinvestment exemptions carry strict conditions &amp; timelines — <strong>54EC</strong>: NHAI/REC
           bonds within 6 months, capped ₹50L, 5‑yr lock‑in; <strong>54 / 54F</strong>: buy a house 1 yr before
