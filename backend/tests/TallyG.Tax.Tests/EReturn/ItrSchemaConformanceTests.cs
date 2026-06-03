@@ -749,6 +749,74 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_reports_winnings_115bb_and_115bbj_in_scheduleOS_and_SI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withWinnings: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 with s.115BB / s.115BBJ winnings must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+        var os = itr2.GetProperty("ScheduleOS");
+        var inner = os.GetProperty("IncOthThanOwnRaceHorse");
+
+        // ₹1.5L lottery + ₹50k online game = ₹2L special-rate, kept OUT of the applicable-rate gross (which
+        // stays the ₹50k of interest + dividend) and surfaced in the special-rate fields.
+        inner.GetProperty("GrossIncChrgblTaxAtAppRate").GetInt64().Should().Be(50_000);
+        inner.GetProperty("IncChargeableSpecialRates").GetInt64().Should().Be(200_000);
+        inner.GetProperty("LtryPzzlChrgblUs115BB").GetInt64().Should().Be(150_000);
+        os.GetProperty("IncChargeable").GetInt64().Should().Be(250_000);   // whole OS head (applicable + special)
+
+        // The quarterly accrual tables carry the winnings (last quarter) — lottery and online games separately.
+        os.GetProperty("IncFrmLottery").GetProperty("DateRange").GetProperty("Up16Of3To31Of3").GetInt64().Should().Be(150_000);
+        os.GetProperty("IncFrmOnGames").GetProperty("DateRange").GetProperty("Up16Of3To31Of3").GetInt64().Should().Be(50_000);
+
+        // Schedule SI taxes each at the flat 30%: 5BB lottery ₹45k, 5BBJ online game ₹15k.
+        var rows = itr2.GetProperty("ScheduleSI").GetProperty("SplCodeRateTax");
+        var lottery = rows.EnumerateArray().Single(r => r.GetProperty("SecCode").GetString() == "5BB");
+        lottery.GetProperty("SplRateInc").GetInt64().Should().Be(150_000);
+        lottery.GetProperty("SplRateIncTax").GetInt64().Should().Be(45_000);
+        var games = rows.EnumerateArray().Single(r => r.GetProperty("SecCode").GetString() == "5BBJ");
+        games.GetProperty("SplRateInc").GetInt64().Should().Be(50_000);
+        games.GetProperty("SplRateIncTax").GetInt64().Should().Be(15_000);
+
+        // PartB-TI splits the OS head: applicable-rate ₹50k + special-rate ₹2L = ₹2.5L total.
+        var partBOs = itr2.GetProperty("PartB-TI").GetProperty("IncFromOS");
+        partBOs.GetProperty("OtherSrcThanOwnRaceHorse").GetInt64().Should().Be(50_000);
+        partBOs.GetProperty("IncChargblSplRate").GetInt64().Should().Be(200_000);
+        partBOs.GetProperty("TotIncFromOS").GetInt64().Should().Be(250_000);
+    }
+
+    [Fact]
+    public void Itr3_reports_winnings_with_the_form_specific_lottery_quarter_key()
+    {
+        var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withWinnings: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with s.115BB / s.115BBJ winnings must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+        var os = itr3.GetProperty("ScheduleOS");
+
+        os.GetProperty("IncOthThanOwnRaceHorse").GetProperty("IncChargeableSpecialRates").GetInt64().Should().Be(200_000);
+        os.GetProperty("IncFrmLottery").GetProperty("DateRange").GetProperty("Up16Of3To31Of3").GetInt64().Should().Be(150_000);
+        os.GetProperty("IncFrmOnGames").GetProperty("DateRange").GetProperty("Up16Of3To31Of3").GetInt64().Should().Be(50_000);
+        // SCHEMA QUIRK: in ITR-3 IncFrmLottery's 2nd quarter key is "Up16Of6To15Of9" but IncFrmOnGames keeps
+        // the standard "Upto15Of9" — the generator must pick the right key per field or it won't conform.
+        os.GetProperty("IncFrmLottery").GetProperty("DateRange").TryGetProperty("Up16Of6To15Of9", out _).Should().BeTrue();
+        os.GetProperty("IncFrmOnGames").GetProperty("DateRange").TryGetProperty("Upto15Of9", out _).Should().BeTrue();
+
+        var games = itr3.GetProperty("ScheduleSI").GetProperty("SplCodeRateTax")
+            .EnumerateArray().Single(r => r.GetProperty("SecCode").GetString() == "5BBJ");
+        games.GetProperty("SplRateIncTax").GetInt64().Should().Be(15_000);
+        itr3.GetProperty("PartB-TI").GetProperty("IncFromOS").GetProperty("IncChargblSplRate").GetInt64().Should().Be(200_000);
+    }
+
+    [Fact]
     public void Itr3_reports_amt_with_section_split()
     {
         var ctx = BuildContext(ItrType.ITR3, presumptiveBusiness: true, ayCode: "AY2025-26", withAmt: true);
@@ -1143,7 +1211,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false)
     {
         var user = new User
         {
@@ -1177,9 +1245,10 @@ public class ItrSchemaConformanceTests
             // withPropertySale: a ₹17L STCG + ₹43L LTCG immovable sale (₹60L) is part of GTI so the
             // SaleofLandBuild detail reconciles with the capital-gains head + the salary plug.
             // withVda: a ₹3L crypto gain (s.115BBH) is part of GTI so Schedule VDA + the 115BBH CG leaf reconcile.
-            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m),
+            // withWinnings: ₹1.5L lottery (s.115BB) + ₹50k online-gaming (s.115BBJ) winnings — part of GTI, taxed flat 30%.
+            GrossTotalIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m),
+            TaxableIncome = 925_000m + (withDepreciation ? -100_000m : 0m) + (withPropertySale ? 6_000_000m : 0m) + (withVda ? 300_000m : 0m) + (withWinnings ? 200_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,
@@ -1418,13 +1487,23 @@ public class ItrSchemaConformanceTests
                 ? new SpouseIncomeApportionment { SpouseName = "Maria Fernandes", SpousePan = "ABCPF1234M", SpouseAadhaar = "789012345678" }
                 : null,
             // Categorised other-sources income (the {"nature":…} tag the capture UI persists) so the
-            // ITR-2/3 gates exercise the itemised Schedule OS.
-            OtherIncomes = new[]
-            {
-                new IncomeSource { Type = IncomeType.OtherSources, Label = "SBI savings a/c", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" },
-                new IncomeSource { Type = IncomeType.OtherSources, Label = "HDFC term deposit", Amount = 30_000m, SourceMetaJson = "{\"nature\":\"fd_interest\"}" },
-                new IncomeSource { Type = IncomeType.OtherSources, Label = "Equity dividend", Amount = 8_000m, SourceMetaJson = "{\"nature\":\"dividend\"}" },
-            },
+            // ITR-2/3 gates exercise the itemised Schedule OS. withWinnings appends flat-30% special-rate
+            // winnings: a ₹1.5L lottery (s.115BB) + a ₹50k online-game prize (s.115BBJ).
+            OtherIncomes = withWinnings
+                ? new[]
+                {
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "SBI savings a/c", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "HDFC term deposit", Amount = 30_000m, SourceMetaJson = "{\"nature\":\"fd_interest\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "Equity dividend", Amount = 8_000m, SourceMetaJson = "{\"nature\":\"dividend\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "Dream11 lottery", Amount = 150_000m, SourceMetaJson = "{\"nature\":\"lottery_115bb\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "Online rummy winnings", Amount = 50_000m, SourceMetaJson = "{\"nature\":\"online_gaming_115bbj\"}" },
+                }
+                : new[]
+                {
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "SBI savings a/c", Amount = 12_000m, SourceMetaJson = "{\"nature\":\"savings_interest\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "HDFC term deposit", Amount = 30_000m, SourceMetaJson = "{\"nature\":\"fd_interest\"}" },
+                    new IncomeSource { Type = IncomeType.OtherSources, Label = "Equity dividend", Amount = 8_000m, SourceMetaJson = "{\"nature\":\"dividend\"}" },
+                },
             // ITR-3 carries books-derived financials so the gate exercises the PARTA_BS/PARTA_PL overlay.
             FinancialStatements = itrType == ItrType.ITR3 ? SampleFinancials() : null,
             // Fed bank accounts so the gate exercises BankAccountDtls/AddtnlBankDetails on every form.

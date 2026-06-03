@@ -39,6 +39,19 @@ public class OtherSourcesTaxTests
     }
 
     [Fact]
+    public void Online_game_winnings_are_taxed_flat_30pct_under_115BBJ()
+    {
+        // Winnings from online real-money games (s.115BBJ) share the flat 30% casual rate, so the engine pools
+        // them with s.115BB winnings (the section split is only a Schedule OS / SI disclosure matter).
+        var r = _engine.Compute(Build(0m, new OtherIncomeInput("Online rummy", 1_000_000m, "online_gaming_115bbj")), Regime.New);
+
+        r.GrossTotalIncome.Should().Be(1_000_000m);
+        r.Rebate87A.Should().Be(0m);          // s.87A never applies to flat-rate winnings
+        r.TotalTax.Should().Be(312_000m);     // 30% = ₹3,00,000 + 4% cess
+        r.Trace.Should().Contain(t => t.Step == "Tax.Casual115BB" && t.Amount == 300_000m);
+    }
+
+    [Fact]
     public void Agricultural_income_partial_integration_raises_the_rate()
     {
         var r = _engine.Compute(Build(1_000_000m, new OtherIncomeInput("Farm", 500_000m, "agricultural")), Regime.Old);

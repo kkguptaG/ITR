@@ -851,7 +851,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var ltcg112A = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112A")).Sum(GainOf);
         var ltcg112 = ctx.Gains.Where(g => g.Term == CapitalGainTerm.Long && Sec(g, "112") && !Sec(g, "112A")).Sum(GainOf);
         var vda = VdaIncome(ctx);   // s.115BBH: consideration − cost only (no improvement/expense/exemption)
-        var lottery = ctx.OtherIncomes.Where(o => OsNature(o) == "lottery_115bb").Sum(o => o.Amount);
+        var lottery = Lottery115BbIncome(ctx);
+        var gaming = OnlineGaming115BbjIncome(ctx);
 
         var rows = new List<object?>();
         decimal totInc = 0m, totTax = 0m;
@@ -878,7 +879,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         Add("2A", 12.5m, ltcg112A);    // 112A LTCG on equity (post 23-Jul-2024)
         Add("22", 12.5m, ltcg112);     // 112 LTCG without indexing (post 23-Jul-2024)
         Add("5BBH", 30m, vda);         // 115BBH virtual digital assets
-        Add("5BB", 30m, lottery);      // 115BB winnings from lotteries / games
+        Add("5BB", 30m, lottery);      // 115BB winnings from lotteries / puzzles / races / gambling
+        Add("5BBJ", 30m, gaming);      // 115BBJ winnings from online games
 
         if (totInc <= 0m)
         {
@@ -2311,6 +2313,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var cgTotal = cgShort + cgLong;          // normal-rate STCG + LTCG
         var vda = VdaIncome(ctx);                // s.115BBH VDA — its own special-rate CG leaf
         var capGainsTotal = cgTotal + vda;       // total under the capital-gains head
+        var specialOs = SpecialRateOsIncome(ctx);// s.115BB/115BBJ winnings — OS income at the flat 30% rate
         var cf = (c?.HousePropertyLossCarriedForward ?? 0m) + (c?.BusinessLossCarriedForward ?? 0m)
                + (c?.SpeculativeLossCarriedForward ?? 0m) + (c?.ShortTermCapitalLossCarriedForward ?? 0m)
                + (c?.LongTermCapitalLossCarriedForward ?? 0m);
@@ -2336,8 +2339,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             },
             ["IncFromOS"] = new Dictionary<string, object?>
             {
-                ["OtherSrcThanOwnRaceHorse"] = R(other),
-                ["IncChargblSplRate"] = R(0m),
+                ["OtherSrcThanOwnRaceHorse"] = R(other - specialOs),   // applicable-rate only
+                ["IncChargblSplRate"] = R(specialOs),                  // s.115BB lottery + s.115BBJ online games
                 ["FromOwnRaceHorse"] = R(0m),
                 ["TotIncFromOS"] = R(other),
             },
@@ -2548,7 +2551,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             }
             if (ti["IncFromOS"] is Dictionary<string, object?> osNode)
             {
-                SetIfInt(osNode, "OtherSrcThanOwnRaceHorse", R(otherRaw));
+                var specialOs = SpecialRateOsIncome(ctx);   // s.115BB/115BBJ winnings at the flat 30% rate
+                SetIfInt(osNode, "OtherSrcThanOwnRaceHorse", R(otherRaw - specialOs));
+                SetIfInt(osNode, "IncChargblSplRate", R(specialOs));
                 SetIfInt(osNode, "TotIncFromOS", R(otherRaw));
             }
 
@@ -2763,6 +2768,23 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     /// (<see cref="ComputeCgSetOff"/>) and surfaced as its own special-rate CG head, mirroring the engine.</summary>
     private static decimal VdaIncome(ItrFilingContext ctx)
         => ctx.Gains.Where(IsVdaGain).Sum(g => Math.Max(0m, g.SalePrice - g.CostOfAcquisition));
+
+    // Casual / windfall other-sources income taxed at a flat 30% (no deduction, no 87A). s.115BB covers
+    // lotteries / crossword puzzles / races / gambling / betting; s.115BBJ covers winnings from ONLINE games.
+    // Both share the 30% rate (so the engine pools them) but disclose under different section codes + Schedule
+    // OS lines, so the generator keeps them apart by the captured "nature" tag.
+    private static bool IsLottery115BbNature(string n) => n is "lottery_115bb" or "lottery" or "115bb" or "casual" or "winnings";
+    private static bool IsOnlineGaming115BbjNature(string n) => n is "online_gaming_115bbj" or "online_gaming" or "gaming" or "115bbj";
+
+    private static decimal Lottery115BbIncome(ItrFilingContext ctx)
+        => ctx.OtherIncomes.Where(o => IsLottery115BbNature(OsNature(o))).Sum(o => o.Amount);
+    private static decimal OnlineGaming115BbjIncome(ItrFilingContext ctx)
+        => ctx.OtherIncomes.Where(o => IsOnlineGaming115BbjNature(OsNature(o))).Sum(o => o.Amount);
+
+    /// <summary>Other-sources income chargeable at the flat 30% special rate (s.115BB lottery + s.115BBJ
+    /// online games) — split out of the applicable-rate Schedule OS bucket and into PartB-TI's IncChargblSplRate.</summary>
+    private static decimal SpecialRateOsIncome(ItrFilingContext ctx)
+        => Lottery115BbIncome(ctx) + OnlineGaming115BbjIncome(ctx);
 
     /// <summary>
     /// Deemed short-term capital gain u/s 50 on depreciable business blocks sold above their value (ITR-3
@@ -3310,16 +3332,22 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var otherInt = Bucket("interest");
         var dividend = Bucket("dividend");
         var familyPension = Bucket("family_pension");
-        // Uncategorised / special-rate / exempt natures → AnyOtherIncome, so the schedule total still
-        // equals the lump the engine summed into GTI. (s.115BB lottery tax + agricultural rate-effect are
-        // handled in the computation; this schedule itemises only the common normal-rate heads.)
+        // s.115BB lottery + s.115BBJ online-gaming winnings are chargeable at a flat 30% special rate — split
+        // them OUT of the applicable-rate bucket and into IncChargeableSpecialRates + their own Schedule OS lines.
+        var lottery = Lottery115BbIncome(ctx);
+        var gaming = OnlineGaming115BbjIncome(ctx);
+        var special = lottery + gaming;
+        // Remaining uncategorised NORMAL-rate natures → AnyOtherIncome (so the applicable-rate total still ties
+        // to the engine's normal other-sources lump). Known normal heads AND the special-rate winnings are excluded.
         var anyOther = ctx.OtherIncomes
             .Where(o => OsNature(o) is not ("savings_interest" or "fd_interest" or "refund_interest"
                 or "interest" or "dividend" or "family_pension"))
+            .Where(o => !IsLottery115BbNature(OsNature(o)) && !IsOnlineGaming115BbjNature(OsNature(o)))
             .Sum(o => o.Amount);
 
         var interestGross = savings + deposit + refund + otherInt;
-        var gross = interestGross + dividend + familyPension + anyOther;   // all chargeable at normal rate
+        var gross = interestGross + dividend + familyPension + anyOther;   // chargeable at the applicable (normal) rate
+        var totalOs = gross + special;                                     // whole other-sources head (incl. special-rate)
 
         // ITR-3's special-rate date-ranges use a distinct definition (DateRangeTypeOS) whose 2nd period is
         // "Up16Of6To15Of9"; ITR-2 (DateRangeType) names it "Upto15Of9". Everything else is shared.
@@ -3348,8 +3376,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 ["Anyotherpropinadeqcons562x"] = 0L,
                 ["FamilyPension"] = R(familyPension),
                 ["AnyOtherIncome"] = R(anyOther),
-                ["IncChargeableSpecialRates"] = 0L,
-                ["LtryPzzlChrgblUs115BB"] = 0L,
+                ["IncChargeableSpecialRates"] = R(special),
+                ["LtryPzzlChrgblUs115BB"] = R(lottery),
                 ["IncChrgblUs115BBE"] = 0L,
                 ["CashCreditsUs68"] = 0L,
                 ["UnExplndInvstmntsUs69"] = 0L,
@@ -3374,10 +3402,13 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     ["TotalTaxBenefit"] = 0L,
                 },
             },
-            ["TotOthSrcNoRaceHorse"] = R(gross),
-            ["IncChargeable"] = R(gross),
-            // Special-rate / quarterly date-range heads are required even when nil → emit zero ranges.
-            ["IncFrmLottery"] = ZeroDateRange(secondQ),
+            ["TotOthSrcNoRaceHorse"] = R(totalOs),
+            ["IncChargeable"] = R(totalOs),
+            // Quarterly accrual tables (drive s.234C). Winnings (s.115BB lottery + s.115BBJ online games) sit in
+            // the last quarter — without a captured receipt date, that's the s.234C-safe default. SCHEMA QUIRK:
+            // in ITR-3 IncFrmLottery's 2nd period is "Up16Of6To15Of9" but IncFrmOnGames keeps "Upto15Of9".
+            ["IncFrmLottery"] = OsDateRange(secondQ, lottery),
+            ["IncFrmOnGames"] = OsDateRange("Upto15Of9", gaming),
             ["DividendIncUs115BBDA"] = ZeroDateRange(secondQ),
             ["DividendIncUs115BBDAaiii"] = ZeroDateRange(secondQ),
             ["DividendIncUs115A1ai"] = ZeroDateRange(secondQ),
@@ -3392,7 +3423,12 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     /// <summary>A nil quarterly date-range — the 5-period advance-tax-style split, all zero. The second
     /// period is named differently across forms (<paramref name="secondPeriodKey"/>): ITR-2 "Upto15Of9",
     /// ITR-3 "Up16Of6To15Of9".</summary>
-    private static Dictionary<string, object?> ZeroDateRange(string secondPeriodKey) => new()
+    private static Dictionary<string, object?> ZeroDateRange(string secondPeriodKey) => OsDateRange(secondPeriodKey, 0m);
+
+    /// <summary>A Schedule OS quarterly accrual table with <paramref name="lastQuarterAmount"/> in the final
+    /// quarter (16-Mar→31-Mar) and the rest nil — the s.234C-safe default when no per-quarter dates are captured.
+    /// The 2nd-period key differs by field/form ("Upto15Of9" vs ITR-3's OS-special "Up16Of6To15Of9").</summary>
+    private static Dictionary<string, object?> OsDateRange(string secondPeriodKey, decimal lastQuarterAmount) => new()
     {
         ["DateRange"] = new Dictionary<string, object?>
         {
@@ -3400,7 +3436,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             [secondPeriodKey] = 0L,
             ["Up16Of9To15Of12"] = 0L,
             ["Up16Of12To15Of3"] = 0L,
-            ["Up16Of3To31Of3"] = 0L,
+            ["Up16Of3To31Of3"] = R(lastQuarterAmount),
         },
     };
 

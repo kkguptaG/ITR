@@ -532,7 +532,11 @@ public sealed class TaxCalculator : ITaxCalculator
         {
             switch ((o.Nature ?? string.Empty).Trim().ToLowerInvariant())
             {
-                case "lottery_115bb" or "lottery" or "115bb" or "casual" or "winnings":
+                // Casual / windfall income taxed at a flat 30% (no deductions, no 87A): s.115BB lotteries,
+                // crossword puzzles, races, gambling, betting — AND s.115BBJ winnings from ONLINE games
+                // (same 30% rate; the s.115BB vs 115BBJ split is a disclosure matter, handled in Schedule OS/SI).
+                case "lottery_115bb" or "lottery" or "115bb" or "casual" or "winnings"
+                    or "online_gaming_115bbj" or "online_gaming" or "gaming" or "115bbj":
                     casual += o.Amount;
                     break;
                 case "agricultural" or "agriculture" or "agri":
