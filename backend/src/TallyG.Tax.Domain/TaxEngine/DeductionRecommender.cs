@@ -77,6 +77,26 @@ public static class DeductionRecommender
                 utilityNote: "Deduct up to ₹10,000 of savings-bank interest from your taxable income — claim it only for savings account interest (not FD/RD).");
         }
 
+        // 80GGA — donations to scientific research or rural-development institutions (100% eligible, no cap).
+        // 80GGC — donations to registered political parties (100% eligible, non-cash only).
+        // Both are unlimited in amount (the what-if adds a nominal ₹1k to check that any saving exists).
+        // Offer only when not already claimed and only under the old regime (new regime disallows both).
+        if (used.GetValueOrDefault("80GGA") <= 0m)
+        {
+            AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80GGA",
+                "Donation to scientific research / rural development (s.80GGA)", 0m,
+                1_000m, lockInYears: 0, liquidity: 1.0m,   // ₹1k probe — actual saving scales with donation
+                utilityNote: "100% deduction on donations to approved scientific research / rural dev institutions (s.35(1)/35CCA). No monetary cap; not allowed under the new regime.");
+        }
+
+        if (used.GetValueOrDefault("80GGC") <= 0m)
+        {
+            AddSuggestion(suggestions, engine, input, oldBaseline.TotalTax, "80GGC",
+                "Donation to political party (s.80GGC)", 0m,
+                1_000m, lockInYears: 0, liquidity: 0.5m,
+                utilityNote: "100% deduction on donations to registered political parties via non-cash modes. No cap; individuals only; not under the new regime.");
+        }
+
         // 80EEA — first-time affordable-housing loan interest (₹1.5L over and above 80C), commonly missed.
         // Only applicable when no house property is owned (self-occupied) + loan before Mar 2022; offer it
         // whenever no 80EEA is already claimed and there is a house on the return.
@@ -204,6 +224,8 @@ public static class DeductionRecommender
             "80EEA" => "80EEA",
             "80EEB" => "80EEB",
             "80GG" => "80GG",
+            "80GGA" => "80GGA",
+            "80GGC" => "80GGC",
             "80TTA" => "80TTA",
             "80TTB" => "80TTB",
             _ => s,

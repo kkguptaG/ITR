@@ -1225,17 +1225,7 @@ public sealed class ReturnService : IReturnService
 
         var input = BuildComputationInput(ret, ayCode, rulesJson, salaries, houses, gains, businesses, incomeSources, deductions, donations80G, exemptIncomes, foreignSourceIncomes, depreciableAssets, unabsorbedDepreciations);
 
-        ComputationResult result;
-        try
-        {
-            result = _calculator.Compute(input, regime);
-        }
-        catch (NotImplementedException)
-        {
-            // Tax engine not yet wired in this build — skip persistence, snapshot omits computation.
-            _logger.LogWarning("Tax engine not implemented; filing return {ReturnId} without a fresh computation.", ret.Id);
-            return null;
-        }
+        var result = _calculator.Compute(input, regime);
 
         var computation = new TaxComputation
         {

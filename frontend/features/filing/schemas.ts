@@ -164,6 +164,8 @@ export const DEDUCTION_SECTIONS = [
   '80EEA',
   '80EEB',
   '80G',
+  '80GGA',
+  '80GGC',
   '80GG',
   '80TTA',
   '80TTB',
