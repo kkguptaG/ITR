@@ -21,7 +21,9 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  CreditCard,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button, Card, Spinner } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
@@ -140,6 +142,20 @@ export function ItrJsonPanel({ returnId }: { returnId: string }) {
           <div className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
             <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{genError}</span>
+          </div>
+        )}
+
+        {/* Actionable quick-fix: if a refund is due but no bank account is on file, surface a direct link. */}
+        {report?.issues.some((i) => i.code === 'REFUND.BANK_MISSING' || i.code === 'REFUND.NO_ACCOUNT_FLAGGED') && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <CreditCard className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              A refund is due but no bank account is set up for it.{' '}
+              <Link href="/settings" className="font-semibold underline underline-offset-2 hover:opacity-75">
+                Add a bank account in Settings
+              </Link>{' '}
+              before filing, or your refund cannot be credited.
+            </span>
           </div>
         )}
 
