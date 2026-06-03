@@ -125,6 +125,7 @@ public sealed class ExtractionService : IExtractionService
         var dividend = RoundTo((long)rng.Next(0, 40_000), 10);
         var rentReceived = RoundTo((long)rng.Next(0, 360_000), 100);
         var mfRedemption = RoundTo((long)rng.Next(0, 300_000), 100);
+        var securitiesSale = RoundTo((long)rng.Next(0, 800_000), 100);
         return new List<ExtractionField>
         {
             Field("ais.salary_gross", Money(salary), MoneyConfidence(rng)),
@@ -135,6 +136,7 @@ public sealed class ExtractionService : IExtractionService
             Field("ais.dividend_income", Money(dividend), MoneyConfidence(rng)),
             Field("ais.rent_received", Money(rentReceived), MoneyConfidence(rng)),
             Field("ais.sft_mutual_fund_redemption", Money(mfRedemption), MoneyConfidence(rng)),
+            Field("ais.sft_sale_of_securities", Money(securitiesSale), MoneyConfidence(rng)),
             Field("ais.assessment_year", "AY 2025-26", High(rng))
         };
     }

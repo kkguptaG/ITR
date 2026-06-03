@@ -17,9 +17,9 @@ public class ReconciliationEngineTests
 
     private static ReconciliationInputs Inputs(
         decimal grossSalary = 0, decimal savings = 0, decimal fd = 0, decimal otherInterest = 0,
-        decimal refundInterest = 0, decimal dividend = 0, decimal rent = 0,
+        decimal refundInterest = 0, decimal dividend = 0, decimal rent = 0, decimal securities = 0,
         decimal tds = 0, decimal advance = 0, decimal sat = 0, decimal tcs = 0)
-        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, tds, advance, sat, tcs);
+        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, securities, tds, advance, sat, tcs);
 
     private static ReconLineDto Line(ReconciliationReportDto r, string label) => r.Lines.Single(l => l.Label == label);
 
@@ -85,5 +85,19 @@ public class ReconciliationEngineTests
         // No AIS rent key on file → no rent line even though the return declares rent.
         var r = ReconciliationEngine.BuildReport(Inputs(rent: 300_000m), Empty, Empty);
         r.Lines.Should().NotContain(l => l.Label == "Rent received");
+    }
+
+    [Fact]
+    public void Securities_sale_value_below_the_AIS_SFT_is_flagged_under_reported()
+    {
+        // AIS SFT shows ₹8L of securities sales but the return only declares ₹3L of sale consideration —
+        // a redemption the department knows about is missing.
+        var ais = new Dictionary<string, decimal> { ["ais.sft_sale_of_securities"] = 800_000m };
+        var r = ReconciliationEngine.BuildReport(Inputs(securities: 300_000m), ais, Empty);
+
+        var line = Line(r, "Securities / MF sales (sale value)");
+        line.Status.Should().Be("under_reported");
+        line.Source.Should().Be("AIS");
+        r.UnderReportedCount.Should().Be(1);
     }
 }

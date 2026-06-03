@@ -13,6 +13,7 @@ public sealed record ReconciliationInputs(
     decimal RefundInterest,
     decimal Dividend,
     decimal RentReceived,
+    decimal SecuritiesSaleValue,
     decimal TdsPaid,
     decimal AdvanceTaxPaid,
     decimal SelfAssessmentTaxPaid,
@@ -59,6 +60,11 @@ public static class ReconciliationEngine
         Compare("interest", "Interest — income-tax refund", r.RefundInterest, ais, "ais.interest_income_tax_refund", "AIS");
         Compare("dividend", "Dividend", r.Dividend, ais, "ais.dividend_income", "AIS");
         Compare("rent", "Rent received", r.RentReceived, ais, "ais.rent_received", "AIS");
+
+        // Capital gains: the AIS reports the SFT SALE VALUE (consideration) of securities / MF, not the gain —
+        // so compare it against the total sale consideration the return declares for those assets. A shortfall
+        // means a sale (often an overlooked mutual-fund redemption) the department knows about is missing.
+        Compare("capital_gains", "Securities / MF sales (sale value)", r.SecuritiesSaleValue, ais, "ais.sft_sale_of_securities", "AIS");
 
         // ---- prepaid taxes (26AS) ----
         // TDS + TCS are claim-vs-available (you want to claim all the credit the department holds); advance

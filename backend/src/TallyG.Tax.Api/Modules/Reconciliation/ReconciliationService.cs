@@ -54,6 +54,12 @@ public sealed class ReconciliationService : IReconciliationService
         var rentReceived = await _db.HouseProperties
             .Where(h => h.TaxReturnId == returnId).SumAsync(h => (decimal?)h.AnnualRent, ct) ?? 0m;
 
+        // Sale consideration of the AIS-tracked listed securities (equity / mutual funds) — what the SFT reports.
+        var securitiesTypes = new[] { CapitalGainAssetType.ListedEquity, CapitalGainAssetType.EquityMutualFund, CapitalGainAssetType.DebtMutualFund };
+        var securitiesSaleValue = await _db.CapitalGains
+            .Where(g => g.TaxReturnId == returnId && securitiesTypes.Contains(g.AssetType))
+            .SumAsync(g => (decimal?)g.SalePrice, ct) ?? 0m;
+
         var inputs = new ReconciliationInputs(
             GrossSalary: salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu),
             SavingsInterest: OtherByNature(others, "savings_interest"),
@@ -62,6 +68,7 @@ public sealed class ReconciliationService : IReconciliationService
             RefundInterest: OtherByNature(others, "refund_interest"),
             Dividend: OtherByNature(others, "dividend"),
             RentReceived: rentReceived,
+            SecuritiesSaleValue: securitiesSaleValue,
             TdsPaid: ret.TdsPaid,
             AdvanceTaxPaid: ret.AdvanceTaxPaid,
             SelfAssessmentTaxPaid: ret.SelfAssessmentTaxPaid,
