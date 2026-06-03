@@ -593,6 +593,14 @@ public class ItrSchemaConformanceTests
         r30.GetProperty("CapGainUs50").GetInt64().Should().Be(200_000);
         r30.GetProperty("RealizationTotalPeriod").GetInt64().Should().Be(600_000);
         r30.GetProperty("TotalDepreciation").GetInt64().Should().Be(0);
+
+        // Schedule UD: ₹3L unabsorbed depreciation b/f from AY2023-24, carried forward unchanged.
+        var ud = itr3.GetProperty("ITR3ScheduleUD");
+        ud.GetProperty("TotBFUDepritAmt").GetInt64().Should().Be(300_000);
+        ud.GetProperty("TotalBalCFNY").GetInt64().Should().Be(300_000);
+        var udRow = ud.GetProperty("ScheduleUD")[0];
+        udRow.GetProperty("AssYr").GetString().Should().Be("2023-24");
+        udRow.GetProperty("BalCFNY").GetInt64().Should().Be(300_000);
     }
 
     [Fact]
@@ -1221,6 +1229,10 @@ public class ItrSchemaConformanceTests
                     new DepreciableAsset { Category = DepreciableAssetCategory.PlantMachinery30, OpeningWdv = 400_000m, SaleProceeds = 600_000m },
                 }
                 : Array.Empty<DepreciableAsset>(),
+            // Brought-forward unabsorbed depreciation so the ITR-3 gate exercises Schedule UD.
+            UnabsorbedDepreciations = withDepreciation
+                ? new[] { new UnabsorbedDepreciation { AssessmentYearLabel = "2023-24", UnabsorbedDepreciationAmount = 300_000m } }
+                : Array.Empty<UnabsorbedDepreciation>(),
             // Portuguese-Civil-Code spouse apportionment so the ITR-2/3 gate exercises Schedule 5A.
             SpouseApportionment = withSpouseApportionment
                 ? new SpouseIncomeApportionment { SpouseName = "Maria Fernandes", SpousePan = "ABCPF1234M", SpouseAadhaar = "789012345678" }

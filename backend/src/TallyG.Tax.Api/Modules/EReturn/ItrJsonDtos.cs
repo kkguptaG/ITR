@@ -137,6 +137,9 @@ public sealed class ItrFilingContext
     /// <summary>Depreciable asset blocks (Schedule DPM / DEP); ITR-3.</summary>
     public IReadOnlyList<DepreciableAsset> DepreciableAssets { get; init; } = Array.Empty<DepreciableAsset>();
 
+    /// <summary>Brought-forward unabsorbed depreciation by prior AY (Schedule UD); ITR-3.</summary>
+    public IReadOnlyList<UnabsorbedDepreciation> UnabsorbedDepreciations { get; init; } = Array.Empty<UnabsorbedDepreciation>();
+
     public string AyCode => Ay?.Code ?? Return.RuleSetVersion;
     public ItrType ItrType => Return.ItrType ?? TallyG.Tax.Domain.Enums.ItrType.ITR1;
 }

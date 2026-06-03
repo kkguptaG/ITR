@@ -28,3 +28,16 @@ export interface UpsertDepreciableAssetBody {
   additionsBelow180Days: number;
   saleProceeds: number;
 }
+
+export interface UnabsorbedDepreciationDto {
+  id: string;
+  assessmentYearLabel: string;
+  unabsorbedDepreciationAmount: number;
+  unabsorbedAllowanceAmount: number;
+}
+
+export interface UpsertUnabsorbedDepreciationBody {
+  assessmentYearLabel: string;
+  unabsorbedDepreciationAmount: number;
+  unabsorbedAllowanceAmount: number;
+}

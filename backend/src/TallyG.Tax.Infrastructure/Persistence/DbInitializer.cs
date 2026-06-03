@@ -553,6 +553,13 @@ public static class DbInitializer
             Category = ExemptIncomeCategory.Interest, Description = "PPF interest (s.10(11))", Amount = 50_000m,
         });
 
+        // Brought-forward unabsorbed depreciation from a loss year (Schedule UD).
+        db.UnabsorbedDepreciations.Add(new UnabsorbedDepreciation
+        {
+            TenantId = RetailTenantId, UserId = DemoUserId, TaxReturnId = returnId,
+            AssessmentYearLabel = "2023-24", UnabsorbedDepreciationAmount = 300_000m, UnabsorbedAllowanceAmount = 0m,
+        });
+
         db.TaxComputations.Add(new TaxComputation
         {
             TenantId = RetailTenantId, TaxReturnId = returnId, Regime = Regime.New, IsRecommended = true,

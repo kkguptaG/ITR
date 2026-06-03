@@ -209,6 +209,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddSchedule5A(skel, ctx);
         AddScheduleAmt(skel, ctx);
         AddScheduleDpmDep(skel, ctx);
+        AddScheduleUd(skel, ctx);
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
@@ -1725,6 +1726,60 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["CapGainUs50"] = R(d.DeemedCapitalGain),
         ["WDVLastDay"] = R(d.ClosingWdv),
     };
+
+    // ----------------------------------------------------------------- Schedule UD (unabsorbed depreciation)
+    // Brought-forward unabsorbed depreciation / allowance (s.32(2)) by prior AY. We DISCLOSE the b/f amounts
+    // and carry them forward unchanged; setting them off against current income (which reduces taxable income)
+    // is a documented follow-up, like the DCG deemed gain. ITR-3 only; emitted only when b/f amounts exist.
+    private static void AddScheduleUd(Dictionary<string, object?> form, ItrFilingContext ctx)
+    {
+        if (ctx.ItrType != ItrType.ITR3 || ctx.UnabsorbedDepreciations.Count == 0)
+        {
+            return;
+        }
+
+        var rows = new List<Dictionary<string, object?>>();
+        decimal totDep = 0m, totAllow = 0m;
+        foreach (var u in ctx.UnabsorbedDepreciations.OrderBy(u => u.AssessmentYearLabel))
+        {
+            var dep = TaxMath0(u.UnabsorbedDepreciationAmount);
+            var allow = TaxMath0(u.UnabsorbedAllowanceAmount);
+            if (dep <= 0m && allow <= 0m)
+            {
+                continue;
+            }
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["AssYr"] = Trunc(u.AssessmentYearLabel.Trim(), 7),
+                ["AmtBFUD"] = R(dep),
+                ["AmtDeprSOCY"] = R(0m),   // set off against current income — deferred (disclosure only)
+                ["BalCFNY"] = R(dep),
+                ["AmtBFUAllow"] = R(allow),
+                ["AmtAllowSOCY"] = R(0m),
+                ["AllowBalCFNY"] = R(allow),
+            });
+            totDep += dep;
+            totAllow += allow;
+        }
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        form["ITR3ScheduleUD"] = new Dictionary<string, object?>
+        {
+            ["ScheduleUD"] = rows,
+            ["CurrAssYr"] = "2025-26",
+            ["CurBalCFNY"] = R(0m),               // current-year unabsorbed depreciation c/f — not computed
+            ["CurAllowBalCFNY"] = R(0m),
+            ["TotBFUDepritAmt"] = R(totDep),
+            ["TotCurYrdepritSetoffInc"] = R(0m),
+            ["TotDepritBalCFNY"] = R(totDep),
+            ["TotBFUAllowAmt"] = R(totAllow),
+            ["TotCurYrAllowSetoffInc"] = R(0m),
+            ["TotalBalCFNY"] = R(totDep + totAllow),
+        };
+    }
 
     private static void AddScheduleFa(Dictionary<string, object?> form, ItrFilingContext ctx)
     {

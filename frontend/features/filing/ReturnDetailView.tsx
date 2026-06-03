@@ -33,7 +33,7 @@ import { ForeignSourceIncomeCard } from '@/features/foreign-source-income';
 import { ClubbedIncomeCard } from '@/features/clubbed-income';
 import { PassThroughIncomeCard } from '@/features/pass-through-income';
 import { SpouseApportionmentCard } from '@/features/spouse-apportionment';
-import { DepreciationCard } from '@/features/depreciation';
+import { DepreciationCard, UnabsorbedDepreciationCard } from '@/features/depreciation';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -158,8 +158,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           <ImmovableAssetsCard returnId={returnId} editable={!locked} />
           {/* Interest in a firm/AOP is an ITR-3-only Schedule AL disclosure. */}
           {detail.itrType === 'ITR3' && <FirmInterestCard returnId={returnId} editable={!locked} />}
-          {/* Depreciation (Schedule DPM) is an ITR-3-only business schedule. */}
+          {/* Depreciation (Schedule DPM/DOA) + unabsorbed depreciation (Schedule UD) are ITR-3-only. */}
           {detail.itrType === 'ITR3' && <DepreciationCard returnId={returnId} editable={!locked} />}
+          {detail.itrType === 'ITR3' && <UnabsorbedDepreciationCard returnId={returnId} editable={!locked} />}
           <ForeignAssetsSection returnId={returnId} editable={!locked} />
         </>
       )}

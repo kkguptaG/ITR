@@ -222,6 +222,8 @@ public sealed class ItrJsonService : IItrJsonService
                 .FirstOrDefaultAsync(s => s.TaxReturnId == returnId && s.TenantId == ret.TenantId, ct),
             DepreciableAssets = await _db.DepreciableAssets
                 .Where(a => a.TaxReturnId == returnId && a.TenantId == ret.TenantId).ToListAsync(ct),
+            UnabsorbedDepreciations = await _db.UnabsorbedDepreciations
+                .Where(u => u.TaxReturnId == returnId && u.TenantId == ret.TenantId).ToListAsync(ct),
             ImmovablePropertiesAL = await _db.ImmovablePropertiesAL
                 .Where(p => p.TaxReturnId == returnId && p.TenantId == ret.TenantId).ToListAsync(ct),
             FirmInterestsAL = await _db.FirmInterestsAL
