@@ -279,6 +279,7 @@ export interface TaxComputationResultDto {
   speculativeLossCarriedForward: number;
   shortTermCapitalLossCarriedForward: number;
   longTermCapitalLossCarriedForward: number;
+  unabsorbedDepreciationCarriedForward: number;
   trace: TraceLineDto[];
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */

@@ -65,6 +65,7 @@ export interface TaxComputationDto {
   speculativeLossCarriedForward: DecimalString;
   shortTermCapitalLossCarriedForward: DecimalString;
   longTermCapitalLossCarriedForward: DecimalString;
+  unabsorbedDepreciationCarriedForward: DecimalString;
   isRecommended: boolean;
   computedAt: IsoDateTime;
 }

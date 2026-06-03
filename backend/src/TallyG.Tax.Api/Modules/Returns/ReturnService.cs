@@ -1414,6 +1414,7 @@ public sealed class ReturnService : IReturnService
         c.AmtCreditSetOff, c.Relief89, c.Relief90And91,
         c.HousePropertyLossCarriedForward, c.BusinessLossCarriedForward, c.SpeculativeLossCarriedForward,
         c.ShortTermCapitalLossCarriedForward, c.LongTermCapitalLossCarriedForward,
+        c.UnabsorbedDepreciationCarriedForward,
         c.IsRecommended, c.ComputedAt);
 
     // --- misc helpers ---

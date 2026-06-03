@@ -331,5 +331,6 @@ public sealed record TaxComputationDto(
     decimal SpeculativeLossCarriedForward,
     decimal ShortTermCapitalLossCarriedForward,
     decimal LongTermCapitalLossCarriedForward,
+    decimal UnabsorbedDepreciationCarriedForward,
     bool IsRecommended,
     DateTimeOffset ComputedAt);

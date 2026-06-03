@@ -406,6 +406,7 @@ public sealed class TaxService : ITaxService
             r.SpeculativeLossCarriedForward,
             r.ShortTermCapitalLossCarriedForward,
             r.LongTermCapitalLossCarriedForward,
+            r.UnabsorbedDepreciationCarriedForward,
             r.Trace.Select(t => new TraceLineDto(t.Step, t.Description, t.Amount, t.RuleRef)).ToList());
 
     private static RegimeSlabsDto ToRegimeSlabsDto(RegimeRules rr)
