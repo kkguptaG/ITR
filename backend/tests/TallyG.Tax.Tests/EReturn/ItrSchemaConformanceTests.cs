@@ -601,6 +601,17 @@ public class ItrSchemaConformanceTests
         var udRow = ud.GetProperty("ScheduleUD")[0];
         udRow.GetProperty("AssYr").GetString().Should().Be("2023-24");
         udRow.GetProperty("BalCFNY").GetInt64().Should().Be(300_000);
+
+        // The deemed STCG now FLOWS into Schedule CG (not just the DCG disclosure): the ₹2L lands as a deemed
+        // short-term gain on other assets, taxed at the applicable rate, and ties out through the CG totals.
+        var cg = itr3.GetProperty("ScheduleCGFor23");
+        var stcg = cg.GetProperty("ShortTermCapGainFor23");
+        stcg.GetProperty("SaleOnOtherAssets").GetProperty("DeemedStcgOnAssets").GetInt64().Should().Be(200_000);
+        stcg.GetProperty("SaleOnOtherAssets").GetProperty("CapgainonAssets").GetInt64().Should().Be(200_000);
+        stcg.GetProperty("TotalSTCG").GetInt64().Should().Be(200_000);
+        cg.GetProperty("CurrYrLosses").GetProperty("InStcgAppRate").GetProperty("CurrYearIncome").GetInt64().Should().Be(200_000);
+        cg.GetProperty("SumOfCGIncm").GetInt64().Should().Be(200_000);
+        cg.GetProperty("TotScheduleCGFor23").GetInt64().Should().Be(200_000);
     }
 
     [Fact]
@@ -1025,9 +1036,12 @@ public class ItrSchemaConformanceTests
         var comp = new TaxComputation
         {
             Regime = Regime.New,
-            GrossTotalIncome = 925_000m,
+            // The deemed STCG u/s 50 (₹2L: the 30% block sold ₹6L, ₹2L above its ₹4L value) is part of GTI when
+            // the depreciation scenario runs — the engine taxes it as a slab-rate STCG, so GTI/taxable include it
+            // and the salary plug (GTI − CG − other heads) stays consistent with Schedule CG.
+            GrossTotalIncome = 925_000m + (withDepreciation ? 200_000m : 0m),
             TotalDeductions = 75_000m,
-            TaxableIncome = 925_000m,
+            TaxableIncome = 925_000m + (withDepreciation ? 200_000m : 0m),
             TaxBeforeCess = 40_000m,
             Cess = 1_600m,
             Rebate87A = 0m,

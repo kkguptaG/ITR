@@ -28,9 +28,14 @@ internal static class TaxComputationInputFactory
         IReadOnlyList<Deduction> deductions,
         IReadOnlyList<Donation80G>? donations80G = null,
         IReadOnlyList<ExemptIncome>? exemptIncomes = null,
-        IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null)
+        IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null,
+        IReadOnlyList<DepreciableAsset>? depreciableAssets = null)
     {
         var ay = ret.AssessmentYear;
+
+        // A depreciable block sold for more than its written-down value yields a deemed short-term capital
+        // gain u/s 50 (slab rate). Fed in as a synthetic STCG so the engine taxes it (Schedule DCG discloses it).
+        var deemedStcg = depreciableAssets is { Count: > 0 } da ? DepreciationCalculator.TotalDeemedCapitalGain(da) : 0m;
 
         // Foreign-source income (Schedule FSI/TR) is the canonical source of the doubly-taxed income +
         // foreign tax paid that drive the s.90/91 foreign-tax-credit; when present it overrides the
@@ -54,7 +59,11 @@ internal static class TaxComputationInputFactory
                 FairMarketValueOnGrandfatherDate: c.FairMarketValue31Jan2018 > 0m ? c.FairMarketValue31Jan2018 : null,
                 IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null,
                 ExemptionSection: c.ExemptionSection,
-                ReinvestmentAmount: c.ReinvestmentAmount)).ToList(),
+                ReinvestmentAmount: c.ReinvestmentAmount))
+                .Concat(deemedStcg > 0m
+                    ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }
+                    : Array.Empty<CapitalGainInput>())
+                .ToList(),
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
                 b.NetProfit, b.SpeculativeFlag)).ToList(),

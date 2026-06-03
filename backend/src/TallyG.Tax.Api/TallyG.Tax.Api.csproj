@@ -7,6 +7,12 @@
     <RootNamespace>TallyG.Tax.Api</RootNamespace>
   </PropertyGroup>
 
+  <!-- The test suite drives internal seams directly (e.g. TaxComputationInputFactory) to lock the
+       capture -> engine-input wiring without standing up the whole web host. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="TallyG.Tax.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />

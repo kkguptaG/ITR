@@ -17,14 +17,19 @@ public sealed partial class ItrJsonGenerationService
 {
     private static void AddScheduleCg(Dictionary<string, object?> form, ItrFilingContext ctx)
     {
-        if (ctx.Gains.Count == 0)
+        // A depreciable block (ITR-3) sold for more than its value yields a deemed STCG u/s 50, which the
+        // engine taxes as a slab-rate short-term gain — so Schedule CG must disclose it even when there are
+        // no ordinary capital-gain transactions.
+        var deemed = DeemedStcgUs50(ctx);
+        if (ctx.Gains.Count == 0 && deemed <= 0m)
         {
             return;
         }
 
         var cg = ComputeCgSetOff(ctx.Gains);
-        var cgShort = cg.ShortGain;            // net current-year STCG (after intra-short set-off)
-        var cgLong = cg.LongGainAfterSetoff;   // net LTCG after the cross-term STCL set-off (s.70(2))
+        var cgShortCaptured = cg.ShortGain;       // net captured current-year STCG (after intra-short set-off)
+        var cgShort = cgShortCaptured + deemed;   // total current-year STCG incl. the deemed s.50 gain
+        var cgLong = cg.LongGainAfterSetoff;      // net LTCG after the cross-term STCL set-off (s.70(2))
         if (cgShort <= 0m && cg.LongGrossGain <= 0m)
         {
             return;   // no positive current-year gain to report (a net loss carries via Schedule CFL)
@@ -36,18 +41,33 @@ public sealed partial class ItrJsonGenerationService
         // STCG rate bucket: equity-STT 111A is a special rate (20% for AY2025-26); everything else is
         // taxed at the applicable/slab rate. LTCG sits at 12.5% (post-Budget-2024 default for AY2025-26).
         var stcg111A = ctx.Gains.Any(g => g.Term == CapitalGainTerm.Short && (g.TaxSection ?? string.Empty).Contains("111A"));
-        var stcgBucket = stcg111A ? "InStcg20Per" : "InStcgAppRate";
-        var stcgAccrual = stcg111A ? "ShortTermUnder20Per" : "ShortTermUnderAppRate";
         var stclSetoffColumn = stcg111A ? "StclSetoff20Per" : "StclSetoffAppRate";   // which STCG-rate the spilled STCL came from
         var ltcg112A = ctx.Gains.Any(g => g.Term == CapitalGainTerm.Long && (g.TaxSection ?? string.Empty).Contains("112A"));
+
+        // STCG by rate bucket: captured 111A equity-STT gains take the 20% special rate (AY2025-26); everything
+        // else — incl. the deemed s.50 gain on depreciable blocks — is taxed at the applicable/slab rate.
+        var stcg20 = stcg111A ? cgShortCaptured : 0m;
+        var stcgApp = (stcg111A ? 0m : cgShortCaptured) + deemed;
 
         if (cgShort > 0m)
         {
             D(skel["ShortTermCapGainFor23"])["TotalSTCG"] = R(cgShort);
-            var b = D(D(skel["CurrYrLosses"])[stcgBucket]);
-            b["CurrYearIncome"] = R(cgShort);
-            b["CurrYrCapGain"] = R(cgShort);
-            D(D(D(skel["AccruOrRecOfCG"])[stcgAccrual])["DateRange"])["Up16Of3To31Of3"] = R(cgShort);
+        }
+
+        if (stcg20 > 0m)
+        {
+            var b = D(D(skel["CurrYrLosses"])["InStcg20Per"]);
+            b["CurrYearIncome"] = R(stcg20);
+            b["CurrYrCapGain"] = R(stcg20);
+            D(D(D(skel["AccruOrRecOfCG"])["ShortTermUnder20Per"])["DateRange"])["Up16Of3To31Of3"] = R(stcg20);
+        }
+
+        if (stcgApp > 0m)
+        {
+            var b = D(D(skel["CurrYrLosses"])["InStcgAppRate"]);
+            b["CurrYearIncome"] = R(stcgApp);
+            b["CurrYrCapGain"] = R(stcgApp);
+            D(D(D(skel["AccruOrRecOfCG"])["ShortTermUnderAppRate"])["DateRange"])["Up16Of3To31Of3"] = R(stcgApp);
         }
 
         if (cg.LongGrossGain > 0m)
@@ -108,9 +128,11 @@ public sealed partial class ItrJsonGenerationService
                 ["DeductSec48"] = Zeros("AquisitCost", "ImproveCost", "ExpOnTrans", "TotalDedn"),
                 ["BalanceCG"] = 0L,
                 ["LossSec94of7Or94of8"] = 0L,
-                ["DeemedStcgOnAssets"] = 0L,
+                // Deemed STCG u/s 50 on depreciable business blocks sold above their written-down value
+                // (Schedule DCG). The same figure flows to the engine as a slab-rate STCG (taxed in PartB-TI).
+                ["DeemedStcgOnAssets"] = R(deemed),
                 ["ExemptionOrDednUs54"] = Zeros("ExemptionGrandTotal"),
-                ["CapgainonAssets"] = 0L,
+                ["CapgainonAssets"] = R(deemed),
             };
             D(skel["LongTermCapGain23"])["SlumpSaleInLtcgDtls"] = new Dictionary<string, object?>();
             D(skel["AccruOrRecOfCG"])["VDATrnsfGainsUnder30Per"] = new Dictionary<string, object?>

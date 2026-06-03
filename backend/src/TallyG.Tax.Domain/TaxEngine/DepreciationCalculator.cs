@@ -1,3 +1,5 @@
+using TallyG.Tax.Domain.Entities;
+
 namespace TallyG.Tax.Domain.TaxEngine;
 
 /// <summary>
@@ -47,6 +49,16 @@ public static class DepreciationCalculator
 
         return new BlockDepreciation(wdv, add180, addLess, rate, proceeds, fullBase, halfBase, depFull, depHalf, totalDep, deemedGain, closingWdv);
     }
+
+    /// <summary>
+    /// Total deemed short-term capital gain u/s 50 across all depreciable blocks — the sale proceeds of a
+    /// block in excess of its value (opening WDV + additions). Single source of truth shared by the tax
+    /// input factory (which taxes it as an STCG) and the generator (Schedule CG / DCG). Rate-independent.
+    /// </summary>
+    public static decimal TotalDeemedCapitalGain(IEnumerable<DepreciableAsset> blocks)
+        => blocks.GroupBy(b => b.Category)
+                 .Sum(g => NonNeg(g.Sum(b => b.SaleProceeds)
+                                  - g.Sum(b => b.OpeningWdv + b.AdditionsAbove180Days + b.AdditionsBelow180Days)));
 
     private static decimal NonNeg(decimal v) => v < 0m ? 0m : v;
 

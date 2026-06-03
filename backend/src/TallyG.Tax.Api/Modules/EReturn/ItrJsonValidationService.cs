@@ -212,18 +212,6 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
-        // --- depreciation: a deemed capital gain u/s 50 (block sold for more than its value) must be taxed ---
-        var deemedStcg = ctx.DepreciableAssets
-            .GroupBy(a => a.Category)
-            .Sum(g => Math.Max(0m, g.Sum(a => a.SaleProceeds)
-                                   - g.Sum(a => a.OpeningWdv + a.AdditionsAbove180Days + a.AdditionsBelow180Days)));
-        if (deemedStcg > 0m)
-        {
-            Warn("DEPRECIATION.DEEMED_GAIN_US50", "$..ScheduleDCG",
-                $"A depreciable block was sold for ₹{deemedStcg:N0} more than its value — this is a deemed short-term capital gain u/s 50 (shown in Schedule DCG).",
-                "Add this deemed gain under Capital gains (short-term, applicable rate) so it is taxed — the depreciation schedules disclose it but do not yet feed it into the capital-gains computation automatically.");
-        }
-
         // --- Schedule 5A (Portuguese Civil Code) jurisdiction check ---
         if (ctx.SpouseApportionment is not null && ctx.Profile is { StateCode: { } stateCode }
             && stateCode.Trim() is not ("07" or "08" or "10"))

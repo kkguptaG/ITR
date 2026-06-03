@@ -1425,7 +1425,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         var isItr3 = ctx.ItrType == ItrType.ITR3;
         var hp = TaxMath0(HousePropertyIncome(ctx.Houses));
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var cg = TaxMath0(cgShort + cgLong);
         var os = TaxMath0(ctx.OtherIncomes.Sum(o => o.Amount));
         var business = isItr3 ? TaxMath0(ctx.Businesses.Sum(PresumptiveIncome)) : 0m;
@@ -2414,7 +2414,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     {
         var c = ctx.Computation;
         var hpRaw = HousePropertyIncome(ctx.Houses);
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var businessRaw = ctx.Businesses.Sum(PresumptiveIncome);
         var otherRaw = ctx.OtherIncomes.Sum(o => o.Amount);
         var gtiRaw = c?.GrossTotalIncome ?? 0m;
@@ -2574,6 +2574,25 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
     {
         var s = ComputeCgSetOff(gains);
         return (s.ShortGain, s.LongGainAfterSetoff);
+    }
+
+    /// <summary>
+    /// Deemed short-term capital gain u/s 50 on depreciable business blocks sold above their value (ITR-3
+    /// only; rate-independent). Single source of truth shared with the tax-input factory, which feeds it to
+    /// the engine as a slab-rate STCG — so this is part of the capital-gains head that backs out salary.
+    /// </summary>
+    private static decimal DeemedStcgUs50(ItrFilingContext ctx)
+        => ctx.ItrType == ItrType.ITR3 ? DepreciationCalculator.TotalDeemedCapitalGain(ctx.DepreciableAssets) : 0m;
+
+    /// <summary>
+    /// Capital-gains split (after s.70 set-off) with the deemed STCG u/s 50 folded into the short-term head.
+    /// Used wherever the salary figure is plugged from the engine's GTI (PartB-TI / Schedule S / Schedule 5A):
+    /// the engine's GTI now includes the deemed gain, so the CG head used to back salary out must too.
+    /// </summary>
+    private static (decimal Short, decimal Long) CapitalGainsHeadWithDeemed(ItrFilingContext ctx)
+    {
+        var (s, l) = CapitalGainsSplit(ctx.Gains);
+        return (s + DeemedStcgUs50(ctx), l);
     }
 
     /// <summary>
@@ -2919,7 +2938,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         var c = ctx.Computation;
         var gti = c?.GrossTotalIncome ?? 0m;
         var hp = HousePropertyIncome(ctx.Houses);
-        var (cgShort, cgLong) = CapitalGainsSplit(ctx.Gains);
+        var (cgShort, cgLong) = CapitalGainsHeadWithDeemed(ctx);
         var business = ctx.Businesses.Sum(PresumptiveIncome);
         var other = ctx.OtherIncomes.Sum(o => o.Amount);
         var salaryNet = TaxMath0(gti - hp - cgShort - cgLong - business - other);   // == PartB-TI Salaries
