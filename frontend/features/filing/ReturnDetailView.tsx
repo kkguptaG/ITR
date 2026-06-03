@@ -22,6 +22,7 @@ import type { TaxComputationDto } from './types';
 import { downloadAcknowledgment, downloadComputation } from './download';
 import { isReturnLocked } from './useReturn';
 import { TaxSummaryPanel } from './components/TaxSummaryPanel';
+import { BusinessIncomeSummaryCard } from './components/BusinessIncomeSummaryCard';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
@@ -143,6 +144,11 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
 
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}
       <ReconciliationCard returnId={returnId} />
+
+      {/* Business / profession summary (Schedule BP) — shown for ITR-3 and ITR-4. */}
+      {(detail.itrType === 'ITR3' || detail.itrType === 'ITR4') && (
+        <BusinessIncomeSummaryCard returnId={returnId} />
+      )}
 
       {/* Schedules 80G + AL + FA — donations + assets/liabilities + foreign assets (ITR-2/3).
           The many Schedule FA tables are grouped under one collapsible section. */}
