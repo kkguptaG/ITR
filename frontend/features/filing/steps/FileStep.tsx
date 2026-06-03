@@ -29,9 +29,11 @@ import type { FilingMode, SubmitReturnResponse } from '../types';
 import { downloadAcknowledgment, downloadComputation } from '../download';
 import { useWizard } from '../WizardContext';
 import { useInvalidateReturn } from '../useReturn';
+import { useQuery } from '@tanstack/react-query';
 import { WizardStep, WizardFooter } from '../components/WizardStep';
 import { ItrJsonPanel } from '../components/ItrJsonPanel';
 import { ReconciliationCard } from '@/features/reconciliation';
+import { listItrJsonForReturn } from '../itr-json';
 
 export function FileStep() {
   const t = useTranslations('wizard');
@@ -56,6 +58,15 @@ export function FileStep() {
       : null,
   );
   const [caRequested, setCaRequested] = useState(isUnderReview);
+
+  // Gate the "e-file now" button on having a Valid ITR JSON artifact — users shouldn't be
+  // able to submit without first generating and validating the JSON.
+  const itrJsonQuery = useQuery({
+    queryKey: ['itr-json', 'forReturn', returnId],
+    queryFn: () => listItrJsonForReturn(returnId),
+    staleTime: 15_000,
+  });
+  const hasValidJson = (itrJsonQuery.data ?? []).some((a) => a.status === 'Valid');
 
   const submitMutation = useMutation({
     mutationFn: () => submitReturn(returnId),
@@ -191,7 +202,9 @@ export function FileStep() {
       <WizardFooter
         primary={
           mode === 'self' ? (
-            <Button type="button" onClick={() => submitMutation.mutate()} loading={submitMutation.isPending}>
+            <Button type="button" onClick={() => submitMutation.mutate()} loading={submitMutation.isPending}
+              disabled={!hasValidJson}
+              title={!hasValidJson ? "Generate and validate the ITR JSON (below) before filing" : undefined}>
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               {t('efileNow')}
             </Button>
