@@ -191,6 +191,36 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- foreign-source income (Schedule FSI/TR) cross-checks ---
+        if (ctx.ForeignSourceIncomes.Count > 0)
+        {
+            // A resident with foreign income almost always holds a foreign asset — Schedule FA should not be empty.
+            if (!AnyForeignAsset(ctx))
+            {
+                Warn("FSI.NO_FOREIGN_ASSET", "$..ScheduleFA",
+                    "Foreign income is reported (Schedule FSI) but no foreign asset is disclosed (Schedule FA).",
+                    "If you hold the underlying foreign asset, disclose it in Schedule FA — undisclosed foreign assets carry heavy penalties (Black Money Act).");
+            }
+
+            // Foreign tax was paid but no s.90/91 credit reduced the Indian tax — the relief may have been left unclaimed.
+            var foreignTaxPaid = ctx.ForeignSourceIncomes.Sum(f => f.TaxPaidOutsideIndia);
+            if (foreignTaxPaid > 0m && (c?.Relief90And91 ?? 0m) <= 0m)
+            {
+                Warn("FSI.RELIEF_NOT_APPLIED", "$..ScheduleTR1.TotalTaxReliefOutsideIndia",
+                    $"Foreign tax of ₹{foreignTaxPaid:N0} was paid but no double-taxation relief (s.90/90A/91) reduced the Indian tax.",
+                    "Relief is the lower of the foreign tax and the Indian tax on that income — it is nil only when there is no Indian tax on it. Confirm the relief section and that the income is offered to tax in India.");
+            }
+        }
+
+        // --- Schedule 5A (Portuguese Civil Code) jurisdiction check ---
+        if (ctx.SpouseApportionment is not null && ctx.Profile is { StateCode: { } stateCode }
+            && stateCode.Trim() is not ("07" or "08" or "10"))
+        {
+            Warn("SCHEDULE5A.JURISDICTION", "$..Schedule5A2014",
+                "Schedule 5A (50/50 spouse apportionment) is declared, but your state is not Goa / Dadra & Nagar Haveli / Daman & Diu.",
+                "Schedule 5A applies only to assessees governed by the Portuguese Civil Code (Goa, Dadra & Nagar Haveli, Daman & Diu). Remove it if it does not apply.");
+        }
+
         // --- lifecycle ---
         if (ctx.Return.Status is ReturnStatus.Filed or ReturnStatus.Processed)
         {
@@ -230,6 +260,13 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             : NoticeText;
         return new ValidationReportDto(errors == 0, errors, warnings, issues, notice);
     }
+
+    /// <summary>True when any Schedule FA foreign-asset table has at least one row.</summary>
+    private static bool AnyForeignAsset(ItrFilingContext ctx)
+        => ctx.ForeignBankAccounts.Count + ctx.ForeignCustodialAccounts.Count + ctx.ForeignEquityDebtInterests.Count
+           + ctx.ForeignImmovableProperties.Count + ctx.ForeignFinancialInterests.Count + ctx.ForeignSigningAuthorities.Count
+           + ctx.ForeignOtherIncomes.Count + ctx.ForeignCashValueInsurances.Count + ctx.ForeignOtherAssets.Count
+           + ctx.ForeignTrustInterests.Count > 0;
 
     private static string NormSection(string? section)
         => (section ?? string.Empty).Replace(" ", string.Empty).ToUpperInvariant();

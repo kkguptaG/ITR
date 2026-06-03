@@ -75,25 +75,57 @@ public class ItrBusinessRulesTests
         Has(report, "PRESUMPTIVE.44ADA_MARGIN").Should().BeTrue();
     }
 
+    [Fact]
+    public void Foreign_income_without_a_foreign_asset_disclosure_warns()
+    {
+        var fsi = new[] { new ForeignSourceIncome { CountryCode = "1", CountryName = "USA", TaxIdentificationNo = "123", Head = ForeignIncomeHead.OtherSources, IncomeFromOutsideIndia = 500_000m, TaxPaidOutsideIndia = 75_000m, ReliefSection = ForeignTaxReliefSection.Section90 } };
+        var report = Svc.Validate(Ctx(foreignSourceIncomes: fsi, relief90And91: 75_000m), StubJson);
+        Has(report, "FSI.NO_FOREIGN_ASSET").Should().BeTrue("foreign income is reported but no Schedule FA asset is disclosed");
+    }
+
+    [Fact]
+    public void Foreign_tax_paid_but_no_credit_applied_warns()
+    {
+        var fsi = new[] { new ForeignSourceIncome { CountryCode = "1", CountryName = "USA", TaxIdentificationNo = "123", Head = ForeignIncomeHead.OtherSources, IncomeFromOutsideIndia = 500_000m, TaxPaidOutsideIndia = 75_000m, ReliefSection = ForeignTaxReliefSection.Section90 } };
+        var report = Svc.Validate(Ctx(foreignSourceIncomes: fsi, relief90And91: 0m), StubJson);
+        Has(report, "FSI.RELIEF_NOT_APPLIED").Should().BeTrue("foreign tax was paid but no s.90/91 relief was credited");
+    }
+
+    [Fact]
+    public void Schedule5A_outside_a_portuguese_civil_code_state_warns()
+    {
+        var spouse = new SpouseIncomeApportionment { SpouseName = "Maria", SpousePan = "ABCPF1234M" };
+        // Maharashtra (27) is not a Portuguese-CC jurisdiction -> warn.
+        Has(Svc.Validate(Ctx(spouseApportionment: spouse, stateCode: "27"), StubJson), "SCHEDULE5A.JURISDICTION").Should().BeTrue();
+        // Goa (10) is -> no warning.
+        Has(Svc.Validate(Ctx(spouseApportionment: spouse, stateCode: "10"), StubJson), "SCHEDULE5A.JURISDICTION").Should().BeFalse();
+    }
+
     // ----------------------------------------------------------------- builders
     private static ItrFilingContext Ctx(
         decimal refundOrPayable = 0m,
         Regime regime = Regime.New,
         IReadOnlyList<BankAccountDetail>? banks = null,
         IReadOnlyList<Deduction>? deductions = null,
-        IReadOnlyList<BusinessIncome>? businesses = null)
+        IReadOnlyList<BusinessIncome>? businesses = null,
+        IReadOnlyList<ForeignSourceIncome>? foreignSourceIncomes = null,
+        SpouseIncomeApportionment? spouseApportionment = null,
+        decimal relief90And91 = 0m,
+        string stateCode = "27")
         => new()
         {
             // AY2024-25 has no bundled schema → SchemaAvailable=false → no conformance noise.
             Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = regime, RuleSetVersion = "AY2024-25" },
             User = new User { FullName = "Demo Taxpayer", Email = "demo@itrhelp.com", MobileE164 = "+919000000002", PanMasked = "ABCDE1234F" },
-            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Profile = new UserProfile { City = "Pune", StateCode = stateCode, Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
             Ay = new AssessmentYear { Code = "AY2024-25" },
-            Computation = new TaxComputation { Regime = regime, GrossTotalIncome = 800_000m, TaxableIncome = 800_000m, RefundOrPayable = refundOrPayable },
+            Computation = new TaxComputation { Regime = regime, GrossTotalIncome = 800_000m, TaxableIncome = 800_000m, RefundOrPayable = refundOrPayable, Relief90And91 = relief90And91 },
             Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 900_000m } },
             BankAccounts = banks ?? Array.Empty<BankAccountDetail>(),
             Deductions = deductions ?? Array.Empty<Deduction>(),
             Businesses = businesses ?? Array.Empty<BusinessIncome>(),
+            ForeignSourceIncomes = foreignSourceIncomes ?? Array.Empty<ForeignSourceIncome>(),
+            SpouseApportionment = spouseApportionment,
         };
 
     private static BankAccountDetail Bank(bool useForRefund) => new()
