@@ -77,7 +77,14 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
           {comp.amtCreditSetOff > 0 && <Line label="Less: AMT credit set off (s.115JD)" value={comp.amtCreditSetOff} tone="subtract" indent />}
           {comp.relief89 > 0 && <Line label="Less: relief u/s 89 (arrears)" value={comp.relief89} tone="subtract" indent />}
           {comp.relief90And91 > 0 && <Line label="Less: relief u/s 90/91 (foreign tax)" value={comp.relief90And91} tone="subtract" indent />}
-          {comp.interestPenalty > 0 && <Line label={t('interestPenalty')} value={comp.interestPenalty} indent />}
+          {comp.interestPenalty > 0 && (
+            <>
+              <Line label={t('interestPenalty')} value={comp.interestPenalty} indent />
+              {comp.interest234A > 0 && <Line label="  ↳ 234A (late filing)" value={comp.interest234A} indent />}
+              {comp.interest234B > 0 && <Line label="  ↳ 234B (advance-tax shortfall)" value={comp.interest234B} indent />}
+              {comp.interest234C > 0 && <Line label="  ↳ 234C (instalment deferment)" value={comp.interest234C} indent />}
+            </>
+          )}
           <Line label={t('totalTax')} value={comp.totalTax} strong />
           {comp.amtCreditGenerated > 0 && <Line label="AMT credit carried forward (s.115JD)" value={comp.amtCreditGenerated} tone="muted" indent />}
           {comp.housePropertyLossCarriedForward > 0 && <Line label="House-property loss carried forward (s.71B)" value={comp.housePropertyLossCarriedForward} tone="muted" indent />}

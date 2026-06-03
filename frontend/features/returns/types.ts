@@ -47,6 +47,9 @@ export interface TaxComputationDto {
   tdsPaid: DecimalString;
   advanceTax: DecimalString;
   interestPenalty: DecimalString;
+  interest234A: DecimalString;
+  interest234B: DecimalString;
+  interest234C: DecimalString;
   /** Positive = refund due, negative = payable. */
   refundOrPayable: DecimalString;
   // AMT (s.115JC/JD) + reliefs (s.89/90/91); "0" when not applicable.

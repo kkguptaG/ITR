@@ -188,6 +188,9 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     tdsPaid: num(c.tdsPaid),
     advanceTax: num(c.advanceTax),
     interestPenalty: num(c.interestPenalty),
+    interest234A: num(c.interest234A),
+    interest234B: num(c.interest234B),
+    interest234C: num(c.interest234C),
     refundOrPayable: num(c.refundOrPayable),
     // AMT/relief breakdown now persisted on the snapshot too.
     adjustedTotalIncome: num(c.adjustedTotalIncome),

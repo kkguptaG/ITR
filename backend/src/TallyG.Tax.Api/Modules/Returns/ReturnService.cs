@@ -1409,6 +1409,7 @@ public sealed class ReturnService : IReturnService
     private static TaxComputationDto ToComputationDto(TaxComputation c) => new(
         c.Id, c.Regime, c.GrossTotalIncome, c.TotalDeductions, c.TaxableIncome, c.TaxBeforeCess,
         c.Cess, c.Rebate87A, c.Surcharge, c.TotalTax, c.TdsPaid, c.AdvanceTax, c.InterestPenalty,
+        c.Interest234A, c.Interest234B, c.Interest234C,
         c.RefundOrPayable, c.AdjustedTotalIncome, c.AlternativeMinimumTax, c.AmtCreditGenerated,
         c.AmtCreditSetOff, c.Relief89, c.Relief90And91,
         c.HousePropertyLossCarriedForward, c.BusinessLossCarriedForward, c.SpeculativeLossCarriedForward,
