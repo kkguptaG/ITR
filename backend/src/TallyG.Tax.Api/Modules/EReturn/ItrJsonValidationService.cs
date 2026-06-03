@@ -176,6 +176,26 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "80TTB (senior citizens) is capped at ₹50,000 across savings + deposit interest. Trim the claim.");
         }
 
+        // 80TTA (non-seniors) and 80TTB (seniors) are mutually exclusive — only one may be claimed.
+        if (sec80TTA > 0m && sec80TTB > 0m)
+        {
+            Warn("DEDUCTION.80TTA_80TTB_BOTH", "$..Section80TTB",
+                "Both 80TTA and 80TTB are claimed, but they are mutually exclusive — 80TTA is for non-senior individuals, 80TTB for senior citizens.",
+                "Keep 80TTB if you are a senior citizen (₹50,000, savings + deposit interest); otherwise keep 80TTA (₹10,000, savings only). Remove the other.");
+        }
+
+        // 80U (self) / 80DD (dependent) are FIXED deductions — ₹75,000 (disability 40–80%) or ₹1,25,000 (severe
+        // ≥80%), independent of the actual expense. Any other figure is almost always a data-entry error.
+        foreach (var d in ctx.Deductions.Where(x => NormSection(x.Section) is "80U" or "80DD" && x.Amount > 0m))
+        {
+            if (d.Amount != 75_000m && d.Amount != 125_000m)
+            {
+                Warn("DEDUCTION.80U_80DD_FIXED", "$..Section" + NormSection(d.Section),
+                    $"{NormSection(d.Section)} is claimed at ₹{d.Amount:N0}, but it is a FIXED deduction of ₹75,000 (disability 40–80%) or ₹1,25,000 (severe disability ≥80%) — not the actual expense incurred.",
+                    "Set the amount to ₹75,000 or ₹1,25,000 depending on the certified disability percentage.");
+            }
+        }
+
         // --- presumptive-scheme eligibility (s.44AD / 44ADA): turnover ceilings + minimum declared margin ---
         foreach (var b in ctx.Businesses.Where(x => x.IsPresumptive))
         {

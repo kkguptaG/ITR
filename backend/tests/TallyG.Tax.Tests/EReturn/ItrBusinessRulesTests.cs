@@ -83,6 +83,22 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Claiming_both_80TTA_and_80TTB_is_flagged_as_mutually_exclusive()
+    {
+        var ded = new[] { Deduct("80TTA", 8_000m), Deduct("80TTB", 30_000m) };
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: ded), StubJson), "DEDUCTION.80TTA_80TTB_BOTH").Should().BeTrue();
+    }
+
+    [Fact]
+    public void Disability_80U_80DD_at_a_non_statutory_amount_warns()
+    {
+        // ₹90,000 is neither the ₹75,000 nor the ₹1,25,000 fixed slab → flag it.
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: new[] { Deduct("80U", 90_000m) }), StubJson), "DEDUCTION.80U_80DD_FIXED").Should().BeTrue();
+        // The exact fixed amounts pass clean.
+        Has(Svc.Validate(Ctx(regime: Regime.Old, deductions: new[] { Deduct("80DD", 125_000m) }), StubJson), "DEDUCTION.80U_80DD_FIXED").Should().BeFalse();
+    }
+
+    [Fact]
     public void Presumptive_44AD_turnover_over_the_cap_is_an_error()
     {
         var biz = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 35_000_000m, GrossReceiptsCash = 0m, NetProfit = 3_000_000m } };
