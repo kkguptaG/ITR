@@ -13,11 +13,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Calculator, Scale } from 'lucide-react';
+import { ChevronRight, Calculator, Scale, Plus } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Spinner, Badge, Button } from '@/components/ui';
 import { formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import type { ItrType } from '@/lib/api-types';
 import { computeTax, filingKeys } from '../api';
+import { incomeHeads } from '../steps';
 import type { Regime, TaxComputationResultDto } from '../types';
 
 type RowKind = 'head' | 'subtotal' | 'deduction' | 'tax' | 'prepaid' | 'result' | 'minor';
@@ -39,7 +41,7 @@ export function ComputationDashboard({
   detail,
 }: {
   returnId: string;
-  detail: { regime: Regime | null };
+  detail: { regime: Regime | null; itrType: ItrType | null };
 }) {
   const router = useRouter();
   const computeQuery = useQuery({
@@ -61,12 +63,17 @@ export function ComputationDashboard({
 
   // Build the computation rows from the chosen-regime result (zeros when not yet computed).
   const v = (n: number | undefined) => n ?? 0;
+  // Show only the income heads relevant to this ITR form — but never hide a head
+  // that already carries income (a positive gain or a loss), so nothing the user
+  // entered is ever silently dropped from the computation.
+  const heads = incomeHeads(detail.itrType);
+  const showHead = (relevant: boolean, amount: number) => relevant || amount !== 0;
   const rows: Row[] = [
-    { key: 'salary', label: 'Salary', amount: v(c?.salaryNetIncome), kind: 'head' as const, href: incomeHref('salary') },
-    { key: 'business', label: 'Income from Business or Profession', amount: v(c?.businessNetIncome), kind: 'head' as const, href: incomeHref('business') },
-    { key: 'house', label: 'Income from House Property', amount: v(c?.housePropertyNetIncome), kind: 'head' as const, href: incomeHref('house') },
-    { key: 'cg', label: 'Capital Gains', amount: v(c?.capitalGainsNetIncome), kind: 'head' as const, href: incomeHref('capitalGains') },
-    { key: 'other', label: 'Income from Other Sources', amount: v(c?.otherSourcesNetIncome), kind: 'head' as const, href: incomeHref('other') },
+    ...(showHead(heads.salary, v(c?.salaryNetIncome)) ? [{ key: 'salary', label: 'Salary', amount: v(c?.salaryNetIncome), kind: 'head' as const, href: incomeHref('salary') }] : []),
+    ...(showHead(heads.business, v(c?.businessNetIncome)) ? [{ key: 'business', label: 'Income from Business or Profession', amount: v(c?.businessNetIncome), kind: 'head' as const, href: incomeHref('business') }] : []),
+    ...(showHead(heads.houseProperty, v(c?.housePropertyNetIncome)) ? [{ key: 'house', label: 'Income from House Property', amount: v(c?.housePropertyNetIncome), kind: 'head' as const, href: incomeHref('house') }] : []),
+    ...(showHead(heads.capitalGains, v(c?.capitalGainsNetIncome)) ? [{ key: 'cg', label: 'Capital Gains', amount: v(c?.capitalGainsNetIncome), kind: 'head' as const, href: incomeHref('capitalGains') }] : []),
+    ...(showHead(heads.otherSources, v(c?.otherSourcesNetIncome)) ? [{ key: 'other', label: 'Income from Other Sources', amount: v(c?.otherSourcesNetIncome), kind: 'head' as const, href: incomeHref('other') }] : []),
     { key: 'gti', label: 'Gross Total Income', amount: v(c?.grossTotalIncome), kind: 'subtotal' as const },
     { key: 'via', label: 'Less: Deductions under Chapter VI-A', amount: v(c?.totalDeductions), kind: 'deduction' as const, href: `/returns/${returnId}/file/deductions` },
     { key: 'taxable', label: 'Taxable Income', amount: v(c?.taxableIncome), kind: 'subtotal' as const },
@@ -165,15 +172,25 @@ export function ComputationDashboard({
                           <ChevronRight className="h-3.5 w-3.5 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-500" aria-hidden="true" />
                         )}
                       </span>
-                      <span
-                        className={cn(
-                          'shrink-0 tabular-nums',
-                          row.kind === 'subtotal' ? 'font-semibold text-ink-900' : 'text-ink-700',
-                          row.amount === 0 && 'text-ink-300',
-                        )}
-                      >
-                        {row.amount === 0 ? '—' : formatInr(row.amount)}
-                      </span>
+                      {row.amount === 0 && clickable && (row.kind === 'head' || row.kind === 'deduction') ? (
+                        // Empty but fillable — invite the user to add it rather than
+                        // showing a dead dash, so they can see at a glance what is
+                        // still blank ("nothing is left out").
+                        <span className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-brand-600 group-hover:text-brand-700">
+                          Add
+                          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            'shrink-0 tabular-nums',
+                            row.kind === 'subtotal' ? 'font-semibold text-ink-900' : 'text-ink-700',
+                            row.amount === 0 && 'text-ink-300',
+                          )}
+                        >
+                          {row.amount === 0 ? '—' : formatInr(row.amount)}
+                        </span>
+                      )}
                     </RowTag>
                   </li>
                 );
