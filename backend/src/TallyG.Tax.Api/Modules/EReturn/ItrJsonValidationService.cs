@@ -485,6 +485,14 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                     $"s.234A interest at 1%/month on net tax payable (~₹{est234A:N0} for ~{monthsLate} month{(monthsLate == 1 ? "" : "s")}) will apply.",
                     "File as soon as possible to limit the interest. Capture the 234A interest amount in the computation; the engine can compute it if you re-run the tax.");
             }
+
+            // A return generated after the due date should be filed u/s 139(4) (belated), not 139(1).
+            if (ctx.Return.FilingSection == ReturnFilingSection.Original)
+            {
+                Warn("FILING.SHOULD_BE_BELATED", "$..FilingStatus.ReturnFileSec",
+                    $"This return is past the due date ({due:dd-MMM-yyyy}) but is marked as an original return u/s 139(1).",
+                    "After the due date the return is a belated return u/s 139(4) — set the filing type to \"Belated\" in the Personal step.");
+            }
         }
 
         // --- advance-tax obligation (s.208 / s.234B) ---

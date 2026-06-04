@@ -296,6 +296,30 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Past_due_date_original_return_warns_it_should_be_belated()
+    {
+        var dueDate = new DateOnly(2025, 7, 31);
+        ItrFilingContext Ctx139(ReturnFilingSection section) => new()
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2025-26", FilingSection = section,
+                OriginalAcknowledgmentNumber = section == ReturnFilingSection.Revised ? "123456789012345" : null,
+                OriginalFilingDate = section == ReturnFilingSection.Revised ? new DateOnly(2025, 7, 1) : null },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2025-26", DueDateNonAudit = dueDate },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 850_000m, TotalTax = 80_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+            GeneratedOn = new DateOnly(2025, 10, 5),  // past the due date
+        };
+        // Original past the due date → warn it should be belated.
+        Has(Svc.Validate(Ctx139(ReturnFilingSection.Original), StubJson), "FILING.SHOULD_BE_BELATED").Should().BeTrue();
+        // Already marked belated → no warning.
+        Has(Svc.Validate(Ctx139(ReturnFilingSection.Belated), StubJson), "FILING.SHOULD_BE_BELATED").Should().BeFalse();
+        // Revised returns are legitimately filed after the due date → no warning.
+        Has(Svc.Validate(Ctx139(ReturnFilingSection.Revised), StubJson), "FILING.SHOULD_BE_BELATED").Should().BeFalse();
+    }
+
+    [Fact]
     public void Advance_tax_missing_when_net_tax_exceeds_10k_warns()
     {
         // Net tax ₹50k after TDS, no advance tax or SAT challan → s.234B interest will apply.
