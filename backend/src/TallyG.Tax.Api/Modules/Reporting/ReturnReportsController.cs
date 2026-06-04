@@ -37,6 +37,16 @@ public sealed class ReturnReportsController : ControllerBase
         return File(file.Content, file.ContentType, file.FileName);
     }
 
+    /// <summary>Download the taxpayer's readable copy of the whole return ("Your ITR").</summary>
+    [HttpGet("{id:guid}/return-pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReturnPdf([FromRoute] Guid id, CancellationToken ct)
+    {
+        var file = await _reporting.GetReturnSummaryAsync(id, ct);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
     /// <summary>List the generated take-away artifacts registered against a return.</summary>
     [HttpGet("{id:guid}/documents")]
     [ProducesResponseType(typeof(IReadOnlyList<GeneratedDocumentDto>), StatusCodes.Status200OK)]

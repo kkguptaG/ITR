@@ -89,6 +89,43 @@ public class ComputationStatementTests
     }
 
     [Fact]
+    public void Return_summary_renders_particulars_income_deductions_and_verification()
+    {
+        var ret = new TaxReturn
+        {
+            ItrType = ItrType.ITR2, Regime = Regime.New, Status = ReturnStatus.ComputedReady,
+            FilingSection = ReturnFilingSection.Original,
+        };
+        var user = new User { FullName = "Demo Taxpayer", PanMasked = "ABCDE1234F" };
+        var profile = new UserProfile { AddressLine1 = "B-12 Greenwood", City = "Pune", Pincode = "411045", ResidentialStatus = "resident" };
+        var ay = new AssessmentYear { Code = "AY2025-26", FyCode = "FY2024-25" };
+        var comp = new TaxComputation
+        {
+            GrossTotalIncome = 1_000_000m, TotalDeductions = 75_000m, TaxableIncome = 925_000m,
+            TotalTax = 50_000m, TdsPaid = 40_000m, RefundOrPayable = -10_000m,
+        };
+        var salaries = new List<SalaryDetail> { new() { Employer = "Acme Corp", Tan = "DEL12345C", Gross = 1_000_000m, StdDeduction = 75_000m } };
+        var deductions = new List<Deduction> { new() { Section = "80C", Amount = 150_000m } };
+        var banks = new List<BankAccountDetail> { new() { BankName = "HDFC Bank", AccountNumber = "50100123456789", AccountType = "SB", Ifsc = "HDFC0001234", UseForRefund = true } };
+
+        var data = new ReturnSummaryData(
+            ret, user, profile, ay, comp,
+            salaries, new List<HouseProperty>(), new List<CapitalGain>(), new List<BusinessIncome>(),
+            new List<IncomeSource>(), deductions, banks);
+
+        var lines = ReturnSummaryContent.Build(data);
+
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label == "Return Particulars");
+        lines.Should().Contain(l => l.Label == "ITR Form" && l.Value == "ITR2");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Detail && l.Label.Contains("Acme Corp") && l.Value == "Rs. 9,25,000");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Subtotal && l.Label == "Gross Total Income" && l.Value == "Rs. 10,00,000");
+        lines.Should().Contain(l => l.Label.Contains("s.80C"));
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Total && l.Label == "Balance Tax Payable" && l.Value == "Rs. 10,000");
+        lines.Should().Contain(l => l.Label == "IFSC" && l.Value == "HDFC0001234");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label == "Verification");
+    }
+
+    [Fact]
     public void Pdf_generator_emits_a_valid_multipage_document()
     {
         var gen = new SimplePdfGenerator();

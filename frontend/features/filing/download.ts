@@ -49,6 +49,10 @@ export const downloadAcknowledgment = (returnId: string) =>
 export const downloadComputation = (returnId: string) =>
   downloadPdf(`/returns/${returnId}/computation`, `computation-${returnId}.pdf`);
 
+/** GET /returns/{id}/return-pdf — the taxpayer's readable copy of the return ("Your ITR"). */
+export const downloadReturnPdf = (returnId: string) =>
+  downloadPdf(`/returns/${returnId}/return-pdf`, `return-${returnId}.pdf`);
+
 /** GET /payments/{id}/invoice:pdf — the GST tax-invoice PDF. */
 export const downloadInvoice = (paymentId: string) =>
   downloadPdf(`/payments/${paymentId}/invoice:pdf`, `invoice-${paymentId}.pdf`);

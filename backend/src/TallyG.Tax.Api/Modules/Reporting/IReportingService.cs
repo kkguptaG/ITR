@@ -19,6 +19,9 @@ public interface IReportingService
     /// <summary>GET /returns/{id}/computation — the computation worksheet PDF for a computed return.</summary>
     Task<GeneratedFile> GetComputationAsync(Guid returnId, CancellationToken ct = default);
 
+    /// <summary>GET /returns/{id}/return-pdf — the taxpayer's readable copy of the whole return.</summary>
+    Task<GeneratedFile> GetReturnSummaryAsync(Guid returnId, CancellationToken ct = default);
+
     /// <summary>GET /payments/{id}/invoice:pdf — the GST tax-invoice PDF for a captured payment.</summary>
     Task<GeneratedFile> GetInvoiceAsync(Guid paymentId, CancellationToken ct = default);
 

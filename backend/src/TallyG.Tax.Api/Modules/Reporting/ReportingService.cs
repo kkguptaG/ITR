@@ -68,7 +68,7 @@ public sealed class ReportingService : IReportingService
 
         var taxpayer = await LoadUserAsync(taxReturn.UserId, ct);
         var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
-        var computation = await LatestComputationAsync(taxReturn.Id, ct);
+        var computation = await LatestComputationAsync(taxReturn, ct);
 
         var title = $"ITR-V Acknowledgment - {ay?.Code ?? "AY"}";
         var lines = ReportContent.Acknowledgment(taxReturn, taxpayer, ay, computation);
@@ -85,7 +85,7 @@ public sealed class ReportingService : IReportingService
     {
         var taxReturn = await LoadReturnAsync(returnId, ct);
 
-        var computation = await LatestComputationAsync(taxReturn.Id, ct)
+        var computation = await LatestComputationAsync(taxReturn, ct)
             ?? throw AppException.NotFound(
                 "No finalized computation exists for this return yet.", "REPORT.NO_COMPUTATION");
 
@@ -99,6 +99,37 @@ public sealed class ReportingService : IReportingService
         return await RenderStoreStreamAsync(
             taxReturn.TenantId, taxReturn.UserId, taxReturn.Id, "computation_sheet",
             title, lines, fileName, ct);
+    }
+
+    // ----------------------------------------------------------- return summary
+
+    public async Task<GeneratedFile> GetReturnSummaryAsync(Guid returnId, CancellationToken ct = default)
+    {
+        var taxReturn = await LoadReturnAsync(returnId, ct);
+        var user = await LoadUserAsync(taxReturn.UserId, ct);
+        var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
+        var profile = await _db.UserProfiles.FirstOrDefaultAsync(p => p.UserId == taxReturn.UserId, ct);
+        var computation = await LatestComputationAsync(taxReturn, ct);
+
+        var salaries = await _db.SalaryDetails.Where(s => s.TaxReturnId == returnId).ToListAsync(ct);
+        var houses = await _db.HouseProperties.Where(h => h.TaxReturnId == returnId).ToListAsync(ct);
+        var gains = await _db.CapitalGains.Where(c => c.TaxReturnId == returnId).ToListAsync(ct);
+        var businesses = await _db.BusinessIncomes.Where(b => b.TaxReturnId == returnId).ToListAsync(ct);
+        var others = await _db.IncomeSources
+            .Where(i => i.TaxReturnId == returnId && i.Type == IncomeType.OtherSources).ToListAsync(ct);
+        var deductions = await _db.Deductions.Where(x => x.TaxReturnId == returnId).ToListAsync(ct);
+        var banks = await _db.BankAccountDetails.Where(b => b.UserId == taxReturn.UserId).ToListAsync(ct);
+
+        var data = new ReturnSummaryData(
+            taxReturn, user, profile, ay, computation,
+            salaries, houses, gains, businesses, others, deductions, banks);
+
+        var title = $"Income-Tax Return Summary - {ay?.Code ?? "AY"}";
+        var lines = ReturnSummaryContent.Build(data);
+        var fileName = $"Return-{returnId:N}.pdf";
+
+        return await RenderStoreStreamAsync(
+            taxReturn.TenantId, taxReturn.UserId, returnId, "return_summary", title, lines, fileName, ct);
     }
 
     // ------------------------------------------------------------------ invoice
@@ -275,12 +306,19 @@ public sealed class ReportingService : IReportingService
     private Task<AssessmentYear?> LoadAyAsync(Guid ayId, CancellationToken ct)
         => _db.AssessmentYears.FirstOrDefaultAsync(a => a.Id == ayId, ct);
 
-    private Task<TaxComputation?> LatestComputationAsync(Guid returnId, CancellationToken ct)
-        => _db.TaxComputations
-            .Where(c => c.TaxReturnId == returnId)
-            .OrderByDescending(c => c.IsRecommended)
+    /// <summary>The computation snapshot a report should present: the one for the return's CHOSEN regime
+    /// (so reports agree with the dashboard, which renders the chosen regime), falling back to the
+    /// recommended/latest when the return has not pinned a regime.</summary>
+    private Task<TaxComputation?> LatestComputationAsync(TaxReturn ret, CancellationToken ct)
+    {
+        var chosen = ret.Regime;
+        return _db.TaxComputations
+            .Where(c => c.TaxReturnId == ret.Id)
+            .OrderByDescending(c => c.Regime == chosen)   // prefer the return's pinned regime
+            .ThenByDescending(c => c.IsRecommended)
             .ThenByDescending(c => c.ComputedAt)
             .FirstOrDefaultAsync(ct);
+    }
 
     /// <summary>
     /// Owner-or-operator gate. The taxpayer who owns the resource may always read it; back-office
