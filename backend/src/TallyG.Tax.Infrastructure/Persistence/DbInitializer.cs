@@ -53,6 +53,13 @@ public static class DbInitializer
         await SeedDemoItr4Ay2026ReturnAsync(db, ct);   // AY2026-27 Sugam presumptive demo
 
         await db.SaveChangesAsync(ct);
+
+        // Safety net for the single-refund-account invariant. The write paths (BankAccountService)
+        // already keep exactly one of a user's accounts flagged UseForRefund, but the seed inserts
+        // accounts directly from several methods (here + the per-return seeds), so a stray duplicate
+        // flag is easy to introduce. Normalise the data so the invariant holds regardless.
+        await NormalizeRefundAccountsAsync(db, ct);
+
         logger.LogInformation("Database seed complete (idempotent).");
     }
 
@@ -161,8 +168,10 @@ public static class DbInitializer
 
     /// <summary>
     /// Two dummy bank accounts for the demo taxpayer (the refund flow needs a fed account). The HDFC SB
-    /// account is the refund account; the SBI current account is a second, non-refund account so the
-    /// "feed many, pick one" UX has something to show. Keyed by a stable Guid → idempotent.
+    /// account (...6789) is THE refund account — the single one across all of this user's accounts,
+    /// including the extra non-refund accounts the per-return seeds add; the SBI current account is a
+    /// second, non-refund account so the "feed many, pick one" UX has something to show. Keyed by a
+    /// stable Guid → idempotent. <see cref="NormalizeRefundAccountsAsync"/> backstops the invariant.
     /// </summary>
     private static async Task SeedBankAccountsAsync(AppDbContext db, CancellationToken ct)
     {
@@ -190,6 +199,42 @@ public static class DbInitializer
             {
                 db.BankAccountDetails.Add(account);
             }
+        }
+    }
+
+    /// <summary>
+    /// Enforces the single-refund-account invariant after seeding: each user has at most one account
+    /// flagged <see cref="BankAccountDetail.UseForRefund"/>. The bank-account write paths
+    /// (<c>BankAccountService</c>) already guarantee this, but the seed inserts rows directly from
+    /// several methods (bypassing the service), so a stray duplicate flag is easy to introduce. For any
+    /// user whose accounts break the invariant this keeps the first flagged account (deterministic
+    /// order) and clears the rest; if a user has accounts but none flagged, it promotes the first.
+    /// Idempotent — a no-op once the data is correct, so it is safe on every boot and self-heals an
+    /// already-seeded demo DB.
+    /// </summary>
+    private static async Task NormalizeRefundAccountsAsync(AppDbContext db, CancellationToken ct)
+    {
+        var accounts = await db.BankAccountDetails.ToListAsync(ct);
+
+        var changed = false;
+        foreach (var group in accounts.GroupBy(b => new { b.TenantId, b.UserId }))
+        {
+            var ordered = group.OrderBy(b => b.BankName).ThenBy(b => b.AccountNumber).ToList();
+            var refund = ordered.FirstOrDefault(b => b.UseForRefund) ?? ordered[0];
+            foreach (var account in ordered)
+            {
+                var shouldUse = ReferenceEquals(account, refund);
+                if (account.UseForRefund != shouldUse)
+                {
+                    account.UseForRefund = shouldUse;
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            await db.SaveChangesAsync(ct);
         }
     }
 
@@ -626,7 +671,9 @@ public static class DbInitializer
         {
             TenantId = RetailTenantId, UserId = DemoUserId,
             BankName = "HDFC Bank", AccountNumber = "50100999888777", AccountType = "SB",
-            Ifsc = "HDFC0001234", UseForRefund = true,
+            // Refund account is the user-scoped primary HDFC ...6789 (seeded in SeedBankAccountsAsync);
+            // a user has exactly one refund account across all returns, so this extra account is not it.
+            Ifsc = "HDFC0001234", UseForRefund = false,
         });
 
         db.TdsEntries.Add(new TdsEntry
@@ -702,7 +749,9 @@ public static class DbInitializer
         {
             TenantId = RetailTenantId, UserId = DemoUserId,
             BankName = "ICICI Bank", AccountNumber = "60100111222333", AccountType = "SB",
-            Ifsc = "ICIC0000456", UseForRefund = true,
+            // Refund account is the user-scoped primary HDFC ...6789 (seeded in SeedBankAccountsAsync);
+            // a user has exactly one refund account across all returns, so this extra account is not it.
+            Ifsc = "ICIC0000456", UseForRefund = false,
         });
 
         // GTI = ₹14,40,000 (business) + ₹10,000 (interest) = ₹14,50,000.
