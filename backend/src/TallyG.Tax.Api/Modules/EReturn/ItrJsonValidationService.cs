@@ -94,6 +94,16 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Add at least one income head (salary, house property, capital gains, business or other sources) in the Income step.");
         }
 
+        // GTI is NIL but a tax liability was computed and/or taxes were paid — an ITD §139(9) defect
+        // (mirrors the official DEF_GTI_TL rule: tax liability without any declared income).
+        var prepaidTotal = (c?.TdsPaid ?? 0m) + ctx.Return.TcsPaid + (c?.AdvanceTax ?? 0m);
+        if (gti <= 0m && ((c?.TotalTax ?? 0m) > 0m || prepaidTotal > 0m))
+        {
+            Err("RETURN.TAX_WITHOUT_INCOME", "$..PartB_TTI",
+                "Gross total income is NIL but a tax liability has been computed and/or taxes have been paid — the return is defective u/s 139(9).",
+                "Either declare the income against which the tax/TDS relates (in the relevant income schedules), or remove the tax entries if no income is taxable.");
+        }
+
         // --- regime ---
         if (ctx.Return.Regime is null)
         {

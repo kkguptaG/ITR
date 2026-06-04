@@ -544,6 +544,21 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Tax_paid_with_nil_income_is_a_139_9_defect()
+    {
+        // GTI NIL but ₹40k TDS on the return → DEF_GTI_TL-style defect.
+        var ctx = new ItrFilingContext
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.New, RuleSetVersion = "AY2024-25", TdsPaid = 40_000m },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.New, GrossTotalIncome = 0m, TaxableIncome = 0m, TdsPaid = 40_000m },
+        };
+        Has(Svc.Validate(ctx, StubJson), "RETURN.TAX_WITHOUT_INCOME").Should().BeTrue();
+    }
+
+    [Fact]
     public void Salary_TDS_with_no_salary_income_warns()
     {
         var tds = new[] { new TdsEntry { Head = TdsHead.Salary, DeductorTan = "DELH12345A", TaxDeducted = 40_000m } };
