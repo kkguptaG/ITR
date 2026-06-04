@@ -69,7 +69,7 @@ public sealed class ReportingService : IReportingService
         var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
         var computation = await LatestComputationAsync(taxReturn.Id, ct);
 
-        var title = $"ITR-V Acknowledgment — {ay?.Code ?? "AY"}";
+        var title = $"ITR-V Acknowledgment - {ay?.Code ?? "AY"}";
         var lines = ReportContent.Acknowledgment(taxReturn, taxpayer, ay, computation);
         var fileName = $"ITRV-{taxReturn.AcknowledgmentNumber}.pdf";
 
@@ -91,7 +91,7 @@ public sealed class ReportingService : IReportingService
         var taxpayer = await LoadUserAsync(taxReturn.UserId, ct);
         var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
 
-        var title = $"Computation Worksheet — {ay?.Code ?? "AY"}";
+        var title = $"Statement of Computation of Income & Tax - {ay?.Code ?? "AY"}";
         var lines = ReportContent.Computation(taxReturn, taxpayer, ay, computation);
         var fileName = $"Computation-{taxReturn.Id:N}.pdf";
 

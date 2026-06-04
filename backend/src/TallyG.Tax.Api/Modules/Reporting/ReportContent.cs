@@ -11,11 +11,29 @@ namespace TallyG.Tax.Api.Modules.Reporting;
 /// <summary>Builds the line models for each take-away PDF from persisted rows.</summary>
 internal static class ReportContent
 {
-    private static readonly CultureInfo Inr = CultureInfo.GetCultureInfo("en-IN");
-
-    /// <summary>Format money as INR for the rendered document body.</summary>
+    /// <summary>Format money for the rendered document body. The core PDF fonts (Helvetica) have no ₹
+    /// glyph and the writer is ASCII, so use a "Rs." prefix and whole rupees (tax rounds to ₹1, s.288B).
+    /// Indian lakh/crore grouping is applied by hand — the app runs in globalization-invariant mode, so
+    /// the "en-IN" culture is unavailable.</summary>
     public static string Money(decimal value)
-        => value.ToString("C", Inr);
+        => (value < 0 ? "-Rs. " : "Rs. ") + GroupIndian((long)Math.Abs(Math.Round(value)));
+
+    /// <summary>Group a non-negative integer in the Indian system: last 3 digits, then pairs (e.g. 12345678 → 1,23,45,678).</summary>
+    private static string GroupIndian(long n)
+    {
+        var digits = n.ToString(CultureInfo.InvariantCulture);
+        if (digits.Length <= 3) return digits;
+
+        var last3 = digits[^3..];
+        var rest = digits[..^3];
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < rest.Length; i++)
+        {
+            if (i > 0 && (rest.Length - i) % 2 == 0) sb.Append(',');
+            sb.Append(rest[i]);
+        }
+        return sb.Append(',').Append(last3).ToString();
+    }
 
     private static string Date(DateTimeOffset value)
         => value.ToOffset(TimeSpan.FromHours(5.5)).ToString("dd MMM yyyy, HH:mm 'IST'", CultureInfo.InvariantCulture);
@@ -59,35 +77,99 @@ internal static class ReportContent
         return lines;
     }
 
-    /// <summary>Computation worksheet fields (docs 09 §9.2/§9.9) — a projection of the computation row.</summary>
+    /// <summary>
+    /// A CA-style Statement of Computation of Total Income &amp; Tax (docs 09 §9.2/§9.9), projected from the
+    /// persisted computation row. Mirrors the structure of a professional computation sheet: total income →
+    /// tax ladder (rebate / surcharge / cess / AMT / reliefs) → interest &amp; fee (s.234A/B/C, 234F) → taxes
+    /// paid → refund/payable, with any losses/credits carried forward. (Head-wise income and the
+    /// rate-wise capital-gains split are a fast-follow that needs the live result, not the snapshot.)
+    /// </summary>
     public static IReadOnlyList<PdfLine> Computation(
         TaxReturn taxReturn,
         User taxpayer,
         AssessmentYear? ay,
-        TaxComputation computation)
+        TaxComputation c)
     {
-        return new List<PdfLine>
+        var lines = new List<PdfLine>
         {
             new("Name", taxpayer.FullName),
             new("PAN", taxpayer.PanMasked ?? "XXXXX____X"),
             new("Assessment Year", ay?.Code ?? "-"),
             new("ITR Form", taxReturn.ItrType?.ToString() ?? "-"),
-            new("Regime", computation.Regime.ToString()),
-            new("Gross Total Income", Money(computation.GrossTotalIncome)),
-            new("Total Deductions (Chapter VI-A)", Money(computation.TotalDeductions)),
-            new("Taxable Income", Money(computation.TaxableIncome)),
-            new("Tax Before Cess", Money(computation.TaxBeforeCess)),
-            new("Rebate u/s 87A", Money(computation.Rebate87A)),
-            new("Surcharge", Money(computation.Surcharge)),
-            new("Health & Education Cess", Money(computation.Cess)),
-            new("Total Tax Liability", Money(computation.TotalTax)),
-            new("TDS Paid", Money(computation.TdsPaid)),
-            new("Advance / Self-Assessment Tax", Money(computation.AdvanceTax)),
-            new("Interest & Penalty", Money(computation.InterestPenalty)),
-            new(computation.RefundOrPayable >= 0 ? "Refund Due" : "Tax Payable",
-                Money(Math.Abs(computation.RefundOrPayable))),
-            new("Computed At", Date(computation.ComputedAt))
+            new("Tax Regime", c.Regime == Domain.Enums.Regime.Old ? "Old Regime" : "New Regime (s.115BAC)"),
+            new("Status", taxReturn.Status.ToString()),
         };
+
+        // ---- Total income ----
+        lines.Add(PdfLine.Heading("Computation of Total Income"));
+        lines.Add(new("Gross Total Income", Money(c.GrossTotalIncome)));
+        lines.Add(new("Less: Deductions under Chapter VI-A", Money(c.TotalDeductions)));
+        lines.Add(PdfLine.Subtotal("Total Income (Taxable Income)", Money(c.TaxableIncome)));
+
+        // ---- Tax ladder. TaxBeforeCess = tax-at-rates − rebate + surcharge, so reconstruct the steps. ----
+        var taxAtRates = c.TaxBeforeCess + c.Rebate87A - c.Surcharge;
+        lines.Add(PdfLine.Heading("Computation of Tax Liability"));
+        lines.Add(new("Tax at applicable rates", Money(taxAtRates)));
+        if (c.Rebate87A > 0m) lines.Add(PdfLine.Detail("Less: Rebate u/s 87A", Money(c.Rebate87A)));
+        if (c.Surcharge > 0m) lines.Add(PdfLine.Detail("Add: Surcharge", Money(c.Surcharge)));
+        lines.Add(PdfLine.Detail("Add: Health & Education Cess @ 4%", Money(c.Cess)));
+        lines.Add(PdfLine.Subtotal("Tax incl. surcharge & cess", Money(c.TaxBeforeCess + c.Cess)));
+
+        // AMT (s.115JC/JD) — only when it actually applies (AdjustedTotalIncome mirrors taxable income even
+        // when not applicable, so gate on the AMT figure itself).
+        if (c.AlternativeMinimumTax > 0m)
+        {
+            lines.Add(PdfLine.Detail("Adjusted Total Income (s.115JC)", Money(c.AdjustedTotalIncome)));
+            lines.Add(PdfLine.Detail("Alternate Minimum Tax (s.115JC)", Money(c.AlternativeMinimumTax)));
+        }
+        if (c.AmtCreditSetOff > 0m) lines.Add(PdfLine.Detail("Less: AMT credit set-off (s.115JD)", Money(c.AmtCreditSetOff)));
+        if (c.Relief89 > 0m) lines.Add(PdfLine.Detail("Less: Relief u/s 89 (arrears)", Money(c.Relief89)));
+        if (c.Relief90And91 > 0m) lines.Add(PdfLine.Detail("Less: Relief u/s 90/90A/91 (foreign tax credit)", Money(c.Relief90And91)));
+        lines.Add(PdfLine.Subtotal("Total Tax Liability", Money(c.TotalTax)));
+
+        // ---- Interest & fee (s.234A/B/C + 234F) ----
+        if (c.InterestPenalty > 0m || c.LateFee234F > 0m)
+        {
+            lines.Add(PdfLine.Heading("Interest & Fee"));
+            if (c.Interest234A > 0m) lines.Add(PdfLine.Detail("Interest u/s 234A (late filing)", Money(c.Interest234A)));
+            if (c.Interest234B > 0m) lines.Add(PdfLine.Detail("Interest u/s 234B (advance-tax shortfall)", Money(c.Interest234B)));
+            if (c.Interest234C > 0m) lines.Add(PdfLine.Detail("Interest u/s 234C (instalment deferment)", Money(c.Interest234C)));
+            if (c.LateFee234F > 0m) lines.Add(PdfLine.Detail("Fee u/s 234F (late filing)", Money(c.LateFee234F)));
+            lines.Add(PdfLine.Subtotal("Total Interest & Fee", Money(c.InterestPenalty + c.LateFee234F)));
+        }
+
+        // ---- Taxes paid ----
+        lines.Add(PdfLine.Heading("Taxes Paid"));
+        lines.Add(new("TDS / TCS credit", Money(c.TdsPaid)));
+        lines.Add(new("Advance & Self-Assessment Tax", Money(c.AdvanceTax)));
+        lines.Add(PdfLine.Subtotal("Total Prepaid Taxes", Money(c.TdsPaid + c.AdvanceTax)));
+
+        // ---- Result ----
+        lines.Add(PdfLine.Total(
+            c.RefundOrPayable >= 0m ? "Refund Due" : "Balance Tax Payable",
+            Money(Math.Abs(c.RefundOrPayable))));
+
+        // ---- Losses / credits carried forward ----
+        var cf = new List<PdfLine>();
+        void Cf(string label, decimal v) { if (v > 0m) cf.Add(PdfLine.Detail(label, Money(v))); }
+        Cf("House-property loss (s.71B)", c.HousePropertyLossCarriedForward);
+        Cf("Business loss (s.72)", c.BusinessLossCarriedForward);
+        Cf("Speculative loss (s.73)", c.SpeculativeLossCarriedForward);
+        Cf("Short-term capital loss (s.74)", c.ShortTermCapitalLossCarriedForward);
+        Cf("Long-term capital loss (s.74)", c.LongTermCapitalLossCarriedForward);
+        Cf("Unabsorbed depreciation (s.32(2))", c.UnabsorbedDepreciationCarriedForward);
+        Cf("AMT credit (s.115JD)", c.AmtCreditGenerated);
+        if (cf.Count > 0)
+        {
+            lines.Add(PdfLine.Heading("Losses / Credits Carried Forward to Next Year"));
+            lines.AddRange(cf);
+        }
+
+        // ---- Footer note ----
+        lines.Add(PdfLine.Spacer());
+        lines.Add(PdfLine.Note($"Computed at {Date(c.ComputedAt)}. System-generated statement - provisional, "
+            + "pending Chartered Accountant validation. Verify against your documents before filing."));
+        return lines;
     }
 
     /// <summary>Fee tax-invoice fields (docs 09 §9.2).</summary>
