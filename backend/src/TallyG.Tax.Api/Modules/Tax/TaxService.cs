@@ -183,6 +183,7 @@ public sealed class TaxService : ITaxService
         Interest234A = r.Interest234A,
         Interest234B = r.Interest234B,
         Interest234C = r.Interest234C,
+        LateFee234F = r.LateFilingFee234F,
         RefundOrPayable = r.RefundOrPayable,
         AdjustedTotalIncome = r.AdjustedTotalIncome,
         AlternativeMinimumTax = r.AlternativeMinimumTax,

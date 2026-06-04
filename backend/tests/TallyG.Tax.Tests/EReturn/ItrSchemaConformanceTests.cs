@@ -51,6 +51,24 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr2_late_filing_fee_234F_flows_into_the_ITR_JSON_and_still_conforms()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withLateFee: true);
+        var json = _gen.Generate(ctx).Json;
+
+        // Conforms to the official schema with the fee present…
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("ITR-2 carrying a s.234F fee must conform. Violations:\n" + Format(result));
+
+        // …and the fee is carried through (no longer hardcoded to 0), with the aggregate liability and
+        // the interest-and-fee total both including it.
+        System.Text.RegularExpressions.Regex.IsMatch(json, "\"LateFilingFee234F\":\\s*5000")
+            .Should().BeTrue("the persisted s.234F fee must flow into the IntrstPay node of the filed JSON");
+        System.Text.RegularExpressions.Regex.IsMatch(json, "\"TotalIntrstPay\":\\s*5000")
+            .Should().BeTrue("TotalIntrstPay must include the s.234F fee");
+    }
+
+    [Fact]
     public void Itr4_2026_with_financial_particulars_conforms_and_emits_schedule_bp()
     {
         var ctx = BuildContext(ItrType.ITR4, presumptiveBusiness: true, withFinancialParticulars: true);
@@ -1434,7 +1452,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false, bool withUpdated = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false, bool withUpdated = false, bool withLateFee = false)
     {
         var user = new User
         {
@@ -1489,6 +1507,7 @@ public class ItrSchemaConformanceTests
             TdsPaid = 50_000m,
             AdvanceTax = 0m,
             InterestPenalty = 0m,
+            LateFee234F = withLateFee ? 5_000m : 0m,
             RefundOrPayable = 8_400m,
         };
         var ret = new TaxReturn

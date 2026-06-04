@@ -1308,6 +1308,7 @@ public sealed class ReturnService : IReturnService
             Interest234A = result.Interest234A,
             Interest234B = result.Interest234B,
             Interest234C = result.Interest234C,
+            LateFee234F = result.LateFilingFee234F,
             RefundOrPayable = result.RefundOrPayable,
             AdjustedTotalIncome = result.AdjustedTotalIncome,
             AlternativeMinimumTax = result.AlternativeMinimumTax,

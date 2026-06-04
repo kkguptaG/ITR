@@ -871,13 +871,13 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    // Real per-section s.234A/B/C split from the computation snapshot (s.234F late fee not modelled → 0).
+    // Real per-section s.234A/B/C interest + s.234F late-filing fee from the computation snapshot.
     private static Dictionary<string, object?> IntrstPayNode(TaxComputation? c) => new()
     {
         ["IntrstPayUs234A"] = R(c?.Interest234A ?? 0m),
         ["IntrstPayUs234B"] = R(c?.Interest234B ?? 0m),
         ["IntrstPayUs234C"] = R(c?.Interest234C ?? 0m),
-        ["LateFilingFee234F"] = R(0m),
+        ["LateFilingFee234F"] = R(c?.LateFee234F ?? 0m),
     };
 
     // Refund node for ITR-1/ITR-4: BankAccountDtls = { AddtnlBankDetails: [...] } (empty when no accounts).
@@ -2791,10 +2791,11 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     ["IntrstPayUs234A"] = R(c?.Interest234A ?? 0m),
                     ["IntrstPayUs234B"] = R(c?.Interest234B ?? 0m),
                     ["IntrstPayUs234C"] = R(c?.Interest234C ?? 0m),
-                    ["LateFilingFee234F"] = R(0m),
-                    ["TotalIntrstPay"] = R(interest),
+                    ["LateFilingFee234F"] = R(c?.LateFee234F ?? 0m),
+                    // TotalIntrstPay is the "interest and fee payable" line — it includes the s.234F fee.
+                    ["TotalIntrstPay"] = R(interest + (c?.LateFee234F ?? 0m)),
                 },
-                ["AggregateTaxInterestLiability"] = R(net + interest),
+                ["AggregateTaxInterestLiability"] = R(net + interest + (c?.LateFee234F ?? 0m)),
         };
         // Reliefs u/s 89 (arrears) + 90/90A/91 (foreign tax credit) — disclosed when the engine credited any,
         // explaining why the net liability is below the gross. Inserted before IntrstPay's sibling totals.
@@ -2968,7 +2969,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                 SetIfInt(col, "GrossTaxPayable", net);
                 SetIfInt(col, "TaxPayAfterCreditUs115JD", net);
                 SetIfInt(col, "NetTaxLiability", net);
-                SetIfInt(col, "AggregateTaxInterestLiability", R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m)));
+                // Aggregate liability = net tax + s.234A/B/C interest + s.234F late-filing fee.
+                SetIfInt(col, "AggregateTaxInterestLiability",
+                    R((c?.TotalTax ?? 0m) + (c?.InterestPenalty ?? 0m) + (c?.LateFee234F ?? 0m)));
                 // Reliefs u/s 89 + 90/90A/91 (foreign tax credit) — disclosed when the engine credited any.
                 var taxRelief = TaxReliefNode(c, ctx);
                 if (taxRelief is not null)
@@ -2980,6 +2983,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
                     SetIfInt(ip, "IntrstPayUs234A", R(c?.Interest234A ?? 0m));
                     SetIfInt(ip, "IntrstPayUs234B", R(c?.Interest234B ?? 0m));
                     SetIfInt(ip, "IntrstPayUs234C", R(c?.Interest234C ?? 0m));
+                    SetIfInt(ip, "LateFilingFee234F", R(c?.LateFee234F ?? 0m));
+                    SetIfInt(ip, "TotalIntrstPay", R((c?.InterestPenalty ?? 0m) + (c?.LateFee234F ?? 0m)));
                 }
             }
 

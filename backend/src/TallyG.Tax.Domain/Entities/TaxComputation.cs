@@ -36,6 +36,9 @@ public class TaxComputation : BaseEntity, ITenantScoped
     public decimal Interest234B { get; set; }
     public decimal Interest234C { get; set; }
 
+    /// <summary>s.234F late-filing fee (flat, not interest); feeds the ITR JSON IntrstPay/Fee node.</summary>
+    public decimal LateFee234F { get; set; }
+
     /// <summary>Positive ⇒ refund, negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; set; }
 
