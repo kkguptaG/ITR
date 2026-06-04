@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Bell, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, ChevronDown, HelpCircle, LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { getActiveAssessmentYear } from '@/features/returns';
+import { formatAssessmentYear } from '@/lib/format';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 function initials(name: string): string {
@@ -28,6 +31,8 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const ayQuery = useQuery({ queryKey: ['assessment-year', 'active'], queryFn: getActiveAssessmentYear, staleTime: 60 * 60_000 });
+  const activeAy = ayQuery.data?.assessmentYear;
 
   // Close the user menu on outside click / Escape.
   useEffect(() => {
@@ -63,7 +68,21 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
       <div className="flex-1" />
 
+      {activeAy && (
+        <span className="hidden items-center rounded-full border border-ink-200 bg-ink-50 px-3 py-1 text-xs font-medium text-ink-700 sm:inline-flex">
+          {formatAssessmentYear(activeAy)}
+        </span>
+      )}
+
       <LanguageSwitcher />
+
+      <Link
+        href="/support"
+        aria-label={t('help')}
+        className="rounded-lg p-2 text-ink-600 hover:bg-ink-100"
+      >
+        <HelpCircle className="h-5 w-5" aria-hidden="true" />
+      </Link>
 
       <Link
         href="/notices"
