@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import {
   Briefcase,
   Home,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Button, Spinner, Alert } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { formatAssessmentYear } from '@/lib/format';
+import { formatAssessmentYear, formatInr } from '@/lib/format';
 import { formatItrType } from '@/features/returns/helpers';
 import {
   computeTax,
@@ -42,6 +43,7 @@ import { WorkspaceRail } from '@/features/filing/components/workspace/WorkspaceR
 export default function WorkspacePage({ params }: { params: { returnId: string } }) {
   const { returnId } = params;
   const { user } = useAuth();
+  const t = useTranslations('workspace');
 
   const detailQuery = useQuery({ queryKey: filingKeys.detail(returnId), queryFn: () => getReturn(returnId) });
   const computeQuery = useQuery({ queryKey: filingKeys.compute(returnId), queryFn: () => computeTax({ returnId }), retry: false });
@@ -60,41 +62,43 @@ export default function WorkspacePage({ params }: { params: { returnId: string }
   if (detailQuery.isLoading || (computeQuery.isLoading && !c)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner size={28} label="Loading computation workspace…" />
+        <Spinner size={28} label={t('loading')} />
       </div>
     );
   }
-  if (!detail) return <Alert variant="error">We couldn&apos;t load this return.</Alert>;
+  if (!detail) return <Alert variant="error">{t('loadError')}</Alert>;
   if (!c) {
-    return <Alert variant="warning">Add some income to compute this return, then come back to the workspace.</Alert>;
+    return <Alert variant="warning">{t('needIncome')}</Alert>;
   }
 
   const heads = incomeHeads(detail.itrType ?? null);
-  const hpType = (t: string) => (t === 'SelfOccupied' ? 'Self-occupied' : t === 'LetOut' ? 'Let-out' : t === 'DeemedLetOut' ? 'Deemed let-out' : t);
+  const hpType = (v: string) => (v === 'SelfOccupied' ? 'Self-occupied' : v === 'LetOut' ? 'Let-out' : v === 'DeemedLetOut' ? 'Deemed let-out' : v);
 
   const defs = [
-    { id: 'salary', letter: 'A', title: 'Income from Salary', icon: Briefcase, applies: heads.salary, net: c.salaryNetIncome,
+    { id: 'salary', letter: 'A', title: t('headSalary'), short: t('headSalary'), icon: Briefcase, applies: heads.salary, net: c.salaryNetIncome,
       entries: (salariesQuery.data ?? []).map((s) => ({ label: s.employer || 'Salary', amount: s.gross, note: s.tan ? `Form 16 · ${s.tan}` : 'Form 16' })) },
-    { id: 'house', letter: 'B', title: 'Income from House Property', icon: Home, applies: heads.houseProperty, net: c.housePropertyNetIncome,
+    { id: 'house', letter: 'B', title: t('headHouse'), short: t('headHouse'), icon: Home, applies: heads.houseProperty, net: c.housePropertyNetIncome,
       entries: (housesQuery.data ?? []).map((h) => ({ label: hpType(h.type), amount: h.annualRent || h.annualValue, note: h.address })) },
-    { id: 'business', letter: 'C', title: 'Profits & Gains of Business / Profession', icon: Wallet, applies: heads.business, net: c.businessNetIncome,
+    { id: 'business', letter: 'C', title: t('headBusiness'), short: t('headBusiness'), icon: Wallet, applies: heads.business, net: c.businessNetIncome,
       entries: (bizQuery.data ?? []).map((b) => ({ label: b.natureOfBusinessCode || 'Business income', amount: b.turnover, note: b.isPresumptive ? `Presumptive ${b.presumptiveSection ?? ''}`.trim() : 'Regular books' })) },
-    { id: 'cg', letter: 'D', title: 'Capital Gains', icon: LineChart, applies: heads.capitalGains, net: c.capitalGainsNetIncome,
+    { id: 'cg', letter: 'D', title: t('headCg'), short: t('headCg'), icon: LineChart, applies: heads.capitalGains, net: c.capitalGainsNetIncome,
       entries: (cgQuery.data ?? []).map((g) => ({ label: `${g.term === 'Long' ? 'Long-term' : 'Short-term'} · ${g.assetType}`, amount: g.salePrice, note: g.taxSection })) },
-    { id: 'other', letter: 'E', title: 'Income from Other Sources', icon: PiggyBank, applies: heads.otherSources, net: c.otherSourcesNetIncome,
+    { id: 'other', letter: 'E', title: t('headOther'), short: t('headOther'), icon: PiggyBank, applies: heads.otherSources, net: c.otherSourcesNetIncome,
       entries: (otherQuery.data ?? []).map((o) => ({ label: o.label || o.type, amount: o.amount, note: o.type })) },
   ];
   const sections: WorkspaceSection[] = defs
     .filter((s) => s.applies || s.net !== 0 || s.entries.length > 0)
-    .map(({ applies: _a, ...s }) => s);
-  const incomeSections = sections.map((s) => ({ id: s.id, label: s.title.replace(/^Income from /, '').replace('Profits & Gains of ', '') }));
+    .map(({ applies: _a, short: _s, ...s }) => s);
+  const incomeSections = defs
+    .filter((s) => s.applies || s.net !== 0 || s.entries.length > 0)
+    .map((s) => ({ id: s.id, label: s.short }));
 
   const insights: string[] = [];
-  if (regime === 'Old' && c.totalDeductions < 150_000) insights.push('Room to claim more under Section 80C / 80D — review your deductions.');
-  if (c.refundOrPayable > 0) insights.push(`A refund of about ₹${Math.round(c.refundOrPayable).toLocaleString('en-IN')} is expected.`);
-  else if (c.refundOrPayable < 0) insights.push(`A balance tax of ₹${Math.round(-c.refundOrPayable).toLocaleString('en-IN')} is payable before filing.`);
-  if (c.interestPenalty > 0) insights.push('Interest u/s 234A/B/C applies — file/pay sooner to minimise it.');
-  if (insights.length === 0) insights.push('Your computation looks complete. Review and file before the due date.');
+  if (regime === 'Old' && c.totalDeductions < 150_000) insights.push(t('insightDeductions'));
+  if (c.refundOrPayable > 0) insights.push(t('insightRefund', { amount: formatInr(c.refundOrPayable) }));
+  else if (c.refundOrPayable < 0) insights.push(t('insightPayable', { amount: formatInr(-c.refundOrPayable) }));
+  if (c.interestPenalty > 0) insights.push(t('insightInterest'));
+  if (insights.length === 0) insights.push(t('insightComplete'));
 
   const findings = validateQuery.data?.findings ?? [];
 
@@ -104,26 +108,26 @@ export default function WorkspacePage({ params }: { params: { returnId: string }
       <div className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-card xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div>
-            <h1 className="text-lg font-semibold text-ink-900">Computation Workspace</h1>
-            <p className="text-xs text-ink-500">Tax calculated as per the {regime} regime</p>
+            <h1 className="text-lg font-semibold text-ink-900">{t('title')}</h1>
+            <p className="text-xs text-ink-500">{t('regimeLine', { regime })}</p>
           </div>
-          <Field label="Assessee" value={user?.fullName ?? '—'} />
-          <Field label="PAN" value={user?.panMasked ?? '—'} mono />
-          <Field label="Assessment Year" value={formatAssessmentYear(detail.assessmentYear)} />
-          <Field label="ITR Type" value={detail.itrType ? formatItrType(detail.itrType) : '—'} />
+          <Field label={t('assessee')} value={user?.fullName ?? '—'} />
+          <Field label={t('pan')} value={user?.panMasked ?? '—'} mono />
+          <Field label={t('assessmentYear')} value={formatAssessmentYear(detail.assessmentYear)} />
+          <Field label={t('itrType')} value={detail.itrType ? formatItrType(detail.itrType) : '—'} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => void validateQuery.refetch()} loading={validateQuery.isFetching}>
-            <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Validate
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" /> {t('validate')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => void computeQuery.refetch()} loading={computeQuery.isFetching}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Recalculate
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> {t('recalculate')}
           </Button>
           <Button variant="ghost" size="sm" disabled>
-            <Save className="h-4 w-4" aria-hidden="true" /> Saved
+            <Save className="h-4 w-4" aria-hidden="true" /> {t('saved')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" aria-hidden="true" /> Print
+            <Printer className="h-4 w-4" aria-hidden="true" /> {t('print')}
           </Button>
         </div>
       </div>
@@ -157,10 +161,10 @@ export default function WorkspacePage({ params }: { params: { returnId: string }
 
       {/* Shortcut bar */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-ink-200 bg-white px-4 py-2 text-xs text-ink-400">
-        <span><b className="text-ink-600">Validate</b> checks before filing</span>
-        <span><b className="text-ink-600">Recalculate</b> refreshes the tax</span>
-        <span><b className="text-ink-600">Print</b> the computation</span>
-        <span className="ml-auto">Auto-saved · live computation</span>
+        <span><b className="text-ink-600">{t('validate')}</b> {t('scValidate')}</span>
+        <span><b className="text-ink-600">{t('recalculate')}</b> {t('scRecalc')}</span>
+        <span><b className="text-ink-600">{t('print')}</b> {t('scPrint')}</span>
+        <span className="ml-auto">{t('autoSaved')}</span>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -38,16 +39,17 @@ const kycSchema = z.object({
 type KycValues = z.infer<typeof kycSchema>;
 
 const SOURCES = [
-  { key: 'salary', label: 'Salary / Pension', icon: Briefcase, hint: 'Form 16 income from an employer or pension' },
-  { key: 'house', label: 'House Property', icon: Home, hint: 'Rent received, or a self-occupied home loan' },
-  { key: 'business', label: 'Business / Profession', icon: Wallet, hint: 'Freelancing, trading, a shop or practice' },
-  { key: 'capitalGains', label: 'Capital Gains', icon: LineChart, hint: 'Shares, mutual funds, property, crypto' },
-  { key: 'otherSources', label: 'Other Sources', icon: PiggyBank, hint: 'Interest, dividends, winnings' },
+  { key: 'salary', labelKey: 'srcSalary', hintKey: 'srcSalaryHint', icon: Briefcase },
+  { key: 'house', labelKey: 'srcHouse', hintKey: 'srcHouseHint', icon: Home },
+  { key: 'business', labelKey: 'srcBusiness', hintKey: 'srcBusinessHint', icon: Wallet },
+  { key: 'capitalGains', labelKey: 'srcCapitalGains', hintKey: 'srcCapitalGainsHint', icon: LineChart },
+  { key: 'otherSources', labelKey: 'srcOther', hintKey: 'srcOtherHint', icon: PiggyBank },
 ] as const;
 type SourceKey = (typeof SOURCES)[number]['key'];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const t = useTranslations('onboarding');
   const { user, refreshUser } = useAuth();
   const [step, setStep] = useState(1);
   const [picks, setPicks] = useState<Record<SourceKey, boolean>>({
@@ -113,8 +115,8 @@ export default function OnboardingPage() {
     <div className="mx-auto w-full max-w-2xl space-y-6">
       {/* Header + step dots */}
       <div className="text-center">
-        <h1 className="text-2xl font-semibold text-ink-900">Welcome to TallyG Tax 👋</h1>
-        <p className="mt-1 text-sm text-ink-500">A couple of quick steps and we&apos;ll set up your return.</p>
+        <h1 className="text-2xl font-semibold text-ink-900">{t('welcome')}</h1>
+        <p className="mt-1 text-sm text-ink-500">{t('subtitle')}</p>
         <div className="mt-4 flex items-center justify-center gap-2">
           {[1, 2].map((n) => (
             <span key={n} className={cn('h-2 w-10 rounded-full', step >= n ? 'bg-brand-600' : 'bg-ink-200')} />
@@ -125,62 +127,62 @@ export default function OnboardingPage() {
       {step === 1 ? (
         <Card>
           <CardHeader>
-            <CardTitle>About you (KYC)</CardTitle>
+            <CardTitle>{t('kycTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit((v) => saveKyc.mutate(v))} className="space-y-4" noValidate>
               {formError && <Alert variant="error">{formError}</Alert>}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="First name" error={errors.firstName?.message} required>
+                <Field label={t('firstName')} error={errors.firstName?.message} required>
                   <Input {...register('firstName')} placeholder="Ram Jivan" />
                 </Field>
-                <Field label="Last name" error={errors.lastName?.message} required>
+                <Field label={t('lastName')} error={errors.lastName?.message} required>
                   <Input {...register('lastName')} placeholder="Singh" />
                 </Field>
-                <Field label="PAN" error={errors.pan?.message} required>
+                <Field label={t('pan')} error={errors.pan?.message} required>
                   <Input {...register('pan')} placeholder="ABCDE1234F" maxLength={10} className="uppercase" />
                 </Field>
-                <Field label="Date of birth" error={errors.dob?.message} required>
+                <Field label={t('dob')} error={errors.dob?.message} required>
                   <Input type="date" {...register('dob')} />
                 </Field>
-                <Field label="Aadhaar (last 4)" error={errors.aadhaarLast4?.message}>
+                <Field label={t('aadhaar')} error={errors.aadhaarLast4?.message}>
                   <Input {...register('aadhaarLast4')} placeholder="1234" maxLength={4} inputMode="numeric" />
                 </Field>
-                <Field label="Residential status">
+                <Field label={t('residentialStatus')}>
                   <Select {...register('residentialStatus')} options={[
-                    { value: 'resident', label: 'Resident' },
-                    { value: 'rnor', label: 'Resident but not ordinarily resident' },
-                    { value: 'non_resident', label: 'Non-resident' },
+                    { value: 'resident', label: t('resResident') },
+                    { value: 'rnor', label: t('resRnor') },
+                    { value: 'non_resident', label: t('resNonResident') },
                   ]} />
                 </Field>
-                <Field label="Address line 1">
-                  <Input {...register('addressLine1')} placeholder="House / street" />
+                <Field label={t('addressLine1')}>
+                  <Input {...register('addressLine1')} placeholder={t('addressPh')} />
                 </Field>
-                <Field label="City">
+                <Field label={t('city')}>
                   <Input {...register('city')} placeholder="Pune" />
                 </Field>
-                <Field label="State code">
+                <Field label={t('stateCode')}>
                   <Input {...register('stateCode')} placeholder="27" maxLength={4} />
                 </Field>
-                <Field label="PIN code" error={errors.pincode?.message}>
+                <Field label={t('pincode')} error={errors.pincode?.message}>
                   <Input {...register('pincode')} placeholder="411001" maxLength={6} inputMode="numeric" />
                 </Field>
-                <Field label="Occupation">
+                <Field label={t('occupation')}>
                   <Select {...register('occupationType')} options={[
-                    { value: '', label: 'Select…' },
-                    { value: 'salaried', label: 'Salaried' },
-                    { value: 'professional', label: 'Professional' },
-                    { value: 'freelancer', label: 'Freelancer' },
-                    { value: 'trader', label: 'Trader / Business' },
-                    { value: 'pensioner', label: 'Pensioner' },
-                    { value: 'msme', label: 'MSME' },
+                    { value: '', label: t('occSelect') },
+                    { value: 'salaried', label: t('occSalaried') },
+                    { value: 'professional', label: t('occProfessional') },
+                    { value: 'freelancer', label: t('occFreelancer') },
+                    { value: 'trader', label: t('occTrader') },
+                    { value: 'pensioner', label: t('occPensioner') },
+                    { value: 'msme', label: t('occMsme') },
                   ]} />
                 </Field>
               </div>
               <div className="flex justify-between gap-3">
-                <Button type="button" variant="ghost" onClick={() => router.push('/dashboard')}>Skip for now</Button>
+                <Button type="button" variant="ghost" onClick={() => router.push('/dashboard')}>{t('skipForNow')}</Button>
                 <Button type="submit" loading={saveKyc.isPending}>
-                  Continue <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  {t('continue')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             </form>
@@ -189,12 +191,12 @@ export default function OnboardingPage() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>What income did you have this year?</CardTitle>
+            <CardTitle>{t('incomeTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-ink-500">Pick all that apply — we&apos;ll choose the right ITR form for you.</p>
+            <p className="text-sm text-ink-500">{t('incomeSubtitle')}</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              {SOURCES.map(({ key, label, icon: Icon, hint }) => {
+              {SOURCES.map(({ key, labelKey, hintKey, icon: Icon }) => {
                 const on = picks[key];
                 return (
                   <button
@@ -211,10 +213,10 @@ export default function OnboardingPage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 font-medium text-ink-900">
-                        {label}
+                        {t(labelKey)}
                         {on && <CheckCircle2 className="h-4 w-4 text-brand-600" aria-hidden="true" />}
                       </span>
-                      <span className="mt-0.5 block text-xs text-ink-500">{hint}</span>
+                      <span className="mt-0.5 block text-xs text-ink-500">{t(hintKey)}</span>
                     </span>
                   </button>
                 );
@@ -224,18 +226,18 @@ export default function OnboardingPage() {
             {picks.business && (
               <label className="flex items-center gap-2 rounded-xl bg-ink-50 p-3 text-sm text-ink-700">
                 <input type="checkbox" checked={presumptive} onChange={(e) => setPresumptive(e.target.checked)} className="h-4 w-4 rounded border-ink-300" />
-                I&apos;d like to declare business income on a presumptive basis (44AD / 44ADA / 44AE).
+                {t('presumptive')}
               </label>
             )}
 
-            {finish.isError && <Alert variant="error">We couldn&apos;t set up your return. Please try again.</Alert>}
+            {finish.isError && <Alert variant="error">{t('setupError')}</Alert>}
 
             <div className="flex items-center justify-between gap-3">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>Back</Button>
+              <Button type="button" variant="ghost" onClick={() => setStep(1)}>{t('back')}</Button>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>Skip</Button>
+                <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>{t('skip')}</Button>
                 <Button onClick={() => finish.mutate()} loading={finish.isPending} disabled={!anyPicked || !ayQuery.data}>
-                  <Sparkles className="h-4 w-4" aria-hidden="true" /> Set up my return
+                  <Sparkles className="h-4 w-4" aria-hidden="true" /> {t('setupReturn')}
                 </Button>
               </div>
             </div>

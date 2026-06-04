@@ -3,6 +3,7 @@
 // WorkspaceRail — the right column of the Computation Workspace: the computation
 // summary (the tax ladder), derived smart insights, and validation alerts.
 
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, CheckCircle2, Info, Lightbulb, ShieldAlert, type LucideIcon } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ export function WorkspaceRail({
   findings: ValidationFinding[];
   insights: string[];
 }) {
+  const t = useTranslations('workspace');
   const taxBeforeCess = result.totalTax - result.cess;
   const refund = result.refundOrPayable >= 0;
 
@@ -51,18 +53,18 @@ export function WorkspaceRail({
       {/* Computation summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-semibold uppercase tracking-wide text-ink-500">Computation summary</CardTitle>
+          <CardTitle className="text-sm font-semibold uppercase tracking-wide text-ink-500">{t('summaryTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-0">
-          <SummaryRow label="Gross total income" value={formatInr(result.grossTotalIncome)} />
-          <SummaryRow label="Total deductions" value={formatInr(result.totalDeductions)} />
-          <SummaryRow label="Taxable income" value={formatInr(result.taxableIncome)} tone="money" />
-          <SummaryRow label={`Tax @ ${regime} regime`} value={formatInr(taxBeforeCess)} />
-          <SummaryRow label="Health & education cess" value={formatInr(result.cess)} />
-          <SummaryRow label="Total tax payable" value={formatInr(result.totalTax)} />
-          <SummaryRow label="TDS / TCS" value={formatInr(result.tdsPaid + result.tcsPaid)} />
+          <SummaryRow label={t('totalGti')} value={formatInr(result.grossTotalIncome)} />
+          <SummaryRow label={t('totalDeductions')} value={formatInr(result.totalDeductions)} />
+          <SummaryRow label={t('totalTaxable')} value={formatInr(result.taxableIncome)} tone="money" />
+          <SummaryRow label={t('taxAtRegime', { regime })} value={formatInr(taxBeforeCess)} />
+          <SummaryRow label={t('cess')} value={formatInr(result.cess)} />
+          <SummaryRow label={t('totalTax')} value={formatInr(result.totalTax)} />
+          <SummaryRow label={t('tdsTcs')} value={formatInr(result.tdsPaid + result.tcsPaid)} />
           <SummaryRow
-            label={refund ? 'Balance / refund' : 'Balance payable'}
+            label={refund ? t('balanceRefund') : t('balancePayable')}
             value={`${refund ? '' : '(-) '}${formatInr(Math.abs(result.refundOrPayable))}`}
             tone={refund ? 'money' : 'payable'}
             strong
@@ -74,8 +76,8 @@ export function WorkspaceRail({
       <Card>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <Lightbulb className="h-4 w-4 text-brand-600" aria-hidden="true" />
-          <CardTitle className="text-sm">Smart insights</CardTitle>
-          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">Beta</span>
+          <CardTitle className="text-sm">{t('smartInsights')}</CardTitle>
+          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">{t('beta')}</span>
         </CardHeader>
         <CardContent className="space-y-2.5">
           {insights.map((text, i) => (
@@ -90,21 +92,21 @@ export function WorkspaceRail({
       {/* Validation & alerts */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-          <CardTitle className="text-sm">Validation &amp; alerts</CardTitle>
+          <CardTitle className="text-sm">{t('validationAlerts')}</CardTitle>
           <span
             className={cn(
               'rounded-full px-2 py-0.5 text-[11px] font-medium',
               findings.length === 0 ? 'bg-money-50 text-money-700' : 'bg-payable-50 text-payable-700',
             )}
           >
-            {findings.length === 0 ? 'All clear' : `${findings.length} alert${findings.length > 1 ? 's' : ''}`}
+            {findings.length === 0 ? t('allClear') : t('alerts', { count: findings.length })}
           </span>
         </CardHeader>
         <CardContent className="space-y-2.5">
           {findings.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-money-700">
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              No blocking issues — ready to review and file.
+              {t('noBlocking')}
             </div>
           ) : (
             findings.slice(0, 6).map((f, i) => {

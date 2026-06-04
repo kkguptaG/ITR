@@ -5,6 +5,7 @@
 // wizard step or hub route.
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import {
   CalendarClock,
   FileCheck2,
@@ -50,31 +51,32 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function WorkspaceNav({ returnId, incomeSections }: { returnId: string; incomeSections: WorkspaceNavSection[] }) {
+  const t = useTranslations('workspace');
   const r = `/returns/${returnId}`;
   return (
-    <nav className="space-y-0.5" aria-label="Workspace sections">
-      <NavLink href="/dashboard" label="Dashboard" icon={LayoutDashboard} />
-      <NavLink href="/settings" label="Assessee Info" icon={UserRound} />
+    <nav className="space-y-0.5" aria-label={t('navSections')}>
+      <NavLink href="/dashboard" label={t('navDashboard')} icon={LayoutDashboard} />
+      <NavLink href="/settings" label={t('navAssessee')} icon={UserRound} />
 
-      <GroupLabel>Income details</GroupLabel>
+      <GroupLabel>{t('navIncome')}</GroupLabel>
       {incomeSections.map((s) => (
         <NavLink key={s.id} href={`#ws-${s.id}`} label={s.label} icon={Wallet} />
       ))}
 
-      <GroupLabel>Deductions &amp; taxes</GroupLabel>
-      <NavLink href={`${r}/file/deductions`} label="Deductions" icon={Receipt} />
-      <NavLink href={`${r}/file/taxes-paid`} label="Tax Payments / TDS" icon={Landmark} />
-      <NavLink href="/documents" label="AIS / TIS / 26AS" icon={FileText} />
+      <GroupLabel>{t('navDeductionsTaxes')}</GroupLabel>
+      <NavLink href={`${r}/file/deductions`} label={t('navDeductions')} icon={Receipt} />
+      <NavLink href={`${r}/file/taxes-paid`} label={t('navTaxPayments')} icon={Landmark} />
+      <NavLink href="/documents" label={t('navAis')} icon={FileText} />
 
-      <GroupLabel>Review &amp; file</GroupLabel>
-      <NavLink href="#ws-summary" label="Tax Summary" icon={Sigma} />
-      <NavLink href="/support" label="Notices" icon={ScrollText} />
-      <NavLink href={r} label="Filing & Verification" icon={FileCheck2} />
+      <GroupLabel>{t('navReview')}</GroupLabel>
+      <NavLink href="#ws-summary" label={t('navTaxSummary')} icon={Sigma} />
+      <NavLink href="/support" label={t('navNotices')} icon={ScrollText} />
+      <NavLink href={r} label={t('navFiling')} icon={FileCheck2} />
 
-      <GroupLabel>Quick actions</GroupLabel>
-      <NavLink href="/documents" label="Import AIS / 26AS" icon={Landmark} />
-      <NavLink href="/documents" label="Upload Document" icon={FileText} />
-      <NavLink href={`${r}/file/regime`} label="Compare Regimes" icon={CalendarClock} />
+      <GroupLabel>{t('navQuickActions')}</GroupLabel>
+      <NavLink href="/documents" label={t('navImportAis')} icon={Landmark} />
+      <NavLink href="/documents" label={t('navUpload')} icon={FileText} />
+      <NavLink href={`${r}/file/regime`} label={t('navCompareRegimes')} icon={CalendarClock} />
     </nav>
   );
 }
