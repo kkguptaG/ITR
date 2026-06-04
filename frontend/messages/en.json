@@ -504,6 +504,35 @@
     "Processed": "Processed",
     "Failed": "Failed"
   },
+  "eVerify": {
+    "title": "E-verify your return",
+    "subtitle": "A filed return is valid only after e-verification.",
+    "pendingTitle": "E-verification pending",
+    "pendingBody": "Verify this return within {days} days — by {date} — or it may be treated as not filed.",
+    "overdueTitle": "E-verification overdue",
+    "overdueBody": "The 30-day window (until {date}) has passed. Verify now to avoid your return being treated as not filed.",
+    "chooseMode": "Choose how to verify",
+    "start": "Start",
+    "verify": "Verify",
+    "confirmNetBanking": "I've verified via net-banking",
+    "checkStatus": "Check status",
+    "downloadItrv": "Download ITR-V",
+    "codeLabel": "Verification code",
+    "devTitle": "Demo mode",
+    "devBody": "Use this test code:",
+    "verifiedTitle": "Return e-verified",
+    "verifiedBody": "Verified on {date} via {mode}.",
+    "reference": "Reference",
+    "genericError": "Something went wrong. Please try again.",
+    "mode": {
+      "AadhaarOtp": "Aadhaar OTP",
+      "NetBanking": "Net banking",
+      "BankAccountEvc": "Bank account EVC",
+      "DematEvc": "Demat account EVC",
+      "BankAtmEvc": "Bank ATM EVC",
+      "ItrV": "Post signed ITR-V to CPC"
+    }
+  },
   "caReview": {
     "queueTitle": "Review queue",
     "queueSubtitle": "Returns assigned to you for review, plus your firm's unassigned pool.",
