@@ -41,6 +41,9 @@ public interface IReturnService
     Task<CapitalGainDto> UpdateCapitalGainAsync(Guid id, Guid gainId, UpsertCapitalGainRequest request, CancellationToken ct = default);
     Task DeleteCapitalGainAsync(Guid id, Guid gainId, CancellationToken ct = default);
 
+    /// <summary>Preview (Commit=false) or commit (Commit=true) a bulk CSV import of capital-gain rows.</summary>
+    Task<CapitalGainImportResult> ImportCapitalGainsAsync(Guid id, CapitalGainImportRequest request, CancellationToken ct = default);
+
     // --- immovable-property buyers (s.194-IA) attached to a capital gain ---
     Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default);
     Task<CapitalGainBuyerDto> AddCapitalGainBuyerAsync(Guid id, Guid gainId, UpsertCapitalGainBuyerRequest request, CancellationToken ct = default);

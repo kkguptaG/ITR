@@ -660,6 +660,69 @@ public sealed class ReturnService : IReturnService
         await MarkInProgressAndSaveAsync(ret, ct);
     }
 
+    public async Task<CapitalGainImportResult> ImportCapitalGainsAsync(Guid id, CapitalGainImportRequest request, CancellationToken ct = default)
+    {
+        var ret = await LoadOwnedReturnAsync(id, ct);
+        var profile = CapitalGainImportProfiles.Find(request.ProfileId)
+                      ?? throw new AppException("RETURN.CG_IMPORT_PROFILE", "Unknown import profile.", 400);
+
+        var parsed = CapitalGainCsvParser.Parse(request.Csv ?? string.Empty, profile);
+
+        // De-dupe against the rows already on the return, then within the batch (HashSet.Add returns false on a hit).
+        var existing = await _db.CapitalGains.Where(c => c.TaxReturnId == id)
+            .Select(c => new { c.AssetType, c.AcquisitionDate, c.TransferDate, c.SalePrice, c.CostOfAcquisition })
+            .ToListAsync(ct);
+        var seen = new HashSet<string>(existing.Select(e =>
+            CapitalGainCsvParser.DedupeKey(e.AssetType, e.AcquisitionDate, e.TransferDate, e.SalePrice, e.CostOfAcquisition)));
+
+        var rows = new List<ImportedCgRow>(parsed.Count);
+        foreach (var p in parsed)
+        {
+            var key = CapitalGainCsvParser.DedupeKey(p.AssetType, p.AcquisitionDate, p.TransferDate, p.SalePrice, p.CostOfAcquisition);
+            rows.Add(p with { Duplicate = !seen.Add(key) });
+        }
+
+        var imported = 0;
+        if (request.Commit)
+        {
+            EnsureMutable(ret);
+            foreach (var row in rows.Where(r => r.Ok))
+            {
+                var entity = new CapitalGain
+                {
+                    TenantId = ret.TenantId,
+                    TaxReturnId = ret.Id,
+                    AssetType = row.AssetType,
+                    Term = row.Term,
+                    AcquisitionDate = row.AcquisitionDate,
+                    TransferDate = row.TransferDate,
+                    SalePrice = row.SalePrice,
+                    CostOfAcquisition = row.CostOfAcquisition,
+                    ExpensesOnTransfer = row.ExpensesOnTransfer,
+                    Isin = string.IsNullOrWhiteSpace(row.Isin) ? null : row.Isin!.Trim(),
+                    CoOwnerPercent = 100m,
+                };
+                ApplyCapitalGainDerived(entity);
+                _db.CapitalGains.Add(entity);
+                imported++;
+            }
+
+            if (imported > 0)
+            {
+                await MarkInProgressAndSaveAsync(ret, ct);
+            }
+        }
+
+        return new CapitalGainImportResult(
+            profile.Id,
+            TotalRows: rows.Count,
+            ValidRows: rows.Count(r => r.Ok),
+            DuplicateRows: rows.Count(r => r.Duplicate),
+            ErrorRows: rows.Count(r => r.Errors.Count > 0),
+            ImportedRows: imported,
+            Rows: rows);
+    }
+
     // =========================================================== immovable-property buyers (s.194-IA)
 
     public async Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default)

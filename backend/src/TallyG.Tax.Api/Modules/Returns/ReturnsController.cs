@@ -176,6 +176,11 @@ public sealed class ReturnsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/capital-gains/import")]
+    [ProducesResponseType(typeof(CapitalGainImportResult), StatusCodes.Status200OK)]
+    public Task<CapitalGainImportResult> ImportCapitalGains(Guid id, [FromBody] CapitalGainImportRequest request, CancellationToken ct)
+        => _returns.ImportCapitalGainsAsync(id, request, ct);
+
     // ------------------------------------------------------------- immovable-property buyers (s.194-IA)
 
     [HttpGet("{id:guid}/capital-gains/{gainId:guid}/buyers")]
