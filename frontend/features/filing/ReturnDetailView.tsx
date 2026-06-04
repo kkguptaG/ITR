@@ -23,6 +23,7 @@ import { downloadAcknowledgment, downloadComputation } from './download';
 import { isReturnLocked } from './useReturn';
 import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import { BusinessIncomeSummaryCard } from './components/BusinessIncomeSummaryCard';
+import { ComputationDashboard } from './components/ComputationDashboard';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
@@ -128,22 +129,25 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
         </Card>
       )}
 
-      {/* Latest computation */}
-      {comp ? (
-        <TaxSummaryPanel comp={comp} />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>{tr('noComputationTitle')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="info">{tr('noComputationBody')}</Alert>
-          </CardContent>
-        </Card>
+      {/* Computation dashboard — the clickable line-by-line hub (every line routes to its form). */}
+      <ComputationDashboard returnId={returnId} detail={detail} />
+
+      {/* Full breakdown + line-by-line trace (collapsible) for power users. */}
+      {comp && (
+        <details className="rounded-2xl border border-ink-200 bg-white">
+          <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ink-700">
+            Full breakdown &amp; computation trace
+          </summary>
+          <div className="px-1 pb-1">
+            <TaxSummaryPanel comp={comp} />
+          </div>
+        </details>
       )}
 
       {/* Prepaid taxes: deductor-wise TDS + advance/self-assessment challans */}
-      <TaxesPaidCard returnId={returnId} editable={!locked} />
+      <div id="taxes-paid" className="scroll-mt-4">
+        <TaxesPaidCard returnId={returnId} editable={!locked} />
+      </div>
 
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}
       <ReconciliationCard returnId={returnId} />
@@ -216,6 +220,11 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     speculativeLossCarriedForward: num(c.speculativeLossCarriedForward),
     shortTermCapitalLossCarriedForward: num(c.shortTermCapitalLossCarriedForward),
     longTermCapitalLossCarriedForward: num(c.longTermCapitalLossCarriedForward),
+    salaryNetIncome: 0,
+    housePropertyNetIncome: 0,
+    businessNetIncome: 0,
+    capitalGainsNetIncome: 0,
+    otherSourcesNetIncome: 0,
     trace: [],
   };
 }

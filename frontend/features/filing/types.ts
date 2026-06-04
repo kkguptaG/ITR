@@ -301,6 +301,12 @@ export interface TaxComputationResultDto {
   shortTermCapitalLossCarriedForward: number;
   longTermCapitalLossCarriedForward: number;
   unabsorbedDepreciationCarriedForward: number;
+  // Per-head net income as it flows into GTI — drives the computation dashboard's clickable head lines.
+  salaryNetIncome: number;
+  housePropertyNetIncome: number;
+  businessNetIncome: number;
+  capitalGainsNetIncome: number;
+  otherSourcesNetIncome: number;
   trace: TraceLineDto[];
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */

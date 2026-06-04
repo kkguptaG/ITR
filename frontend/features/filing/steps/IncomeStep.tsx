@@ -7,9 +7,12 @@
 // /returns/{id}/<head>. Saving is immediate per row; "Continue" just advances.
 // ---------------------------------------------------------------------------
 
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui';
 import { formatInr } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import {
   addBusinessIncome,
   addCapitalGain,
@@ -81,6 +84,14 @@ export function IncomeStep() {
   const invalidate = useInvalidateReturn(returnId);
   const heads = incomeHeads(detail.itrType);
 
+  // Deep-link focus: the Computation Dashboard links here with ?focus=<head> to land on a section.
+  const focus = useSearchParams().get('focus');
+  useEffect(() => {
+    if (!focus) return;
+    const el = document.getElementById(`income-${focus}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus]);
+
   // ------- salary
   const salary = useHeadCrud<SalaryDetailDto, Parameters<typeof addSalary>[1]>(
     returnId,
@@ -128,7 +139,7 @@ export function IncomeStep() {
       <WizardStep title={t('incomeTitle')} description={t('incomeSubtitle')}>
         {/* Salary */}
         {heads.salary && (
-          <Section title={ti('salaryHead')}>
+          <Section id="salary" focused={focus === 'salary'} title={ti('salaryHead')}>
             <EditableList<SalaryDetailDto>
               items={salary.query.data ?? []}
               getKey={(s) => s.id}
@@ -184,7 +195,7 @@ export function IncomeStep() {
 
         {/* House property */}
         {heads.houseProperty && (
-          <Section title={ti('houseHead')}>
+          <Section id="house" focused={focus === 'house'} title={ti('houseHead')}>
             <EditableList<HousePropertyDto>
               items={house.query.data ?? []}
               getKey={(h) => h.id}
@@ -231,7 +242,7 @@ export function IncomeStep() {
 
         {/* Capital gains */}
         {heads.capitalGains && (
-          <Section title={ti('capitalGainsHead')}>
+          <Section id="capitalGains" focused={focus === 'capitalGains'} title={ti('capitalGainsHead')}>
             <EditableList<CapitalGainDto>
               items={gains.query.data ?? []}
               getKey={(g) => g.id}
@@ -288,7 +299,7 @@ export function IncomeStep() {
 
         {/* Business income */}
         {heads.business && (
-          <Section title={ti('businessHead')}>
+          <Section id="business" focused={focus === 'business'} title={ti('businessHead')}>
             <EditableList<BusinessIncomeDto>
               items={business.query.data ?? []}
               getKey={(b) => b.id}
@@ -358,7 +369,7 @@ export function IncomeStep() {
 
         {/* Other sources */}
         {heads.otherSources && (
-          <Section title={ti('otherHead')}>
+          <Section id="other" focused={focus === 'other'} title={ti('otherHead')}>
             <EditableList<IncomeSourceDto>
               items={otherSources}
               getKey={(s) => s.id}
@@ -407,9 +418,15 @@ export function IncomeStep() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ id, title, focused, children }: { id?: string; title: string; focused?: boolean; children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
+    <section
+      id={id ? `income-${id}` : undefined}
+      className={cn(
+        'space-y-3 scroll-mt-24 rounded-xl',
+        focused && 'animate-[pulse_1.2s_ease-in-out_2] ring-2 ring-brand-300 ring-offset-4 ring-offset-bg',
+      )}
+    >
       <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-500">{title}</h3>
       {children}
     </section>
