@@ -101,15 +101,17 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
     {
         RuleFor(x => x.AssetType).IsInEnum().WithMessage("Unknown asset type.");
         RuleFor(x => x.Term).IsInEnum().WithMessage("Unknown capital-gain term.");
+        RuleFor(x => x.AcquisitionMode).IsInEnum().WithMessage("Unknown acquisition mode.");
         RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0);
         RuleFor(x => x.CostOfAcquisition).GreaterThanOrEqualTo(0);
         RuleFor(x => x.CostOfImprovement).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ExpensesOnTransfer).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ExemptionAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ReinvestmentAmount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.PreviousOwnerCost).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ExemptionSection)
-            .Must(s => string.IsNullOrWhiteSpace(s) || new[] { "54", "54F", "54EC" }.Contains(s.Trim().ToUpperInvariant()))
-            .WithMessage("Exemption section must be 54, 54F or 54EC.");
+            .Must(s => string.IsNullOrWhiteSpace(s) || new[] { "54", "54B", "54F", "54EC" }.Contains(s.Trim().ToUpperInvariant()))
+            .WithMessage("Exemption section must be 54, 54B, 54F or 54EC.");
         RuleFor(x => x.TaxSection).MaximumLength(16);
         RuleFor(x => x.Isin).MaximumLength(20);
 
@@ -117,6 +119,13 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
             RuleFor(x => x.TransferDate!.Value)
                 .GreaterThanOrEqualTo(x => x.AcquisitionDate!.Value)
                 .WithMessage("Transfer date cannot precede the acquisition date."));
+
+        // s.49(1)/s.2(42A): for gifted / inherited / will assets the holding (and cost) step in from the
+        // previous owner, so the previous owner's acquisition cannot post-date the transfer.
+        When(x => x.PreviousOwnerAcquisitionDate.HasValue && x.TransferDate.HasValue, () =>
+            RuleFor(x => x.TransferDate!.Value)
+                .GreaterThanOrEqualTo(x => x.PreviousOwnerAcquisitionDate!.Value)
+                .WithMessage("Transfer date cannot precede the previous owner's acquisition date."));
     }
 }
 

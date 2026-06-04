@@ -311,8 +311,22 @@ public sealed class RuleSet
             }
         }
 
+        // Cost Inflation Index (s.48) keyed by financial-year START year ("2001" ⇒ FY2001-02 = base 100).
+        var cii = new Dictionary<int, int>();
+        if (c.TryGetProperty("cost_inflation_index", out var ci) && ci.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in ci.EnumerateObject())
+            {
+                if (int.TryParse(p.Name, out var fy) && p.Value.ValueKind == JsonValueKind.Number)
+                {
+                    cii[fy] = p.Value.GetInt32();
+                }
+            }
+        }
+
         return new CapitalGainRules
         {
+            CostInflationIndex = cii,
             Ltcg112AExemption = GetDecimal(c, "ltcg_112a_exemption") ?? 125000m,
             Ltcg112ARate = GetDecimal(c, "ltcg_112a_rate") ?? 0.125m,
             Stcg111ARate = GetDecimal(c, "stcg_111a_rate") ?? 0.15m,
@@ -557,6 +571,67 @@ public sealed class CapitalGainRules
     public DateOnly? GrandfatherDate112A { get; init; }
     public DateOnly? PropertyIndexationCutoff { get; init; }
     public IReadOnlyDictionary<string, int> HoldingMonths { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>Cost Inflation Index (s.48), keyed by financial-year START year (2001 = FY2001-02 = base 100).</summary>
+    public IReadOnlyDictionary<int, int> CostInflationIndex { get; init; } = new Dictionary<int, int>();
+
+    /// <summary>Financial-year start year for a date (Apr–Mar): Jan–Mar fall in the prior FY.</summary>
+    public static int FinancialYearStart(DateOnly d) => d.Month >= 4 ? d.Year : d.Year - 1;
+
+    /// <summary>
+    /// Indexed cost of acquisition (s.48 second proviso): cost × CII(transfer FY) ÷ CII(acquisition FY).
+    /// Acquisitions before the base year (FY2001-02) index from the base. When the table lacks the transfer
+    /// FY (e.g. a not-yet-notified current year) the latest notified index at/under it is used. Returns the
+    /// un-indexed cost when the table or acquisition year is unavailable (indexation simply doesn't apply).
+    /// </summary>
+    public decimal IndexedCostOf(decimal cost, DateOnly acquisition, DateOnly transfer)
+    {
+        if (cost <= 0m || CostInflationIndex.Count == 0)
+        {
+            return cost;
+        }
+
+        var baseYear = CostInflationIndex.Keys.Min();
+        var acqFy = Math.Max(baseYear, FinancialYearStart(acquisition));
+        var trnFy = FinancialYearStart(transfer);
+        if (!CostInflationIndex.TryGetValue(acqFy, out var acqCii) || acqCii <= 0)
+        {
+            return cost;
+        }
+
+        if (!CostInflationIndex.TryGetValue(trnFy, out var trnCii))
+        {
+            trnCii = CostInflationIndex.Where(kv => kv.Key <= trnFy).Select(kv => kv.Value).DefaultIfEmpty(acqCii).Max();
+        }
+
+        return Math.Round(cost * trnCii / acqCii, 0, MidpointRounding.AwayFromZero);
+    }
+
+    private static readonly IReadOnlyDictionary<Enums.CapitalGainAssetType, string> HoldingKeys =
+        new Dictionary<Enums.CapitalGainAssetType, string>
+        {
+            [Enums.CapitalGainAssetType.ListedEquity] = "listed_equity",
+            [Enums.CapitalGainAssetType.EquityMutualFund] = "equity_mf",
+            [Enums.CapitalGainAssetType.DebtMutualFund] = "debt_mf",
+            [Enums.CapitalGainAssetType.UnlistedShares] = "unlisted_shares",
+            [Enums.CapitalGainAssetType.ImmovableProperty] = "immovable_property",
+            [Enums.CapitalGainAssetType.AgriculturalLand] = "agricultural_land",
+            [Enums.CapitalGainAssetType.Bonds] = "bonds",
+            [Enums.CapitalGainAssetType.Gold] = "gold",
+            [Enums.CapitalGainAssetType.Jewellery] = "jewellery",
+        };
+
+    /// <summary>Holding-period threshold in months above which a gain is long-term, per asset class
+    /// (s.2(42A)). Falls back to the "other" key, then 24 months, when the asset isn't explicitly mapped.</summary>
+    public int HoldingThresholdMonths(Enums.CapitalGainAssetType assetType)
+    {
+        if (HoldingKeys.TryGetValue(assetType, out var key) && HoldingMonths.TryGetValue(key, out var m) && m > 0)
+        {
+            return m;
+        }
+
+        return HoldingMonths.TryGetValue("other", out var o) && o > 0 ? o : 24;
+    }
 }
 
 /// <summary>Presumptive-taxation rules (44AD/44ADA) used by ITR-4.</summary>

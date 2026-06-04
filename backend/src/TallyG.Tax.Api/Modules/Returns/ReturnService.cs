@@ -593,7 +593,11 @@ public sealed class ReturnService : IReturnService
             ExemptionAmount = request.ExemptionAmount,
             ReinvestmentAmount = request.ReinvestmentAmount,
             Isin = request.Isin?.Trim(),
-            FairMarketValue31Jan2018 = request.FairMarketValue31Jan2018
+            FairMarketValue31Jan2018 = request.FairMarketValue31Jan2018,
+            AcquisitionMode = request.AcquisitionMode,
+            PreviousOwnerAcquisitionDate = request.PreviousOwnerAcquisitionDate,
+            PreviousOwnerCost = request.PreviousOwnerCost,
+            IsRuralAgriculturalLand = request.IsRuralAgriculturalLand
         };
 
         ApplyCapitalGainDerived(entity);
@@ -624,6 +628,10 @@ public sealed class ReturnService : IReturnService
         entity.ReinvestmentAmount = request.ReinvestmentAmount;
         entity.Isin = request.Isin?.Trim();
         entity.FairMarketValue31Jan2018 = request.FairMarketValue31Jan2018;
+        entity.AcquisitionMode = request.AcquisitionMode;
+        entity.PreviousOwnerAcquisitionDate = request.PreviousOwnerAcquisitionDate;
+        entity.PreviousOwnerCost = request.PreviousOwnerCost;
+        entity.IsRuralAgriculturalLand = request.IsRuralAgriculturalLand;
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1381,8 +1389,22 @@ public sealed class ReturnService : IReturnService
     /// <summary>Capital gain = sale − (cost + improvement + transfer expenses) − exemption, floored at 0 only for exemption.</summary>
     private static void ApplyCapitalGainDerived(CapitalGain c)
     {
-        // Use indexed cost when supplied (engine may refine it); fall back to actual cost.
-        var costBase = c.IndexedCost > 0 ? c.IndexedCost : c.CostOfAcquisition;
+        // Rural agricultural land is not a capital asset (s.2(14)) — fully exempt, shown as a zero gain.
+        if (c.AssetType == CapitalGainAssetType.AgriculturalLand && c.IsRuralAgriculturalLand)
+        {
+            c.Gain = 0m;
+            return;
+        }
+
+        // s.49(1) cost step-in: gifted / inherited / will assets take the previous owner's cost.
+        var stepIn = c.AcquisitionMode is CapitalGainAcquisitionMode.Gift
+            or CapitalGainAcquisitionMode.Inheritance
+            or CapitalGainAcquisitionMode.Will;
+        var acquisitionCost = stepIn && c.PreviousOwnerCost > 0m ? c.PreviousOwnerCost : c.CostOfAcquisition;
+
+        // Use indexed cost when supplied (the engine auto-indexes land/building via CII at compute time);
+        // otherwise the (step-in) actual cost.
+        var costBase = c.IndexedCost > 0 ? c.IndexedCost : acquisitionCost;
 
         // s.112A grandfathering (s.55(2)(ac)): listed equity / equity MF acquired on/before 31-Jan-2018 uses
         // the higher of actual cost and (lower of the 31-Jan-2018 FMV and the sale value) — keeps the shown
@@ -1474,7 +1496,8 @@ public sealed class ReturnService : IReturnService
     private static CapitalGainDto ToCapitalGainDto(CapitalGain c) => new(
         c.Id, c.AssetType, c.Term, c.TaxSection, c.AcquisitionDate, c.TransferDate, c.SalePrice,
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
-        c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018);
+        c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
+        c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand);
 
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,

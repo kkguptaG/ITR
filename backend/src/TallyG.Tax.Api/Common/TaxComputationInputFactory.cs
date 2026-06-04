@@ -52,6 +52,20 @@ internal static class TaxComputationInputFactory
         // return's manual fields so the engine credits the relief (and the credit reconciles with TR1).
         var fsi = foreignSourceIncomes ?? Array.Empty<ForeignSourceIncome>();
         var hasFsi = fsi.Count > 0;
+
+        // Capital-gain rules (holding thresholds, CII, indexation cutoff) drive the DYNAMIC derivation of each
+        // gain's term + indexed cost. Parse defensively: a malformed rule-set fails loudly in the engine, so
+        // here we degrade to defaults rather than throwing earlier than the engine would.
+        CapitalGainRules cgRules;
+        try
+        {
+            cgRules = RuleSet.Parse(rulesJson).CapitalGains;
+        }
+        catch
+        {
+            cgRules = new CapitalGainRules();
+        }
+
         return new TaxComputationInput
         {
             AssessmentYearCode = ayCode,
@@ -63,13 +77,19 @@ internal static class TaxComputationInputFactory
                 s.Employer, s.Gross + s.ProfitsInLieu, s.Perquisites, s.ExemptAllowances, s.HraExemption, s.ProfessionalTax)).ToList(),
             HouseProperties = houses.Select(h => new HousePropertyInput(
                 h.Type, h.AnnualValue, h.MunicipalTaxPaid, h.InterestOnLoan)).ToList(),
-            CapitalGains = gains.Select(c => new CapitalGainInput(
-                c.AssetType, c.Term, c.TaxSection, c.SalePrice, c.CostOfAcquisition, c.CostOfImprovement,
-                c.ExpensesOnTransfer, c.ExemptionAmount, c.AcquisitionDate, c.TransferDate,
-                FairMarketValueOnGrandfatherDate: c.FairMarketValue31Jan2018 > 0m ? c.FairMarketValue31Jan2018 : null,
-                IndexedCost: c.IndexedCost > 0m ? c.IndexedCost : null,
-                ExemptionSection: c.ExemptionSection,
-                ReinvestmentAmount: c.ReinvestmentAmount))
+            CapitalGains = gains
+                .Select(c => (c, d: CapitalGainDerivation.Derive(
+                    c.AssetType, c.Term, c.AcquisitionMode, c.AcquisitionDate, c.TransferDate,
+                    c.PreviousOwnerAcquisitionDate, c.CostOfAcquisition, c.PreviousOwnerCost, c.IndexedCost,
+                    c.IsRuralAgriculturalLand, cgRules)))
+                .Where(x => !x.d.RuralExempt)   // rural agricultural land is exempt (s.2(14)) — excluded from the gain set
+                .Select(x => new CapitalGainInput(
+                    x.c.AssetType, x.d.Term, x.c.TaxSection, x.c.SalePrice, x.d.EffectiveCost, x.c.CostOfImprovement,
+                    x.c.ExpensesOnTransfer, x.c.ExemptionAmount, x.d.EffectiveAcquisitionDate, x.c.TransferDate,
+                    FairMarketValueOnGrandfatherDate: x.c.FairMarketValue31Jan2018 > 0m ? x.c.FairMarketValue31Jan2018 : null,
+                    IndexedCost: x.d.IndexedCost,
+                    ExemptionSection: x.c.ExemptionSection,
+                    ReinvestmentAmount: x.c.ReinvestmentAmount))
                 .Concat(deemedStcg > 0m
                     ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }
                     : Array.Empty<CapitalGainInput>())

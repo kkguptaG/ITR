@@ -11,5 +11,7 @@ public enum CapitalGainAssetType
     Bonds = 5,
     Gold = 6,
     CryptoVda = 7,
+    AgriculturalLand = 8,
+    Jewellery = 9,
     Other = 99
 }

@@ -200,7 +200,11 @@ public sealed record UpsertCapitalGainRequest(
     decimal ExemptionAmount,
     decimal ReinvestmentAmount,
     string? Isin,
-    decimal FairMarketValue31Jan2018 = 0m);
+    decimal FairMarketValue31Jan2018 = 0m,
+    CapitalGainAcquisitionMode AcquisitionMode = CapitalGainAcquisitionMode.Purchase,
+    DateOnly? PreviousOwnerAcquisitionDate = null,
+    decimal PreviousOwnerCost = 0m,
+    bool IsRuralAgriculturalLand = false);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -219,7 +223,11 @@ public sealed record CapitalGainDto(
     decimal ReinvestmentAmount,
     decimal Gain,
     string? Isin,
-    decimal FairMarketValue31Jan2018);
+    decimal FairMarketValue31Jan2018,
+    CapitalGainAcquisitionMode AcquisitionMode,
+    DateOnly? PreviousOwnerAcquisitionDate,
+    decimal PreviousOwnerCost,
+    bool IsRuralAgriculturalLand);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

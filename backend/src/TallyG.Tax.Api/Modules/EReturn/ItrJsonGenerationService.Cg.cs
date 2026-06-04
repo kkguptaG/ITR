@@ -161,7 +161,7 @@ public sealed partial class ItrJsonGenerationService
     private static void AddImmovablePropertySales(Dictionary<string, object?> skel, ItrFilingContext ctx)
     {
         static Dictionary<string, object?> D(object? o) => (Dictionary<string, object?>)o!;
-        var props = ctx.Gains.Where(g => g.AssetType == CapitalGainAssetType.ImmovableProperty).ToList();
+        var props = ctx.Gains.Where(g => g.AssetType is CapitalGainAssetType.ImmovableProperty or CapitalGainAssetType.AgriculturalLand).ToList();
         if (props.Count == 0)
         {
             return;

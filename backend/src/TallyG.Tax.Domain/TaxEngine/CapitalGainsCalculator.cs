@@ -86,14 +86,15 @@ public static class CapitalGainsCalculator
             CapitalGainAssetType.ListedEquity or CapitalGainAssetType.EquityMutualFund
                 => ComputeEquity(g, netProceeds, rules),
 
-            CapitalGainAssetType.ImmovableProperty
+            // Land/building, incl. urban agricultural land (rural is excluded upstream as exempt).
+            CapitalGainAssetType.ImmovableProperty or CapitalGainAssetType.AgriculturalLand
                 => ComputeProperty(g, netProceeds, rules),
 
             CapitalGainAssetType.CryptoVda
                 => ComputeCrypto(g, rules),
 
-            // Unlisted shares / gold / bonds / debt-MF long-term -> 112 @ without-indexation rate.
-            CapitalGainAssetType.UnlistedShares or CapitalGainAssetType.Gold or CapitalGainAssetType.Bonds
+            // Unlisted shares / gold / jewellery / bonds long-term -> 112 @ without-indexation rate.
+            CapitalGainAssetType.UnlistedShares or CapitalGainAssetType.Gold or CapitalGainAssetType.Jewellery or CapitalGainAssetType.Bonds
                 when g.Term == CapitalGainTerm.Long
                 => ComputeSection112(g, netProceeds, rules),
 
@@ -229,9 +230,17 @@ public static class CapitalGainsCalculator
         {
             case "54":
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+            case "54B":
+                // s.54B: capital gain on agricultural land reinvested in new agricultural land — agri land only.
+                if (g.AssetType != CapitalGainAssetType.AgriculturalLand)
+                {
+                    return 0m;
+                }
+
+                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
             case "54EC":
-                // s.54EC applies only to LTCG on land or building — ignore it for any other asset.
-                if (g.AssetType != CapitalGainAssetType.ImmovableProperty)
+                // s.54EC applies only to LTCG on land or building (incl. agricultural land) — ignore otherwise.
+                if (g.AssetType is not (CapitalGainAssetType.ImmovableProperty or CapitalGainAssetType.AgriculturalLand))
                 {
                     return 0m;
                 }

@@ -15,8 +15,23 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     /// <summary>e.g. "111A", "112A", "112", "115BBH".</summary>
     public string? TaxSection { get; set; }
 
+    /// <summary>How the asset was acquired. Gift / Inheritance / Will step in the previous owner's cost
+    /// (s.49(1)) and holding period (s.2(42A)) — see <see cref="PreviousOwnerCost"/> / <see cref="PreviousOwnerAcquisitionDate"/>.</summary>
+    public CapitalGainAcquisitionMode AcquisitionMode { get; set; } = CapitalGainAcquisitionMode.Purchase;
+
     public DateOnly? AcquisitionDate { get; set; }
     public DateOnly? TransferDate { get; set; }
+
+    /// <summary>For Gift / Inheritance / Will: the date the PREVIOUS owner acquired the asset — the holding
+    /// period (and indexation base year) counts from here (s.2(42A) / s.55). Null ⇒ use <see cref="AcquisitionDate"/>.</summary>
+    public DateOnly? PreviousOwnerAcquisitionDate { get; set; }
+
+    /// <summary>For Gift / Inheritance / Will: the cost to the previous owner (s.49(1)). 0 ⇒ use <see cref="CostOfAcquisition"/>.</summary>
+    public decimal PreviousOwnerCost { get; set; }
+
+    /// <summary>True when this is RURAL agricultural land — not a "capital asset" u/s 2(14), so the gain is
+    /// fully exempt and excluded from the computation. Urban agricultural land remains taxable (eligible for s.54B).</summary>
+    public bool IsRuralAgriculturalLand { get; set; }
 
     public decimal SalePrice { get; set; }
     public decimal CostOfAcquisition { get; set; }
