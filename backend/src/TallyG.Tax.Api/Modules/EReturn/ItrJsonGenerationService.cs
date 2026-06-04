@@ -2880,6 +2880,35 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
 
         OverlayItr3ScheduleBpDepreciation(skel, ctx);
         OverlayItr3FinancialStatements(skel, ctx.FinancialStatements);
+        OverlayItr3NoBooksBS(skel, ctx);
+    }
+
+    /// <summary>
+    /// Populate PARTA_BS.NoBooksOfAccBS (the no-account-case balance sheet) from the business
+    /// financial particulars, for an ITR-3 filer who keeps no formal books. Uses the same debtors /
+    /// creditors / stock / cash figures captured on the business income.
+    /// </summary>
+    private static void OverlayItr3NoBooksBS(Dictionary<string, object?> skel, ItrFilingContext ctx)
+    {
+        var debtors = ctx.Businesses.Sum(b => b.SundryDebtors);
+        var creditors = ctx.Businesses.Sum(b => b.SundryCreditors);
+        var stock = ctx.Businesses.Sum(b => b.Inventory);
+        var cash = ctx.Businesses.Sum(b => b.CashBalance);
+        if (debtors + creditors + stock + cash <= 0m)
+        {
+            return;
+        }
+
+        if (skel["PARTA_BS"] is Dictionary<string, object?> bs)
+        {
+            bs["NoBooksOfAccBS"] = new Dictionary<string, object?>
+            {
+                ["TotSundryDbtAmt"] = R(debtors),
+                ["TotSundryCrdAmt"] = R(creditors),
+                ["TotStkInTradAmt"] = R(stock),
+                ["CashBalAmt"] = R(cash),
+            };
+        }
     }
 
     // Schedule BP — book-vs-tax depreciation reconciliation worksheet (BusinessIncOthThanSpec). Chains book

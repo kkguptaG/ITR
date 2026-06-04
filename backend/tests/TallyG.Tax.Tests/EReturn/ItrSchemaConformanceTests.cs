@@ -89,6 +89,25 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr3_no_books_balance_sheet_populated_from_financial_particulars()
+    {
+        // A regular-books ITR-3 filer who keeps no formal books discloses the no-account-case
+        // balance sheet (PARTA_BS.NoBooksOfAccBS) from the business financial particulars.
+        var ctx = BuildContext(ItrType.ITR3, ayCode: "AY2025-26", withDepreciation: true, withFinancialParticulars: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR3, json);
+        result.Errors.Should().BeEmpty("ITR-3 with NoBooksOfAccBS must stay conformant. Violations:\n" + Format(result));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var nb = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("PARTA_BS").GetProperty("NoBooksOfAccBS");
+        nb.GetProperty("TotSundryDbtAmt").GetInt64().Should().Be(250_000);
+        nb.GetProperty("TotSundryCrdAmt").GetInt64().Should().Be(120_000);
+        nb.GetProperty("TotStkInTradAmt").GetInt64().Should().Be(400_000);
+        nb.GetProperty("CashBalAmt").GetInt64().Should().Be(90_000);
+    }
+
+    [Fact]
     public void Itr2_2025_json_conforms_to_official_schema()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26");
@@ -1440,7 +1459,14 @@ public class ItrSchemaConformanceTests
         var businesses = withDepreciation
             // Regular-books (non-presumptive) business so the Schedule BP book-vs-tax depreciation reconciliation
             // applies (presumptive income would subsume depreciation). Overrides presumptiveBusiness.
-            ? new[] { new BusinessIncome { IsPresumptive = false, NetProfit = 800_000m } }
+            ? new[] { new BusinessIncome
+                {
+                    IsPresumptive = false, NetProfit = 800_000m,
+                    SundryDebtors = withFinancialParticulars ? 250_000m : 0m,
+                    SundryCreditors = withFinancialParticulars ? 120_000m : 0m,
+                    Inventory = withFinancialParticulars ? 400_000m : 0m,
+                    CashBalance = withFinancialParticulars ? 90_000m : 0m,
+                } }
             : withGoodsCarriage
                 // s.44AE goods carriage with a per-vehicle list — exercises the GoodsDtlsUs44AE schedule.
                 ? new[] { new BusinessIncome
