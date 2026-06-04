@@ -96,12 +96,20 @@ export interface UpdateReturnBody {
   foreignIncomeDoublyTaxed?: number;
   foreignTaxPaid?: number;
   foreignDtaaApplies?: boolean;
-  /** s.139 filing section: 'Original' | 'Belated' | 'Revised'. */
+  /** s.139 filing section: 'Original' | 'Belated' | 'Revised' | 'Updated'. */
   filingSection?: string;
-  /** 15-digit acknowledgment number of the original return (revised only). */
+  /** 15-digit acknowledgment number of the original return (revised/updated). */
   originalAcknowledgmentNumber?: string | null;
-  /** Original return filing date, YYYY-MM-DD (revised only). */
+  /** Original return filing date, YYYY-MM-DD (revised/updated). */
   originalFilingDate?: string | null;
+  /** ITR-U reason for updating ('1'..'7' | 'OTH'). */
+  updatedReturnReason?: string;
+  /** ITR-U time tier 1-4 (≤12/24/36/48 months → 25/50/60/70% additional tax). */
+  updatedReturnTier?: number;
+  /** Whether the original return was previously filed for this AY. */
+  originalReturnPreviouslyFiled?: boolean;
+  /** Tax already paid with the original return. */
+  originalTaxPaid?: number;
 }
 export const updateReturn = (id: string, body: UpdateReturnBody) =>
   apiPatch<ReturnDetailDto>(`/returns/${id}`, body);

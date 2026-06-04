@@ -40,10 +40,15 @@ export const personalSchema = z
     hasCapitalGains: z.boolean().default(false),
     hasBusinessIncome: z.boolean().default(false),
     hasMultipleProperties: z.boolean().default(false),
-    // s.139 filing section + original-return details (revised only).
-    filingSection: z.enum(['Original', 'Belated', 'Revised']).default('Original'),
+    // s.139 filing section + original-return details (revised/updated).
+    filingSection: z.enum(['Original', 'Belated', 'Revised', 'Updated']).default('Original'),
     originalAcknowledgmentNumber: z.string().trim().optional().or(z.literal('')),
     originalFilingDate: z.string().trim().optional().or(z.literal('')),
+    // Updated return (ITR-U) fields.
+    updatedReturnReason: z.enum(['1', '2', '3', '4', '5', '6', '7', 'OTH']).default('2'),
+    updatedReturnTier: z.coerce.number().int().min(1).max(4).default(1),
+    originalReturnPreviouslyFiled: z.boolean().default(false),
+    originalTaxPaid: optionalMoney,
   })
   .refine(
     (v) => v.filingSection !== 'Revised' || /^[0-9]{15}$/.test(v.originalAcknowledgmentNumber ?? ''),
@@ -52,7 +57,12 @@ export const personalSchema = z
   .refine((v) => v.filingSection !== 'Revised' || !!v.originalFilingDate, {
     message: 'Enter the date the original return was filed.',
     path: ['originalFilingDate'],
-  });
+  })
+  // An updated return that revises a previously-filed return needs the 15-digit original ack.
+  .refine(
+    (v) => v.filingSection !== 'Updated' || !v.originalReturnPreviouslyFiled || /^[0-9]{15}$/.test(v.originalAcknowledgmentNumber ?? ''),
+    { message: 'A previously-filed original return needs its 15-digit acknowledgment number.', path: ['originalAcknowledgmentNumber'] },
+  );
 export type PersonalFormValues = z.infer<typeof personalSchema>;
 
 // ----------------------------------------------------------------- salary

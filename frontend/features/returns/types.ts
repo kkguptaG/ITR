@@ -84,12 +84,20 @@ export interface ReturnDetailDto {
   answersJson: string;
   filingMode: string;
   isRevised: boolean;
-  /** s.139 section: 'Original' | 'Belated' | 'Revised'. */
+  /** s.139 section: 'Original' | 'Belated' | 'Revised' | 'Updated'. */
   filingSection: string;
-  /** 15-digit acknowledgment number of the original return (revised only). */
+  /** 15-digit acknowledgment number of the original return (revised/updated). */
   originalAcknowledgmentNumber: string | null;
-  /** Original return filing date, YYYY-MM-DD (revised only). */
+  /** Original return filing date, YYYY-MM-DD (revised/updated). */
   originalFilingDate: string | null;
+  /** ITR-U reason for updating ('1'..'7' | 'OTH'). */
+  updatedReturnReason: string | null;
+  /** ITR-U time tier 1-4. */
+  updatedReturnTier: number;
+  /** Whether the original return was previously filed. */
+  originalReturnPreviouslyFiled: boolean;
+  /** Tax already paid with the original return. */
+  originalTaxPaid: number;
   acknowledgmentNumber: string | null;
   createdAt: IsoDateTime;
   submittedAt: IsoDateTime | null;

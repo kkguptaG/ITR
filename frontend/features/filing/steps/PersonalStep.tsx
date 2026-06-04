@@ -45,9 +45,13 @@ export function PersonalStep() {
       hasCapitalGains: false,
       hasBusinessIncome: false,
       hasMultipleProperties: false,
-      filingSection: (detail.filingSection as 'Original' | 'Belated' | 'Revised') ?? 'Original',
+      filingSection: (detail.filingSection as 'Original' | 'Belated' | 'Revised' | 'Updated') ?? 'Original',
       originalAcknowledgmentNumber: detail.originalAcknowledgmentNumber ?? '',
       originalFilingDate: detail.originalFilingDate ?? '',
+      updatedReturnReason: (detail.updatedReturnReason as '1' | '2' | '3' | '4' | '5' | '6' | '7' | 'OTH') ?? '2',
+      updatedReturnTier: detail.updatedReturnTier || 1,
+      originalReturnPreviouslyFiled: detail.originalReturnPreviouslyFiled ?? false,
+      originalTaxPaid: detail.originalTaxPaid ?? 0,
     },
   });
 
@@ -84,9 +88,18 @@ export function PersonalStep() {
         answersJson: JSON.stringify({ ...safeParse(detail.answersJson), ...answers }),
         filingSection: values.filingSection,
         originalAcknowledgmentNumber:
-          values.filingSection === 'Revised' ? values.originalAcknowledgmentNumber || null : null,
+          values.filingSection === 'Revised' || values.filingSection === 'Updated'
+            ? values.originalAcknowledgmentNumber || null
+            : null,
         originalFilingDate:
-          values.filingSection === 'Revised' ? values.originalFilingDate || null : null,
+          values.filingSection === 'Revised' || values.filingSection === 'Updated'
+            ? values.originalFilingDate || null
+            : null,
+        updatedReturnReason: values.filingSection === 'Updated' ? values.updatedReturnReason : undefined,
+        updatedReturnTier: values.filingSection === 'Updated' ? values.updatedReturnTier : undefined,
+        originalReturnPreviouslyFiled:
+          values.filingSection === 'Updated' ? values.originalReturnPreviouslyFiled : undefined,
+        originalTaxPaid: values.filingSection === 'Updated' ? values.originalTaxPaid : undefined,
       });
     },
     onMutate: () => setSaveState('saving'),
@@ -138,6 +151,7 @@ export function PersonalStep() {
               <option value="Original">{t('filingOriginal')}</option>
               <option value="Belated">{t('filingBelated')}</option>
               <option value="Revised">{t('filingRevised')}</option>
+              {(itrType === 'ITR2' || itrType === 'ITR3') && <option value="Updated">{t('filingUpdated')}</option>}
             </Select>
           </Field>
         </div>
@@ -157,6 +171,52 @@ export function PersonalStep() {
             <Field label={t('originalDate')} error={errors.originalFilingDate?.message} required>
               <Input type="date" {...register('originalFilingDate')} disabled={locked} />
             </Field>
+          </div>
+        )}
+
+        {/* Updated return (ITR-U, s.139(8A)) — reason, time period, and the original return details. */}
+        {filingSection === 'Updated' && (
+          <div className="space-y-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4">
+            <p className="text-sm text-brand-800">{t('updatedReturnHint')}</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t('updatedReason')}>
+                <Select {...register('updatedReturnReason')} disabled={locked}>
+                  <option value="1">{t('updReason1')}</option>
+                  <option value="2">{t('updReason2')}</option>
+                  <option value="3">{t('updReason3')}</option>
+                  <option value="4">{t('updReason4')}</option>
+                  <option value="5">{t('updReason5')}</option>
+                  <option value="6">{t('updReason6')}</option>
+                  <option value="7">{t('updReason7')}</option>
+                  <option value="OTH">{t('updReasonOth')}</option>
+                </Select>
+              </Field>
+              <Field label={t('updatedPeriod')} hint={t('updatedPeriodHint')}>
+                <Select {...register('updatedReturnTier')} disabled={locked}>
+                  <option value="1">{t('updTier1')}</option>
+                  <option value="2">{t('updTier2')}</option>
+                  <option value="3">{t('updTier3')}</option>
+                  <option value="4">{t('updTier4')}</option>
+                </Select>
+              </Field>
+              <Field label={t('updatedOriginalTax')} hint={t('updatedOriginalTaxHint')}>
+                <Input type="number" min="0" {...register('originalTaxPaid', { valueAsNumber: true })} disabled={locked} />
+              </Field>
+              <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-ink-700">
+                <input type="checkbox" {...register('originalReturnPreviouslyFiled')} disabled={locked} />
+                {t('updatedPreviouslyFiled')}
+              </label>
+            </div>
+            {watch('originalReturnPreviouslyFiled') && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t('originalAck')} error={errors.originalAcknowledgmentNumber?.message} required>
+                  <Input {...register('originalAcknowledgmentNumber')} placeholder="15-digit acknowledgment no." inputMode="numeric" maxLength={15} disabled={locked} />
+                </Field>
+                <Field label={t('originalDate')}>
+                  <Input type="date" {...register('originalFilingDate')} disabled={locked} />
+                </Field>
+              </div>
+            )}
           </div>
         )}
 
