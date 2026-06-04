@@ -453,6 +453,17 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- s.54EC capital-gains-bond exemption cap (₹50 lakh per financial year) ---
+        var ec54 = ctx.Gains
+            .Where(g => (g.ExemptionSection ?? string.Empty).Replace(" ", "").Contains("54EC", StringComparison.OrdinalIgnoreCase))
+            .Sum(g => g.ExemptionAmount);
+        if (ec54 > 5_000_000m)
+        {
+            Err("CG.54EC_OVER_CAP", "$..ScheduleCG",
+                $"s.54EC bond-reinvestment exemption claimed (₹{ec54:N0}) exceeds the ₹50,00,000 per-financial-year cap.",
+                "Investment in NHAI/REC/PFC/IRFC capital-gains bonds is capped at ₹50 lakh per FY (across all transfers). Trim the 54EC exemption to ₹50,00,000.");
+        }
+
         // --- Form 10BA reminder for s.80GG (rent paid deduction) ---
         // 80GG requires the assessee to file Form 10BA (a declaration that no HRA is received and the
         // assessee / spouse / minor child doesn't own a residential property) separately on the portal

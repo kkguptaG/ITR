@@ -215,6 +215,25 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Section_54EC_exemption_over_50_lakh_errors()
+    {
+        var over = new[] { new CapitalGain { ExemptionSection = "54EC", ExemptionAmount = 6_000_000m } };
+        Has(Svc.Validate(Ctx(gains: over), StubJson), "CG.54EC_OVER_CAP").Should().BeTrue();
+
+        // Two transfers totalling over ₹50L (the cap is across all transfers in the FY).
+        var split = new[]
+        {
+            new CapitalGain { ExemptionSection = "54EC", ExemptionAmount = 3_000_000m },
+            new CapitalGain { ExemptionSection = "54 EC", ExemptionAmount = 2_500_000m },
+        };
+        Has(Svc.Validate(Ctx(gains: split), StubJson), "CG.54EC_OVER_CAP").Should().BeTrue();
+
+        // Within the cap → no error.
+        var ok = new[] { new CapitalGain { ExemptionSection = "54EC", ExemptionAmount = 5_000_000m } };
+        Has(Svc.Validate(Ctx(gains: ok), StubJson), "CG.54EC_OVER_CAP").Should().BeFalse();
+    }
+
+    [Fact]
     public void Vda_with_improvement_or_transfer_expenses_warns_they_are_disallowed()
     {
         var gains = new[] { Vda(salePrice: 500_000m, cost: 200_000m, expenses: 5_000m) };
