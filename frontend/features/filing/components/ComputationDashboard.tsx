@@ -13,13 +13,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Calculator, Scale, Plus, Landmark } from 'lucide-react';
+import { ChevronRight, Calculator, Scale, Plus, Landmark, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Spinner, Badge, Button } from '@/components/ui';
 import { formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ItrType } from '@/lib/api-types';
 import { listBankAccounts, bankAccountKeys } from '@/features/bank-accounts';
-import { computeTax, filingKeys } from '../api';
+import { computeTax, validateReturn, filingKeys } from '../api';
 import { incomeHeads } from '../steps';
 import type { Regime, TaxComputationResultDto } from '../types';
 
@@ -75,7 +75,22 @@ export function ComputationDashboard({
     bankAccountsQuery.isSuccess &&
     !(bankAccountsQuery.data ?? []).some((a) => a.useForRefund);
 
+  // Pre-filing validation — the same ITD defect checks the Summary/File steps run
+  // (shared query key), surfaced on the hub so filing-readiness shows at a glance.
+  const validateQuery = useQuery({
+    queryKey: [...filingKeys.compute(returnId), 'validate'],
+    queryFn: () => validateReturn(returnId),
+    retry: false,
+    staleTime: 10_000,
+  });
+  const findings = validateQuery.data?.findings ?? [];
+  const blockerCount = findings.filter((f) => f.severity === 'block').length;
+  // Non-blocking findings (warn + info) are grouped as "worth a look", matching
+  // how the Summary step buckets them, so the hub and the step always agree.
+  const warningCount = findings.filter((f) => f.severity !== 'block').length;
+
   const incomeHref = (focus: string) => `/returns/${returnId}/file/income?focus=${focus}`;
+  const reviewHref = `/returns/${returnId}/file/summary`;
 
   // Build the computation rows from the chosen-regime result (zeros when not yet computed).
   const v = (n: number | undefined) => n ?? 0;
@@ -160,6 +175,40 @@ export function ComputationDashboard({
           </div>
         ) : (
           <>
+            {/* Filing-readiness at a glance — surfaces the ITD defect checks on the
+                hub and routes to the Summary step where each finding is detailed. */}
+            {validateQuery.isSuccess && (
+              <button
+                type="button"
+                onClick={() => router.push(reviewHref)}
+                className={cn(
+                  'mb-3 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors',
+                  blockerCount > 0
+                    ? 'border-red-200 bg-red-50 text-red-900 hover:bg-red-100'
+                    : warningCount > 0
+                      ? 'border-payable-200 bg-payable-50 text-payable-800 hover:bg-payable-100'
+                      : 'border-money-200 bg-money-50 text-money-800 hover:bg-money-100',
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  {blockerCount > 0 ? (
+                    <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  ) : warningCount > 0 ? (
+                    <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="font-medium">
+                    {blockerCount > 0
+                      ? `${blockerCount} ${blockerCount === 1 ? 'issue' : 'issues'} to fix before you can file`
+                      : warningCount > 0
+                        ? `${warningCount} ${warningCount === 1 ? 'thing' : 'things'} worth reviewing before filing`
+                        : 'No issues found — ready to review and file'}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 opacity-60" aria-hidden="true" />
+              </button>
+            )}
             <ul className="divide-y divide-ink-100">
               {rows.map((row) => {
                 const clickable = !!row.href || !!row.scrollTo;
