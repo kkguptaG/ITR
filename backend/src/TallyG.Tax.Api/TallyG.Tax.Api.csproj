@@ -35,6 +35,9 @@
     <EmbeddedResource Include="Modules\EReturn\Schemas\ITR-3_2025.json" LogicalName="ITR-3_2025.json" />
     <!-- RBI IFSC master (gzipped, IFSC-sorted TSV) for IFSC -> bank/branch lookup + auto-fill. -->
     <EmbeddedResource Include="Modules\BankAccounts\Data\ifsc.tsv.gz" LogicalName="ifsc.tsv.gz" />
+    <!-- Securities reference: ISIN master (ISIN -> name/type) + NSE 31-Jan-2018 highs (s.112A grandfathered FMV). -->
+    <EmbeddedResource Include="Modules\Reference\Data\isin.tsv.gz" LogicalName="isin.tsv.gz" />
+    <EmbeddedResource Include="Modules\Reference\Data\share-fmv-31jan2018.tsv.gz" LogicalName="share-fmv-31jan2018.tsv.gz" />
   </ItemGroup>
 
   <ItemGroup>
