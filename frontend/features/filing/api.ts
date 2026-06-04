@@ -96,6 +96,12 @@ export interface UpdateReturnBody {
   foreignIncomeDoublyTaxed?: number;
   foreignTaxPaid?: number;
   foreignDtaaApplies?: boolean;
+  /** s.139 filing section: 'Original' | 'Belated' | 'Revised'. */
+  filingSection?: string;
+  /** 15-digit acknowledgment number of the original return (revised only). */
+  originalAcknowledgmentNumber?: string | null;
+  /** Original return filing date, YYYY-MM-DD (revised only). */
+  originalFilingDate?: string | null;
 }
 export const updateReturn = (id: string, body: UpdateReturnBody) =>
   apiPatch<ReturnDetailDto>(`/returns/${id}`, body);

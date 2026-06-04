@@ -84,6 +84,12 @@ export interface ReturnDetailDto {
   answersJson: string;
   filingMode: string;
   isRevised: boolean;
+  /** s.139 section: 'Original' | 'Belated' | 'Revised'. */
+  filingSection: string;
+  /** 15-digit acknowledgment number of the original return (revised only). */
+  originalAcknowledgmentNumber: string | null;
+  /** Original return filing date, YYYY-MM-DD (revised only). */
+  originalFilingDate: string | null;
   acknowledgmentNumber: string | null;
   createdAt: IsoDateTime;
   submittedAt: IsoDateTime | null;

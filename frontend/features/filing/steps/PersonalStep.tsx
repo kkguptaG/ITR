@@ -45,10 +45,14 @@ export function PersonalStep() {
       hasCapitalGains: false,
       hasBusinessIncome: false,
       hasMultipleProperties: false,
+      filingSection: (detail.filingSection as 'Original' | 'Belated' | 'Revised') ?? 'Original',
+      originalAcknowledgmentNumber: detail.originalAcknowledgmentNumber ?? '',
+      originalFilingDate: detail.originalFilingDate ?? '',
     },
   });
 
   const itrType = watch('itrType');
+  const filingSection = watch('filingSection');
   const hasCapitalGains = watch('hasCapitalGains');
   const hasBusinessIncome = watch('hasBusinessIncome');
   const hasMultipleProperties = watch('hasMultipleProperties');
@@ -78,6 +82,11 @@ export function PersonalStep() {
       return updateReturn(returnId, {
         itrType: values.itrType,
         answersJson: JSON.stringify({ ...safeParse(detail.answersJson), ...answers }),
+        filingSection: values.filingSection,
+        originalAcknowledgmentNumber:
+          values.filingSection === 'Revised' ? values.originalAcknowledgmentNumber || null : null,
+        originalFilingDate:
+          values.filingSection === 'Revised' ? values.originalFilingDate || null : null,
       });
     },
     onMutate: () => setSaveState('saving'),
@@ -124,7 +133,32 @@ export function PersonalStep() {
               <option value="ITR4">ITR-4 (Sugam)</option>
             </Select>
           </Field>
+          <Field label={t('filingSection')} hint={t('filingSectionHint')}>
+            <Select {...register('filingSection')} disabled={locked}>
+              <option value="Original">{t('filingOriginal')}</option>
+              <option value="Belated">{t('filingBelated')}</option>
+              <option value="Revised">{t('filingRevised')}</option>
+            </Select>
+          </Field>
         </div>
+
+        {/* Revised return → the original return's acknowledgment + filing date are mandatory. */}
+        {filingSection === 'Revised' && (
+          <div className="grid gap-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 sm:grid-cols-2">
+            <Field label={t('originalAck')} error={errors.originalAcknowledgmentNumber?.message} required>
+              <Input
+                {...register('originalAcknowledgmentNumber')}
+                placeholder="15-digit acknowledgment no."
+                inputMode="numeric"
+                maxLength={15}
+                disabled={locked}
+              />
+            </Field>
+            <Field label={t('originalDate')} error={errors.originalFilingDate?.message} required>
+              <Input type="date" {...register('originalFilingDate')} disabled={locked} />
+            </Field>
+          </div>
+        )}
 
         {/* Plain-language questionnaire that drives the selector */}
         <fieldset className="space-y-2 rounded-xl border border-ink-200 p-4">

@@ -27,19 +27,32 @@ const optionalSignedMoney = z
 const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
 // ----------------------------------------------------------------- personal
-export const personalSchema = z.object({
-  pan: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .optional()
-    .refine((v) => !v || PAN.test(v), 'Enter a valid 10-character PAN (e.g. ABCDE1234F).'),
-  itrType: z.enum(['ITR1', 'ITR2', 'ITR3', 'ITR4']),
-  // We collect a couple of questionnaire flags that feed the auto-selector.
-  hasCapitalGains: z.boolean().default(false),
-  hasBusinessIncome: z.boolean().default(false),
-  hasMultipleProperties: z.boolean().default(false),
-});
+export const personalSchema = z
+  .object({
+    pan: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .optional()
+      .refine((v) => !v || PAN.test(v), 'Enter a valid 10-character PAN (e.g. ABCDE1234F).'),
+    itrType: z.enum(['ITR1', 'ITR2', 'ITR3', 'ITR4']),
+    // We collect a couple of questionnaire flags that feed the auto-selector.
+    hasCapitalGains: z.boolean().default(false),
+    hasBusinessIncome: z.boolean().default(false),
+    hasMultipleProperties: z.boolean().default(false),
+    // s.139 filing section + original-return details (revised only).
+    filingSection: z.enum(['Original', 'Belated', 'Revised']).default('Original'),
+    originalAcknowledgmentNumber: z.string().trim().optional().or(z.literal('')),
+    originalFilingDate: z.string().trim().optional().or(z.literal('')),
+  })
+  .refine(
+    (v) => v.filingSection !== 'Revised' || /^[0-9]{15}$/.test(v.originalAcknowledgmentNumber ?? ''),
+    { message: 'A revised return needs the 15-digit acknowledgment number of the original return.', path: ['originalAcknowledgmentNumber'] },
+  )
+  .refine((v) => v.filingSection !== 'Revised' || !!v.originalFilingDate, {
+    message: 'Enter the date the original return was filed.',
+    path: ['originalFilingDate'],
+  });
 export type PersonalFormValues = z.infer<typeof personalSchema>;
 
 // ----------------------------------------------------------------- salary
