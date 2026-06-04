@@ -138,6 +138,7 @@ export function ComputationDashboard({
     ...(v(c?.surcharge) > 0 ? [{ key: 'sur', label: 'Add: Surcharge', amount: v(c?.surcharge), kind: 'tax' as const, indent: true }] : []),
     { key: 'cess', label: 'Add: Health & Education Cess', amount: v(c?.cess), kind: 'tax' as const, indent: true },
     ...(v(c?.alternativeMinimumTax) > 0 ? [{ key: 'amt', label: 'Alternate Minimum Tax (s.115JC)', amount: v(c?.alternativeMinimumTax), kind: 'tax' as const, indent: true }] : []),
+    ...(v(c?.amtCreditSetOff) > 0 ? [{ key: 'amtjd', label: 'Less: AMT credit set-off (s.115JD)', amount: v(c?.amtCreditSetOff), kind: 'tax' as const, indent: true }] : []),
     ...(v(c?.relief89) > 0 ? [{ key: 'rel89', label: 'Less: Relief u/s 89 (arrears)', amount: v(c?.relief89), kind: 'tax' as const, indent: true }] : []),
     ...(v(c?.relief90And91) > 0 ? [{ key: 'rel90', label: 'Less: Relief u/s 90/91 (foreign tax)', amount: v(c?.relief90And91), kind: 'tax' as const, indent: true }] : []),
     { key: 'totaltax', label: 'Total Tax Liability', amount: v(c?.totalTax), kind: 'subtotal' as const },
@@ -160,6 +161,7 @@ export function ComputationDashboard({
     { key: 'cf-stcl', label: 'Short-term capital loss carried forward (s.74)', amount: v(c?.shortTermCapitalLossCarriedForward), kind: 'minor' as const },
     { key: 'cf-ltcl', label: 'Long-term capital loss carried forward (s.74)', amount: v(c?.longTermCapitalLossCarriedForward), kind: 'minor' as const },
     { key: 'cf-ud', label: 'Unabsorbed depreciation carried forward (s.32(2))', amount: v(c?.unabsorbedDepreciationCarriedForward), kind: 'minor' as const },
+    { key: 'cf-amt', label: 'AMT credit carried forward (s.115JD)', amount: v(c?.amtCreditGenerated), kind: 'minor' as const },
   ].filter((r) => r.amount > 0);
 
   const refundOrPayable = v(c?.refundOrPayable);
