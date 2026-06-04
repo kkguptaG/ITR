@@ -68,6 +68,16 @@ export function ReconciliationCard({ returnId }: { returnId: string }) {
             <Alert variant={query.data.mismatchCount === 0 ? 'success' : 'warning'}>
               {query.data.notice}
             </Alert>
+            {query.data.underReportedAmount > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-payable-50 px-4 py-3">
+                <span className="text-sm font-medium text-payable-800">
+                  Income the department knows about, missing from your return
+                </span>
+                <span className="text-lg font-semibold tabular-nums text-payable-700">
+                  {formatInr(query.data.underReportedAmount)}
+                </span>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

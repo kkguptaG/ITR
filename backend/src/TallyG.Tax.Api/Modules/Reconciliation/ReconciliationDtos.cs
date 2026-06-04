@@ -22,4 +22,6 @@ public sealed record ReconciliationReportDto(
     IReadOnlyList<ReconLineDto> Lines,
     int MismatchCount,
     int UnderReportedCount,
-    string Notice);
+    string Notice,
+    /// <summary>Total income (₹) the department reports but the return omits — the §143(1) exposure (credits excluded).</summary>
+    decimal UnderReportedAmount = 0m);

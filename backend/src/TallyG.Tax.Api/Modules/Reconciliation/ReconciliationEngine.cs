@@ -101,11 +101,21 @@ public static class ReconciliationEngine
 
         var under = lines.Count(l => l.Status == "under_reported");
         var mismatches = lines.Count(l => l.Status != "matched");
+
+        // The §143(1) income exposure: the rupee total the department knows about but the return omits,
+        // counting only INCOME heads (credit lines like TDS/TCS under-claim a credit, not under-report income).
+        var creditCategories = new[] { "tds", "tcs", "advance_tax", "self_assessment_tax" };
+        var underReportedAmount = lines
+            .Where(l => l.Status == "under_reported" && !creditCategories.Contains(l.Category))
+            .Sum(l => l.InSource - l.InReturn);
+
         var notice = mismatches == 0
             ? "Your return matches the department's AIS / 26AS within rounding. Good to file."
-            : $"{mismatches} line(s) differ from AIS/26AS ({under} under-reported). Review before filing — under-reported income is the leading cause of a §143(1) intimation.";
+            : underReportedAmount > 0m
+                ? $"{mismatches} line(s) differ from AIS/26AS. About ₹{underReportedAmount:N0} of income the department knows about isn't in your return — review before filing, as under-reported income is the leading cause of a §143(1) intimation."
+                : $"{mismatches} line(s) differ from AIS/26AS ({under} under-reported). Review before filing.";
 
-        return new ReconciliationReportDto(true, lines, mismatches, under, notice);
+        return new ReconciliationReportDto(true, lines, mismatches, under, notice, underReportedAmount);
     }
 
     private static (string Status, string Note) Classify(decimal inReturn, decimal inSource, bool claimVsAvailable = false, string creditLabel = "TDS")

@@ -18,4 +18,6 @@ export interface ReconciliationReportDto {
   mismatchCount: number;
   underReportedCount: number;
   notice: string;
+  /** Total income (₹) the department reports but the return omits — the §143(1) exposure. */
+  underReportedAmount: number;
 }

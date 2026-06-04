@@ -110,6 +110,18 @@ public class ReconciliationEngineTests
     }
 
     [Fact]
+    public void Under_reported_amount_sums_income_heads_but_excludes_credit_lines()
+    {
+        // Income under-reported by ₹32k (dividend ₹40k vs ₹8k); a TDS credit under-claim (₹10k available,
+        // ₹0 claimed) is NOT income under-reporting, so it must not inflate the §143(1) exposure.
+        var ais = new Dictionary<string, decimal> { ["ais.dividend_income"] = 40_000m };
+        var as26 = new Dictionary<string, decimal> { ["form26as.tds_interest"] = 10_000m };
+        var r = ReconciliationEngine.BuildReport(Inputs(dividend: 8_000m, tds: 0m), ais, as26);
+
+        r.UnderReportedAmount.Should().Be(32_000m, "only the dividend income gap counts, not the TDS credit");
+    }
+
+    [Fact]
     public void Multiple_mismatches_counted_correctly()
     {
         var ais = new Dictionary<string, decimal>
