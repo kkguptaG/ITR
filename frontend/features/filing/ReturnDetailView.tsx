@@ -87,6 +87,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
               {formatAssessmentYear(detail.assessmentYear)}
             </h1>
             {detail.itrType && <Badge tone="brand">{formatItrType(detail.itrType)}</Badge>}
+            {detail.filingSection && detail.filingSection !== 'Original' && (
+              <Badge tone="warning">{filingSectionLabel(detail.filingSection)}</Badge>
+            )}
           </div>
           <StatusBadge status={detail.status}>{ts(detail.status)}</StatusBadge>
         </div>
@@ -219,4 +222,18 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
 
 function num(v: string | number): number {
   return typeof v === 'number' ? v : Number(v) || 0;
+}
+
+/** Short badge label for a non-original s.139 filing section. */
+function filingSectionLabel(section: string): string {
+  switch (section) {
+    case 'Belated':
+      return 'Belated · 139(4)';
+    case 'Revised':
+      return 'Revised · 139(5)';
+    case 'Updated':
+      return 'Updated · ITR-U';
+    default:
+      return section;
+  }
 }
