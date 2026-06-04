@@ -68,6 +68,33 @@ public sealed class ReconciliationServiceTests
         report.UnderReportedCount.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Detects_immovable_property_and_gst_turnover_under_reporting_from_db()
+    {
+        await using var db = NewContext();
+        var ret = NewReturn();
+        db.TaxReturns.Add(ret);
+
+        // Return declares: a ₹30L immovable-property sale + ₹20L business turnover.
+        db.CapitalGains.Add(new CapitalGain { TenantId = TenantId, TaxReturnId = ret.Id, AssetType = CapitalGainAssetType.ImmovableProperty, SalePrice = 3_000_000m });
+        db.BusinessIncomes.Add(new BusinessIncome { TenantId = TenantId, TaxReturnId = ret.Id, IsPresumptive = true, PresumptiveSection = "44AD", Turnover = 2_000_000m });
+
+        // AIS reports a ₹50L property sale (SFT-012); GST portal reports ₹40L turnover — both higher.
+        AddExtraction(db, ret.Id, DocumentKind.AIS,
+            "{\"ais.sft_sale_of_immovable_property\":{\"value\":\"5000000\",\"confidence\":0.95,\"source\":\"ocr\"}}");
+        AddExtraction(db, ret.Id, DocumentKind.GstData,
+            "{\"gst.turnover_total\":{\"value\":\"4000000\",\"confidence\":0.95,\"source\":\"ocr\"}}");
+        await db.SaveChangesAsync();
+
+        var report = await new ReconciliationService(db, new FakeCurrentUser()).ReconcileAsync(ret.Id);
+
+        report.HasSources.Should().BeTrue();
+        Line(report, "Immovable property sale (sale value)").Status.Should().Be("under_reported");   // 30L vs 50L
+        Line(report, "Business turnover (GST)").Status.Should().Be("under_reported");                 // 20L vs 40L
+        // §143(1) exposure = (50L−30L) + (40L−20L) = ₹40L.
+        report.UnderReportedAmount.Should().Be(4_000_000m);
+    }
+
     private static ReconLineDto Line(ReconciliationReportDto r, string label) => r.Lines.Single(l => l.Label == label);
 
     private static void AddExtraction(AppDbContext db, Guid returnId, DocumentKind kind, string fieldsJson)
