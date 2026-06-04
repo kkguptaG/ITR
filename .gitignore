@@ -33,3 +33,6 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+srv.out.log
+srv.err.log
+srv.pid
