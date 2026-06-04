@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, Plus, Pencil, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, Calculator, Upload } from 'lucide-react';
 import { Button, Spinner, Alert } from '@/components/ui';
 import { formatInr } from '@/lib/format';
 import {
@@ -29,6 +29,7 @@ import { CapitalGainForm } from '@/features/filing/components/income-forms';
 import { CgSummaryDashboard } from '@/features/capital-gains/CgSummaryDashboard';
 import { CG_CATEGORIES, categoryOfRow, type CgCategoryKey } from '@/features/capital-gains/categories';
 import { GuidedAssistant } from '@/features/capital-gains/GuidedAssistant';
+import { CgImportPanel } from '@/features/capital-gains/CgImportPanel';
 
 function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
   return {
@@ -77,6 +78,7 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
   const [busy, setBusy] = useState(false);
   const [catFilter, setCatFilter] = useState<'all' | CgCategoryKey>('all');
   const [search, setSearch] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const detailQ = useQuery({ queryKey: filingKeys.detail(returnId), queryFn: () => getReturn(returnId) });
   const gainsQ = useQuery({ queryKey: filingKeys.gains(returnId), queryFn: () => listCapitalGains(returnId) });
@@ -153,7 +155,18 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
           <h1 className="mt-1 text-xl font-bold text-ink-900">{t('title')}</h1>
           <p className="text-sm text-ink-500">{t('subtitle')}</p>
         </div>
-        {/* Beginner / Pro toggle */}
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setImporting((v) => !v);
+            setEditing(null);
+          }}
+        >
+          <Upload className="h-4 w-4" aria-hidden="true" /> {t('importCta')}
+        </Button>
         <div className="inline-flex rounded-xl border border-ink-200 bg-white p-0.5 text-xs font-medium shadow-sm">
           {(['beginner', 'pro'] as const).map((m) => (
             <button
@@ -170,7 +183,12 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
             </button>
           ))}
         </div>
+        </div>
       </div>
+
+      {importing ? (
+        <CgImportPanel returnId={returnId} onClose={() => setImporting(false)} onImported={invalidate} />
+      ) : null}
 
       {editing ? (
         <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">

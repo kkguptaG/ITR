@@ -17,6 +17,8 @@ import type {
   AssignmentDto,
   BusinessIncomeDto,
   CapitalGainDto,
+  CapitalGainImportRequest,
+  CapitalGainImportResult,
   CompleteUploadRequest,
   ComputeRequest,
   ComputeResponse,
@@ -144,6 +146,8 @@ export const updateCapitalGain = (id: string, gainId: string, body: UpsertCapita
   apiPatch<CapitalGainDto>(`/returns/${id}/capital-gains/${gainId}`, body);
 export const deleteCapitalGain = (id: string, gainId: string) =>
   api.delete(`/returns/${id}/capital-gains/${gainId}`).then(() => undefined);
+export const importCapitalGains = (id: string, body: CapitalGainImportRequest) =>
+  apiPost<CapitalGainImportResult>(`/returns/${id}/capital-gains/import`, body);
 
 // --------------------------------------------------------------- business income
 export const listBusinessIncomes = (id: string) =>

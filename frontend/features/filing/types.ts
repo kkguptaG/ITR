@@ -205,6 +205,36 @@ export interface UpsertCapitalGainRequest {
   coOwnerPercent?: number;
 }
 
+// --- Bulk import (P4) ---
+export interface CapitalGainImportRequest {
+  profileId: string;
+  csv: string;
+  commit?: boolean;
+}
+export interface ImportedCgRow {
+  row: number;
+  assetType: CapitalGainAssetType;
+  term: CapitalGainTerm;
+  acquisitionDate: string | null;
+  transferDate: string | null;
+  salePrice: number;
+  costOfAcquisition: number;
+  expensesOnTransfer: number;
+  isin: string | null;
+  duplicate: boolean;
+  errors: string[];
+  ok: boolean;
+}
+export interface CapitalGainImportResult {
+  profileId: string;
+  totalRows: number;
+  validRows: number;
+  duplicateRows: number;
+  errorRows: number;
+  importedRows: number;
+  rows: ImportedCgRow[];
+}
+
 export interface BusinessFinancialParticulars {
   partnerCapital: number;
   securedLoans: number;
