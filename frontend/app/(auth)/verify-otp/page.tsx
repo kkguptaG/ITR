@@ -27,6 +27,7 @@ import type {
 } from '@/lib/api-types';
 import { AuthHeading } from '@/features/auth/AuthHeading';
 import { AuthFormFallback } from '@/features/auth/AuthFormFallback';
+import { getProfile } from '@/features/profile/api';
 import {
   clearOtpHandoff,
   getOtpHandoff,
@@ -103,7 +104,20 @@ function VerifyOtpForm() {
         // Store tokens + user, then leave the auth area.
         login(res.accessToken, res.refreshToken, res.user);
         clearOtpHandoff();
-        router.replace(next ?? '/dashboard');
+
+        // First-time users (no KYC on file) go through onboarding; everyone else
+        // to their requested page (or the dashboard). A profile-fetch failure must
+        // never block sign-in — fall back to the dashboard.
+        let dest = next ?? '/dashboard';
+        if (!next) {
+          try {
+            const profile = await getProfile();
+            if (!profile.isComplete) dest = '/onboarding';
+          } catch {
+            /* ignore — proceed to the dashboard */
+          }
+        }
+        router.replace(dest);
       } catch (err) {
         const message =
           err instanceof ApiError
