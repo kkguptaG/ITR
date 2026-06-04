@@ -100,11 +100,17 @@ public class ItrSchemaConformanceTests
         result.Errors.Should().BeEmpty("ITR-3 with NoBooksOfAccBS must stay conformant. Violations:\n" + Format(result));
 
         using var doc = System.Text.Json.JsonDocument.Parse(json);
-        var nb = doc.RootElement.GetProperty("ITR").GetProperty("ITR3").GetProperty("PARTA_BS").GetProperty("NoBooksOfAccBS");
+        var itr3 = doc.RootElement.GetProperty("ITR").GetProperty("ITR3");
+        var nb = itr3.GetProperty("PARTA_BS").GetProperty("NoBooksOfAccBS");
         nb.GetProperty("TotSundryDbtAmt").GetInt64().Should().Be(250_000);
         nb.GetProperty("TotSundryCrdAmt").GetInt64().Should().Be(120_000);
         nb.GetProperty("TotStkInTradAmt").GetInt64().Should().Be(400_000);
         nb.GetProperty("CashBalAmt").GetInt64().Should().Be(90_000);
+
+        // The no-books P&L net profit must match the taxed business income (regular-books NetProfit = ₹8L).
+        var pl = itr3.GetProperty("PARTA_PL").GetProperty("NoBooksOfAccPL");
+        pl.GetProperty("NetProfit").GetInt64().Should().Be(800_000);
+        pl.GetProperty("TotBusinessProfession").GetInt64().Should().Be(800_000);
     }
 
     [Fact]

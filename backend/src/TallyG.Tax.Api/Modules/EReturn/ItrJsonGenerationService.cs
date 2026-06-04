@@ -2881,6 +2881,55 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         OverlayItr3ScheduleBpDepreciation(skel, ctx);
         OverlayItr3FinancialStatements(skel, ctx.FinancialStatements);
         OverlayItr3NoBooksBS(skel, ctx);
+        OverlayItr3NoBooksPL(skel, ctx);
+    }
+
+    /// <summary>
+    /// Populate PARTA_PL.NoBooksOfAccPL (the no-account-case profit &amp; loss) for a regular-books
+    /// non-presumptive ITR-3 business so the disclosed net profit matches the taxed business income
+    /// (rather than the skeleton's zeros). GrossProfit = gross receipts (no separate COGS captured);
+    /// Expenses = receipts − net profit, so NetProfit = GrossProfit − Expenses is internally consistent.
+    /// </summary>
+    private static void OverlayItr3NoBooksPL(Dictionary<string, object?> skel, ItrFilingContext ctx)
+    {
+        var regular = ctx.Businesses.Where(b => !b.IsPresumptive).ToList();
+        if (regular.Count == 0)
+        {
+            return;
+        }
+
+        var receipts = regular.Sum(b => b.Turnover);
+        var digital = regular.Sum(b => b.GrossReceiptsDigital);
+        var net = regular.Sum(b => b.NetProfit);
+        if (receipts <= 0m && net <= 0m)
+        {
+            return;
+        }
+
+        var bankMode = digital > 0m ? digital : receipts;          // default the whole turnover to bank mode
+        var otherMode = Math.Max(0m, receipts - bankMode);
+        var expenses = Math.Max(0m, receipts - net);
+
+        if (skel["PARTA_PL"] is Dictionary<string, object?> pl)
+        {
+            pl["NoBooksOfAccPL"] = new Dictionary<string, object?>
+            {
+                ["GrossReceipt"] = R(receipts),
+                ["GrsRcptAccPayeeOrBankMode"] = R(bankMode),
+                ["GrsRcptOtherMode"] = R(otherMode),
+                ["GrossProfit"] = R(receipts),
+                ["Expenses"] = R(expenses),
+                ["NetProfit"] = R(net),
+                // Profession columns are nil for a regular-books business filer.
+                ["GrossReceiptPrf"] = 0L,
+                ["GrsRcptAccPayeeOrBankModePrf"] = 0L,
+                ["GrsRcptOtherModePrf"] = 0L,
+                ["GrossProfitPrf"] = 0L,
+                ["ExpensesPrf"] = 0L,
+                ["NetProfitPrf"] = 0L,
+                ["TotBusinessProfession"] = R(net),
+            };
+        }
     }
 
     /// <summary>
