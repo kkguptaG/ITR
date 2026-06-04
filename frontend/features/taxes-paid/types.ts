@@ -6,6 +6,13 @@
 export type TdsHead = 'Salary' | 'OtherThanSalary';
 export type ChallanKind = 'Advance' | 'SelfAssessment';
 
+/** One ITD TDS deductee code (e.g. code "94J-B" → section "194J(b)" → description), from the reference master. */
+export interface TdsCodeRecord {
+  code: string;
+  section: string;
+  description: string;
+}
+
 export interface TdsEntryDto {
   id: string;
   head: TdsHead;

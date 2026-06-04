@@ -15,11 +15,13 @@ public sealed class ReferenceController : ControllerBase
 {
     private readonly IIsinLookupService _isin;
     private readonly IGrandfatherFmvLookupService _fmv;
+    private readonly ITdsCodeService _tds;
 
-    public ReferenceController(IIsinLookupService isin, IGrandfatherFmvLookupService fmv)
+    public ReferenceController(IIsinLookupService isin, IGrandfatherFmvLookupService fmv, ITdsCodeService tds)
     {
         _isin = isin;
         _fmv = fmv;
+        _tds = tds;
     }
 
     /// <summary>Resolve an ISIN to its security name + type; 404 if it isn't in the master.</summary>
@@ -47,4 +49,9 @@ public sealed class ReferenceController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<GrandfatherFmvRecord>), StatusCodes.Status200OK)]
     public ActionResult<IReadOnlyList<GrandfatherFmvRecord>> SearchFmv([FromQuery] string q)
         => Ok(_fmv.Search(q ?? string.Empty));
+
+    /// <summary>The ITD TDS section/deductee codes, for the section picker on a TDS-credit entry.</summary>
+    [HttpGet("tds-codes")]
+    [ProducesResponseType(typeof(IReadOnlyList<TdsCodeRecord>), StatusCodes.Status200OK)]
+    public ActionResult<IReadOnlyList<TdsCodeRecord>> TdsCodes() => Ok(_tds.All());
 }

@@ -38,6 +38,8 @@
     <!-- Securities reference: ISIN master (ISIN -> name/type) + NSE 31-Jan-2018 highs (s.112A grandfathered FMV). -->
     <EmbeddedResource Include="Modules\Reference\Data\isin.tsv.gz" LogicalName="isin.tsv.gz" />
     <EmbeddedResource Include="Modules\Reference\Data\share-fmv-31jan2018.tsv.gz" LogicalName="share-fmv-31jan2018.tsv.gz" />
+    <!-- ITD TDS section/deductee codes (small fixed master) for the TDS-entry section picker. -->
+    <EmbeddedResource Include="Modules\Reference\Data\tds-codes.tsv" LogicalName="tds-codes.tsv" />
   </ItemGroup>
 
   <ItemGroup>

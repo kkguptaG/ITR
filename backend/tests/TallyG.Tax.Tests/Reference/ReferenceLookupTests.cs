@@ -12,6 +12,7 @@ public sealed class ReferenceLookupTests
 {
     private static readonly IsinLookupService Isin = new();
     private static readonly GrandfatherFmvLookupService Fmv = new();
+    private static readonly TdsCodeService Tds = new();
 
     [Fact]
     public void Isin_resolves_a_known_security_case_insensitively()
@@ -52,5 +53,15 @@ public sealed class ReferenceLookupTests
         hits.Should().NotBeEmpty();
         hits.Count.Should().BeLessThanOrEqualTo(5);
         hits.Should().OnlyContain(r => r.Symbol.StartsWith("3"));
+    }
+
+    [Fact]
+    public void Tds_codes_load_with_known_sections()
+    {
+        var all = Tds.All();
+        all.Should().HaveCountGreaterThan(50);
+        all.Should().Contain(c => c.Code == "94J-B" && c.Description.Contains("professional"));
+        all.Should().Contain(c => c.Section == "192" && c.Description.Contains("Salary")); // salary
+        all.Should().OnlyContain(c => c.Code.Length > 0 && c.Section.Length > 0);
     }
 }

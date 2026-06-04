@@ -39,6 +39,7 @@ import {
   deleteTcs,
   deleteTds,
   getTaxesPaid,
+  getTdsCodes,
   taxesPaidKeys,
 } from '../api';
 
@@ -360,6 +361,21 @@ function AddTdsForm({ returnId, onDone, onSaved }: { returnId: string; onDone: (
   const { formError, handleError, reset } = useApiFormError<TdsFormValues>(setError);
   const isOther = watch('head') === 'OtherThanSalary';
 
+  // Full ITD TDS section master (59 codes + descriptions) from the reference module; falls back to a
+  // small hardcoded subset until it loads / if it's unavailable. value = ITD code (the schema's TDSSection enum).
+  const codesQuery = useQuery({
+    queryKey: taxesPaidKeys.tdsCodes,
+    queryFn: getTdsCodes,
+    staleTime: 24 * 60 * 60_000,
+  });
+  const sectionOptions =
+    codesQuery.data && codesQuery.data.length > 0
+      ? codesQuery.data.map((c) => ({
+          value: c.code,
+          label: `${c.section} · ${c.description.length > 64 ? `${c.description.slice(0, 63)}…` : c.description}`,
+        }))
+      : TDS_SECTIONS.map((s) => ({ value: s, label: s }));
+
   const tanReg = register('deductorTan');
   const save = useMutation({
     mutationFn: (v: TdsFormValues) =>
@@ -394,7 +410,7 @@ function AddTdsForm({ returnId, onDone, onSaved }: { returnId: string; onDone: (
         </Field>
         {isOther && (
           <Field label={t('section')} error={errors.tdsSection?.message}>
-            <Select {...register('tdsSection')} options={TDS_SECTIONS.map((s) => ({ value: s, label: s }))} />
+            <Select {...register('tdsSection')} options={sectionOptions} />
           </Field>
         )}
       </div>

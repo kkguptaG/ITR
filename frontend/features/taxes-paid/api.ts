@@ -13,6 +13,7 @@ import type {
   ChallanDto,
   TaxesPaidSummaryDto,
   TcsEntryDto,
+  TdsCodeRecord,
   TdsEntryDto,
   UpsertChallanBody,
   UpsertTcsEntryBody,
@@ -22,7 +23,13 @@ import type {
 export const taxesPaidKeys = {
   all: ['taxes-paid'] as const,
   summary: (returnId: string) => [...taxesPaidKeys.all, returnId] as const,
+  tdsCodes: ['reference', 'tds-codes'] as const,
 };
+
+/** The ITD TDS section/deductee codes (reference master) for the section picker. */
+export function getTdsCodes(): Promise<TdsCodeRecord[]> {
+  return apiGet<TdsCodeRecord[]>('/reference/tds-codes');
+}
 
 const base = (returnId: string) => `/returns/${returnId}/taxes-paid`;
 

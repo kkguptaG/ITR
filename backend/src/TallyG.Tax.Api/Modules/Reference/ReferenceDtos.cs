@@ -8,3 +8,9 @@ public sealed record IsinRecord(string Isin, string Name, string Type);
 /// 31-Jan-2018 — used for s.112A LTCG on equity/equity-MF acquired on or before that date.
 /// </summary>
 public sealed record GrandfatherFmvRecord(string Symbol, decimal Fmv);
+
+/// <summary>
+/// One ITD TDS deductee code (e.g. "94J-B" → section "194J(b)" → "Fees for professional services"),
+/// for picking the right section on a TDS-credit entry.
+/// </summary>
+public sealed record TdsCodeRecord(string Code, string Section, string Description);
