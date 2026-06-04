@@ -77,6 +77,10 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
           {comp.amtCreditSetOff > 0 && <Line label="Less: AMT credit set off (s.115JD)" value={comp.amtCreditSetOff} tone="subtract" indent />}
           {comp.relief89 > 0 && <Line label="Less: relief u/s 89 (arrears)" value={comp.relief89} tone="subtract" indent />}
           {comp.relief90And91 > 0 && <Line label="Less: relief u/s 90/91 (foreign tax)" value={comp.relief90And91} tone="subtract" indent />}
+          <Line label={t('totalTax')} value={comp.totalTax} strong />
+          {/* Interest u/s 234A/B/C is a default add-on levied *after* the tax
+              liability — show it below Total tax so the column sums correctly
+              (Total tax + interest − prepaid taxes = payable). */}
           {comp.interestPenalty > 0 && (
             <>
               <Line label={t('interestPenalty')} value={comp.interestPenalty} indent />
@@ -85,7 +89,6 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
               {comp.interest234C > 0 && <Line label="  ↳ 234C (instalment deferment)" value={comp.interest234C} indent />}
             </>
           )}
-          <Line label={t('totalTax')} value={comp.totalTax} strong />
           {comp.amtCreditGenerated > 0 && <Line label="AMT credit carried forward (s.115JD)" value={comp.amtCreditGenerated} tone="muted" indent />}
           {comp.housePropertyLossCarriedForward > 0 && <Line label="House-property loss carried forward (s.71B)" value={comp.housePropertyLossCarriedForward} tone="muted" indent />}
           {comp.businessLossCarriedForward > 0 && <Line label="Business loss carried forward (s.72)" value={comp.businessLossCarriedForward} tone="muted" indent />}

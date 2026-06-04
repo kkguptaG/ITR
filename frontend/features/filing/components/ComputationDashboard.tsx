@@ -77,8 +77,11 @@ export function ComputationDashboard({
     ...(v(c?.alternativeMinimumTax) > 0 ? [{ key: 'amt', label: 'Alternate Minimum Tax (s.115JC)', amount: v(c?.alternativeMinimumTax), kind: 'tax' as const, indent: true }] : []),
     ...(v(c?.relief89) > 0 ? [{ key: 'rel89', label: 'Less: Relief u/s 89 (arrears)', amount: v(c?.relief89), kind: 'tax' as const, indent: true }] : []),
     ...(v(c?.relief90And91) > 0 ? [{ key: 'rel90', label: 'Less: Relief u/s 90/91 (foreign tax)', amount: v(c?.relief90And91), kind: 'tax' as const, indent: true }] : []),
-    ...(v(c?.interestPenalty) > 0 ? [{ key: 'int', label: 'Add: Interest u/s 234A/B/C', amount: v(c?.interestPenalty), kind: 'tax' as const, indent: true }] : []),
     { key: 'totaltax', label: 'Total Tax Liability', amount: v(c?.totalTax), kind: 'subtotal' as const },
+    // Interest u/s 234A/B/C is a default add-on, not part of the statutory tax
+    // liability — show it *after* the Total Tax Liability subtotal so the running
+    // tally (subtotal + interest − prepaid credits = payable) reads top-to-bottom.
+    ...(v(c?.interestPenalty) > 0 ? [{ key: 'int', label: 'Add: Interest u/s 234A/B/C', amount: v(c?.interestPenalty), kind: 'tax' as const }] : []),
     { key: 'tds', label: 'Less: TDS credit', amount: v(c?.tdsPaid) - v(c?.tcsPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid' },
     ...(v(c?.tcsPaid) > 0 ? [{ key: 'tcs', label: 'Less: TCS credit', amount: v(c?.tcsPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid', indent: true }] : []),
     ...(v(c?.advanceTax) - v(c?.selfAssessmentTaxPaid) > 0 ? [{ key: 'adv', label: 'Less: Advance tax', amount: v(c?.advanceTax) - v(c?.selfAssessmentTaxPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid', indent: true }] : []),

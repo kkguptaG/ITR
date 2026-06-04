@@ -55,7 +55,12 @@ export function furthestStep(detail: ReturnDetailDto | undefined): WizardStepSlu
     case 'PendingPayment':
       return 'payment';
     case 'ComputedReady':
-      return 'summary';
+      // Computation is done and reviewed on Summary — the user must be able to
+      // advance to Payment, where creating the order transitions the return to
+      // PendingPayment. Capping the furthest step at 'summary' deadlocked the
+      // wizard (Payment was unreachable, so the order that moves the status
+      // forward could never be created).
+      return 'payment';
     case 'InProgress':
       return 'regime';
     case 'Draft':

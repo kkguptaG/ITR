@@ -30,6 +30,7 @@ import { useWizard } from '../WizardContext';
 import { useInvalidateReturn } from '../useReturn';
 import { WizardStep, WizardFooter } from '../components/WizardStep';
 import { PlanPicker } from '../components/PlanPicker';
+import { mockGatewayPaymentId, mockGatewaySignature } from '@/features/payments/helpers';
 
 export function PaymentStep() {
   const t = useTranslations('wizard');
@@ -80,11 +81,15 @@ export function PaymentStep() {
         return { status: created.status };
       }
 
-      // STUB: simulate the Razorpay checkout callback (mock paymentId + signature).
-      const mockPaymentId = `pay_mock_${created.gatewayOrderId ?? created.paymentId}`;
+      // STUB: simulate the Razorpay checkout callback. The server verifies a real
+      // HMAC-SHA256("orderId|paymentId") with the dev key, so we must compute the
+      // matching signature here (a literal placeholder is rejected) — same scheme
+      // as CheckoutDialog.
+      const gatewayPaymentId = mockGatewayPaymentId();
+      const signature = await mockGatewaySignature(created.gatewayOrderId ?? '', gatewayPaymentId);
       const verified = await verifyPayment(created.paymentId, {
-        gatewayPaymentId: mockPaymentId,
-        signature: 'mock-signature',
+        gatewayPaymentId,
+        signature,
       });
       return { status: verified.status };
     },

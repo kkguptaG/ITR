@@ -37,11 +37,13 @@ public sealed class OtpRequestRequestValidator : AbstractValidator<OtpRequestReq
     public OtpRequestRequestValidator()
     {
         RuleFor(x => x.Identifier)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("An email or mobile number is required.")
             .Must(id => id.Contains('@') || AuthValidationHelpers.LooksLikeMobile(id))
             .WithMessage("Provide a valid email or mobile number.");
 
         RuleFor(x => x.Purpose)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Purpose is required.")
             .Must(p => AllowedPurposes.Contains(p.Trim().ToLowerInvariant()))
             .WithMessage("Purpose must be one of: login, signup, reset.");
