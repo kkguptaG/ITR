@@ -313,6 +313,15 @@ export function ComputationDashboard({
               </div>
             )}
 
+            {/* Net agricultural income is EXEMPT — it never enters GTI/taxable income; it only raises
+                the slab rate (partial integration). Shown as a memo so the running total stays honest. */}
+            {v(c?.netAgriculturalIncome) > 0 && (
+              <p className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-500">
+                <span>Net agricultural income (exempt; included only to set the slab rate)</span>
+                <span className="tabular-nums">{formatInr(v(c?.netAgriculturalIncome))}</span>
+              </p>
+            )}
+
             {/* Net result */}
             <div
               className={cn(

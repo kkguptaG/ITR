@@ -582,7 +582,9 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         {
             ["UpdatedTotInc"] = R(updatedTaxableInc),
             ["AmtPayable"] = R(amtPayableUpdated),
-            ["FeeIncUS234F"] = 0L,
+            // s.234F late-filing fee on the updated return — disclosed from the persisted computation snapshot
+            // (was hardcoded to 0, which dropped the fee an ITR-U filer always owes for a late-furnished return).
+            ["FeeIncUS234F"] = R(c?.LateFee234F ?? 0m),
             ["ReleifUS89"] = R(relief89),
             ["AggrLiabilityRefund"] = 0L,
             ["AggrLiabilityNoRefund"] = R(aggregateAdditional),
@@ -843,9 +845,11 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["GrossTaxLiability"] = R(grossTaxLiab),
             ["Section89"] = R(c?.Relief89 ?? 0m),
             ["NetTaxLiability"] = R(net),
-            ["TotalIntrstPay"] = R(interest),
+            // "Interest and fee payable" (D5) and "Total tax, fee and interest" (D6) both fold in the s.234F
+            // late-filing fee — without it a belated Sahaj's totals understate the liability vs the dashboard.
+            ["TotalIntrstPay"] = R(interest + (c?.LateFee234F ?? 0m)),
             ["IntrstPay"] = IntrstPayNode(c),
-            ["TotTaxPlusIntrstPay"] = R(net + interest),
+            ["TotTaxPlusIntrstPay"] = R(net + interest + (c?.LateFee234F ?? 0m)),
         };
     }
 
@@ -867,7 +871,8 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             ["GrossTaxLiability"] = R(taxBeforeCess + cess),
             ["NetTaxLiability"] = R(net),
             ["IntrstPay"] = IntrstPayNode(c),
-            ["TotTaxPlusIntrstPay"] = R(net + interest),
+            // "Total tax, fee and interest" folds in the s.234F late-filing fee (matching the IntrstPay node).
+            ["TotTaxPlusIntrstPay"] = R(net + interest + (c?.LateFee234F ?? 0m)),
         };
     }
 

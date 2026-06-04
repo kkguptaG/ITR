@@ -69,6 +69,57 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr1_late_filing_fee_234F_folds_into_the_interest_and_fee_totals()
+    {
+        var ctx = BuildContext(ItrType.ITR1, withLateFee: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR1, json);
+        result.Errors.Should().BeEmpty("an ITR-1 carrying a s.234F fee must conform. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var tc = doc.RootElement.GetProperty("ITR").GetProperty("ITR1").GetProperty("ITR1_TaxComputation");
+
+        // Fee disclosed in the IntrstPay breakdown, then folded into the "interest and fee payable" subtotal
+        // and the "total tax, fee and interest" grand total: net ₹41,600 + ₹0 interest + ₹5,000 fee.
+        tc.GetProperty("IntrstPay").GetProperty("LateFilingFee234F").GetInt64().Should().Be(5_000);
+        tc.GetProperty("TotalIntrstPay").GetInt64().Should().Be(5_000, "TotalIntrstPay must include the s.234F fee");
+        tc.GetProperty("TotTaxPlusIntrstPay").GetInt64().Should().Be(46_600, "the grand total must include the s.234F fee");
+    }
+
+    [Fact]
+    public void Itr4_late_filing_fee_234F_folds_into_the_total_tax_fee_and_interest()
+    {
+        var ctx = BuildContext(ItrType.ITR4, presumptiveBusiness: true, withLateFee: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR4, json);
+        result.Errors.Should().BeEmpty("an ITR-4 carrying a s.234F fee must conform. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var tc = doc.RootElement.GetProperty("ITR").GetProperty("ITR4").GetProperty("TaxComputation");
+
+        tc.GetProperty("IntrstPay").GetProperty("LateFilingFee234F").GetInt64().Should().Be(5_000);
+        // Total tax, fee and interest = net ₹41,600 + ₹0 interest + ₹5,000 fee.
+        tc.GetProperty("TotTaxPlusIntrstPay").GetInt64().Should().Be(46_600, "the grand total must include the s.234F fee");
+    }
+
+    [Fact]
+    public void Updated_return_discloses_the_234F_fee_in_partB_ATI()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withUpdated: true, withLateFee: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("an updated ITR-2 (ITR-U) carrying a s.234F fee must conform. Violations:\n" + Format(result));
+
+        using var doc = JsonDocument.Parse(json);
+        var ati = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("PartB-ATI");
+        ati.GetProperty("FeeIncUS234F").GetInt64().Should()
+            .Be(5_000, "the persisted s.234F fee must flow into PartB-ATI (it was hardcoded to 0)");
+    }
+
+    [Fact]
     public void Itr4_2026_with_financial_particulars_conforms_and_emits_schedule_bp()
     {
         var ctx = BuildContext(ItrType.ITR4, presumptiveBusiness: true, withFinancialParticulars: true);
