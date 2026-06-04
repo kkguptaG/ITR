@@ -10,7 +10,24 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     public Guid TaxReturnId { get; set; }
 
     public CapitalGainAssetType AssetType { get; set; }
+
+    /// <summary>Fine-grained asset sub-type (ESOP/RSU/SGB/foreign share/…). Optional. When set, the broad
+    /// <see cref="AssetType"/> is derived from it via <see cref="TaxEngine.CapitalGainTaxonomy.CategoryOf"/>
+    /// at save time, so the engine keeps routing off the category. Drives UI guidance + schedule nuance.</summary>
+    public CapitalGainSubType? SubType { get; set; }
+
     public CapitalGainTerm Term { get; set; }
+
+    /// <summary>STT was paid on the transfer — gates s.111A/112A equity treatment (Ch.3 §3.6.1).</summary>
+    public bool SttPaid { get; set; }
+
+    /// <summary>TDS deducted on this sale (s.194-IA property 1% / s.195 NRI), credited against the liability.</summary>
+    public decimal TdsOnSale { get; set; }
+    public string? TdsSection { get; set; }
+
+    /// <summary>The assessee's ownership share for a jointly-held asset (percent; default 100). The gain is
+    /// apportioned to this share before tax (each co-owner returns their own portion).</summary>
+    public decimal CoOwnerPercent { get; set; } = 100m;
 
     /// <summary>e.g. "111A", "112A", "112", "115BBH".</summary>
     public string? TaxSection { get; set; }

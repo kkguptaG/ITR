@@ -83,13 +83,19 @@ internal static class TaxComputationInputFactory
                     c.PreviousOwnerAcquisitionDate, c.CostOfAcquisition, c.PreviousOwnerCost, c.IndexedCost,
                     c.IsRuralAgriculturalLand, cgRules)))
                 .Where(x => !x.d.RuralExempt)   // rural agricultural land is exempt (s.2(14)) — excluded from the gain set
-                .Select(x => new CapitalGainInput(
-                    x.c.AssetType, x.d.Term, x.c.TaxSection, x.c.SalePrice, x.d.EffectiveCost, x.c.CostOfImprovement,
-                    x.c.ExpensesOnTransfer, x.c.ExemptionAmount, x.d.EffectiveAcquisitionDate, x.c.TransferDate,
-                    FairMarketValueOnGrandfatherDate: x.c.FairMarketValue31Jan2018 > 0m ? x.c.FairMarketValue31Jan2018 : null,
-                    IndexedCost: x.d.IndexedCost,
-                    ExemptionSection: x.c.ExemptionSection,
-                    ReinvestmentAmount: x.c.ReinvestmentAmount))
+                .Select(x =>
+                {
+                    // Joint ownership (s.45 r/w co-ownership): apportion the gain components to the assessee's
+                    // share. Default 100% ⇒ factor 1.0 ⇒ byte-identical to a solely-owned asset.
+                    var f = x.c.CoOwnerPercent is > 0m and < 100m ? x.c.CoOwnerPercent / 100m : 1m;
+                    return new CapitalGainInput(
+                        x.c.AssetType, x.d.Term, x.c.TaxSection, x.c.SalePrice * f, x.d.EffectiveCost * f, x.c.CostOfImprovement * f,
+                        x.c.ExpensesOnTransfer * f, x.c.ExemptionAmount, x.d.EffectiveAcquisitionDate, x.c.TransferDate,
+                        FairMarketValueOnGrandfatherDate: x.c.FairMarketValue31Jan2018 > 0m ? x.c.FairMarketValue31Jan2018 * f : null,
+                        IndexedCost: x.d.IndexedCost is { } ic ? ic * f : null,
+                        ExemptionSection: x.c.ExemptionSection,
+                        ReinvestmentAmount: x.c.ReinvestmentAmount);
+                })
                 .Concat(deemedStcg > 0m
                     ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }
                     : Array.Empty<CapitalGainInput>())

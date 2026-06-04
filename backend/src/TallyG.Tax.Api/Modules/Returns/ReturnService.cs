@@ -580,7 +580,7 @@ public sealed class ReturnService : IReturnService
         {
             TenantId = ret.TenantId,
             TaxReturnId = ret.Id,
-            AssetType = request.AssetType,
+            AssetType = ResolveCapitalGainAssetType(request),
             Term = request.Term,
             TaxSection = request.TaxSection?.Trim(),
             AcquisitionDate = request.AcquisitionDate,
@@ -597,7 +597,12 @@ public sealed class ReturnService : IReturnService
             AcquisitionMode = request.AcquisitionMode,
             PreviousOwnerAcquisitionDate = request.PreviousOwnerAcquisitionDate,
             PreviousOwnerCost = request.PreviousOwnerCost,
-            IsRuralAgriculturalLand = request.IsRuralAgriculturalLand
+            IsRuralAgriculturalLand = request.IsRuralAgriculturalLand,
+            SubType = request.SubType,
+            SttPaid = request.SttPaid,
+            TdsOnSale = request.TdsOnSale,
+            TdsSection = request.TdsSection?.Trim(),
+            CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent,
         };
 
         ApplyCapitalGainDerived(entity);
@@ -614,7 +619,8 @@ public sealed class ReturnService : IReturnService
         var entity = await _db.CapitalGains.FirstOrDefaultAsync(c => c.Id == gainId && c.TaxReturnId == id, ct)
                      ?? throw AppException.NotFound("Capital gain not found.", "RETURN.CG_NOT_FOUND");
 
-        entity.AssetType = request.AssetType;
+        entity.AssetType = ResolveCapitalGainAssetType(request);
+        entity.SubType = request.SubType;
         entity.Term = request.Term;
         entity.TaxSection = request.TaxSection?.Trim();
         entity.AcquisitionDate = request.AcquisitionDate;
@@ -632,6 +638,10 @@ public sealed class ReturnService : IReturnService
         entity.PreviousOwnerAcquisitionDate = request.PreviousOwnerAcquisitionDate;
         entity.PreviousOwnerCost = request.PreviousOwnerCost;
         entity.IsRuralAgriculturalLand = request.IsRuralAgriculturalLand;
+        entity.SttPaid = request.SttPaid;
+        entity.TdsOnSale = request.TdsOnSale;
+        entity.TdsSection = request.TdsSection?.Trim();
+        entity.CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent;
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1417,7 +1427,9 @@ public sealed class ReturnService : IReturnService
             costBase = Math.Max(c.CostOfAcquisition, Math.Min(c.FairMarketValue31Jan2018, c.SalePrice));
         }
 
-        var gross = c.SalePrice - costBase - c.CostOfImprovement - c.ExpensesOnTransfer;
+        // Joint ownership: show only the assessee's apportioned share (mirrors the engine's apportionment).
+        var factor = c.CoOwnerPercent is > 0m and < 100m ? c.CoOwnerPercent / 100m : 1m;
+        var gross = (c.SalePrice - costBase - c.CostOfImprovement - c.ExpensesOnTransfer) * factor;
         c.Gain = gross - c.ExemptionAmount;
     }
 
@@ -1493,11 +1505,17 @@ public sealed class ReturnService : IReturnService
         h.Id, h.Type, h.Address, h.AnnualValue, h.AnnualRent, h.MunicipalTaxPaid,
         h.StdDeduction30Pct, h.InterestOnLoan, h.CoOwnerSharePct, h.NetIncome);
 
+    // When a fine-grained sub-type is supplied, the broad tax-behaviour category is derived from it
+    // (s.3.6) so the engine keeps routing off AssetType; otherwise the request's AssetType is used as-is.
+    private static CapitalGainAssetType ResolveCapitalGainAssetType(UpsertCapitalGainRequest r)
+        => r.SubType is { } st ? TallyG.Tax.Domain.TaxEngine.CapitalGainTaxonomy.CategoryOf(st) : r.AssetType;
+
     private static CapitalGainDto ToCapitalGainDto(CapitalGain c) => new(
         c.Id, c.AssetType, c.Term, c.TaxSection, c.AcquisitionDate, c.TransferDate, c.SalePrice,
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
         c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
-        c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand);
+        c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand,
+        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent);
 
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,

@@ -204,7 +204,12 @@ public sealed record UpsertCapitalGainRequest(
     CapitalGainAcquisitionMode AcquisitionMode = CapitalGainAcquisitionMode.Purchase,
     DateOnly? PreviousOwnerAcquisitionDate = null,
     decimal PreviousOwnerCost = 0m,
-    bool IsRuralAgriculturalLand = false);
+    bool IsRuralAgriculturalLand = false,
+    CapitalGainSubType? SubType = null,
+    bool SttPaid = false,
+    decimal TdsOnSale = 0m,
+    string? TdsSection = null,
+    decimal CoOwnerPercent = 100m);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -227,7 +232,12 @@ public sealed record CapitalGainDto(
     CapitalGainAcquisitionMode AcquisitionMode,
     DateOnly? PreviousOwnerAcquisitionDate,
     decimal PreviousOwnerCost,
-    bool IsRuralAgriculturalLand);
+    bool IsRuralAgriculturalLand,
+    CapitalGainSubType? SubType,
+    bool SttPaid,
+    decimal TdsOnSale,
+    string? TdsSection,
+    decimal CoOwnerPercent);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

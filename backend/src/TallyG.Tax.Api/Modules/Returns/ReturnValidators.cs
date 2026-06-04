@@ -109,6 +109,11 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
         RuleFor(x => x.ExemptionAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ReinvestmentAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.PreviousOwnerCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TdsOnSale).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TdsSection).MaximumLength(16);
+        RuleFor(x => x.CoOwnerPercent).InclusiveBetween(0m, 100m).WithMessage("Ownership share must be between 0 and 100%.");
+        When(x => x.SubType.HasValue, () =>
+            RuleFor(x => x.SubType!.Value).IsInEnum().WithMessage("Unknown asset sub-type."));
         RuleFor(x => x.ExemptionSection)
             .Must(s => string.IsNullOrWhiteSpace(s) || new[] { "54", "54B", "54F", "54EC" }.Contains(s.Trim().ToUpperInvariant()))
             .WithMessage("Exemption section must be 54, 54B, 54F or 54EC.");
