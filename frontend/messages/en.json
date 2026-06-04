@@ -31,6 +31,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "returns": "My Returns",
+    "refundTracker": "Refund Tracker",
     "documents": "Documents",
     "payments": "Payments",
     "filings": "Filings",
@@ -785,6 +786,20 @@
     "back": "Back",
     "skip": "Skip",
     "setupReturn": "Set up my return"
+  },
+  "refundTracker": {
+    "title": "Refund Tracker",
+    "subtitle": "Track the refund — or demand — on every return you've filed.",
+    "kpiReturns": "Returns",
+    "kpiExpected": "Total expected refund",
+    "kpiCredited": "Credited so far",
+    "empty": "No returns yet. Start a return and its refund will show up here.",
+    "estimated": "Estimated",
+    "filedVerify": "E-verify to process",
+    "processing": "Being processed",
+    "refund": "Refund",
+    "payable": "Payable",
+    "view": "View"
   },
   "caReview": {
     "queueTitle": "Review queue",

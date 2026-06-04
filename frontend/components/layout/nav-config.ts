@@ -21,6 +21,7 @@ import {
   Landmark,
   BookOpenCheck,
   Scale,
+  Wallet,
 } from 'lucide-react';
 import type { Role } from '@/lib/api-types';
 
@@ -50,6 +51,7 @@ export const navSections: NavSection[] = [
     items: [
       { href: '/dashboard', messageKey: 'dashboard', icon: LayoutDashboard },
       { href: '/returns', messageKey: 'returns', icon: FileText },
+      { href: '/refund-tracker', messageKey: 'refundTracker', icon: Wallet },
       { href: '/documents', messageKey: 'documents', icon: FolderOpen },
       { href: '/payments', messageKey: 'payments', icon: CreditCard },
       { href: '/filings', messageKey: 'filings', icon: FileDown },

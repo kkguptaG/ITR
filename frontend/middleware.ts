@@ -6,6 +6,7 @@ import { SESSION_COOKIE } from '@/lib/token-store';
 const PROTECTED_PREFIXES = [
   '/dashboard',
   '/returns',
+  '/refund-tracker',
   '/documents',
   '/payments',
   '/notices',
