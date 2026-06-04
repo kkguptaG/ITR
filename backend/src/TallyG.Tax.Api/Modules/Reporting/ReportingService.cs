@@ -5,6 +5,7 @@ using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Common;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
+using TallyG.Tax.Domain.TaxEngine;
 using TallyG.Tax.Infrastructure.Persistence;
 
 namespace TallyG.Tax.Api.Modules.Reporting;
@@ -135,6 +136,25 @@ public sealed class ReportingService : IReportingService
             });
 
         return file;
+    }
+
+    // ------------------------------------------------------------------ form 10E
+
+    public async Task<GeneratedFile> GetForm10EAsync(
+        decimal currentYearTotalIncome,
+        IReadOnlyList<ArrearYearAllocation> arrears,
+        CancellationToken ct = default)
+    {
+        var user = await LoadUserAsync(_currentUser.UserId, ct);
+        var result = Form10ECalculator.Compute(currentYearTotalIncome, arrears ?? Array.Empty<ArrearYearAllocation>());
+
+        var title = "Form 10E - Relief u/s 89(1) [Rule 21AA]";
+        var lines = ReportContent.Form10E(user, ay: null, currentYearTotalIncome, arrears ?? Array.Empty<ArrearYearAllocation>(), result);
+        var fileName = $"Form10E-{user.Id:N}.pdf";
+
+        return await RenderStoreStreamAsync(
+            _currentUser.TenantId, _currentUser.UserId, taxReturnId: null, "form_10e",
+            title, lines, fileName, ct);
     }
 
     // ----------------------------------------------------------- list documents

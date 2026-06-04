@@ -25,8 +25,13 @@ namespace TallyG.Tax.Api.Modules.Tax;
 public sealed class TaxController : ControllerBase
 {
     private readonly ITaxService _tax;
+    private readonly Reporting.IReportingService _reporting;
 
-    public TaxController(ITaxService tax) => _tax = tax;
+    public TaxController(ITaxService tax, Reporting.IReportingService reporting)
+    {
+        _tax = tax;
+        _reporting = reporting;
+    }
 
     /// <summary>Compute and persist the tax for a saved return (returns both regimes + recommendation).</summary>
     [HttpPost("compute")]
@@ -67,6 +72,21 @@ public sealed class TaxController : ControllerBase
     [ProducesResponseType(typeof(Relief89Response), StatusCodes.Status200OK)]
     public Relief89Response Relief89([FromBody] Relief89Request request)
         => _tax.ComputeRelief89(request);
+
+    /// <summary>Download the filled Form 10E (Rule 21AA) PDF for the s.89(1) arrears relief. Authenticated —
+    /// the assessee's name + PAN come from the signed-in user.</summary>
+    [HttpPost("form-10e")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Form10E([FromBody] Relief89Request request, CancellationToken ct)
+    {
+        var arrears = (request.Arrears ?? Array.Empty<Relief89ArrearYear>())
+            .Select(a => new Domain.TaxEngine.ArrearYearAllocation(a.FinancialYear, a.TotalIncomeOfThatYear, a.ArrearsForThatYear))
+            .ToList();
+
+        var file = await _reporting.GetForm10EAsync(request.CurrentYearTotalIncome, arrears, ct);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
 }
 
 /// <summary>POST /tax/regime-compare body.</summary>

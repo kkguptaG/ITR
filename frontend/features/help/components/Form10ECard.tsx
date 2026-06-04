@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Calculator, Plus, Trash2 } from 'lucide-react';
+import { Calculator, Plus, Trash2, Download } from 'lucide-react';
 import {
   Alert,
   Button,
@@ -22,6 +22,7 @@ import {
 import { formatInr } from '@/lib/format';
 import { ApiError } from '@/lib/api';
 import { computeRelief89, type Relief89Response } from '../relief-89';
+import { downloadForm10E } from '@/features/filing/download';
 
 interface ArrearRow {
   financialYear: string;
@@ -35,12 +36,14 @@ export function Form10ECard() {
   const [currentIncome, setCurrentIncome] = useState<number>(0);
   const [rows, setRows] = useState<ArrearRow[]>([emptyRow()]);
 
+  const arrears = () => rows.filter((r) => r.arrearsForThatYear > 0);
+
   const mutation = useMutation({
-    mutationFn: () =>
-      computeRelief89({
-        currentYearTotalIncome: currentIncome,
-        arrears: rows.filter((r) => r.arrearsForThatYear > 0),
-      }),
+    mutationFn: () => computeRelief89({ currentYearTotalIncome: currentIncome, arrears: arrears() }),
+  });
+
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadForm10E({ currentYearTotalIncome: currentIncome, arrears: arrears() }),
   });
 
   const setRow = (i: number, patch: Partial<ArrearRow>) =>
@@ -150,6 +153,22 @@ export function Form10ECard() {
             <p className="mt-2 text-xs italic text-ink-400">
               Old-regime estimate. File Form 10E on the income-tax portal before claiming this relief in your return.
             </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => downloadMutation.mutate()}
+              loading={downloadMutation.isPending}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Download Form 10E (PDF)
+            </Button>
+            {downloadMutation.isError && (
+              <p className="mt-1 text-xs text-payable-700">
+                Couldn&apos;t generate the Form 10E PDF — please make sure you&apos;re signed in and try again.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

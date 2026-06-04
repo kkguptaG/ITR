@@ -3,8 +3,10 @@
 // effects and no tax logic (docs 09 §9.9 — DocGen is a pure projection of the persisted trace).
 
 using System.Globalization;
+using System.Linq;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Entities;
+using TallyG.Tax.Domain.TaxEngine;
 
 namespace TallyG.Tax.Api.Modules.Reporting;
 
@@ -169,6 +171,61 @@ internal static class ReportContent
         lines.Add(PdfLine.Spacer());
         lines.Add(PdfLine.Note($"Computed at {Date(c.ComputedAt)}. System-generated statement - provisional, "
             + "pending Chartered Accountant validation. Verify against your documents before filing."));
+        return lines;
+    }
+
+    /// <summary>
+    /// Form No. 10E (Rule 21AA) — particulars for claiming relief u/s 89(1) on salary received in arrears
+    /// or advance. Lays out Annexure I in the ITD's item order, with Table A spreading the arrears across
+    /// the earlier years (each year's extra tax derived from the same old-regime slab function the
+    /// calculator uses), and the resulting relief.
+    /// </summary>
+    public static IReadOnlyList<PdfLine> Form10E(
+        User user,
+        AssessmentYear? ay,
+        decimal currentYearTotalIncome,
+        IReadOnlyList<ArrearYearAllocation> arrears,
+        Form10EResult result)
+    {
+        var totalArrears = arrears.Sum(a => System.Math.Max(0m, a.ArrearsForThatYear));
+
+        var lines = new List<PdfLine>
+        {
+            PdfLine.Note("FORM No. 10E  [See rule 21AA]"),
+            PdfLine.Note("Form for furnishing particulars of income u/s 192(2A) for claiming relief u/s 89(1)"),
+            PdfLine.Spacer(),
+            new("Name of the assessee", user.FullName),
+            new("PAN", user.PanMasked ?? "XXXXX____X"),
+            new("Assessment Year", ay?.Code ?? "-"),
+        };
+
+        lines.Add(PdfLine.Heading("Annexure I - Arrears or advance of salary"));
+        lines.Add(new("1. Total income of the year of receipt (incl. arrears)", Money(currentYearTotalIncome)));
+        lines.Add(new("2. Salary received in arrears / advance", Money(totalArrears)));
+        lines.Add(new("3. Total income excluding (2)", Money(currentYearTotalIncome - totalArrears)));
+        lines.Add(new("4. Tax on total income at (1)", Money(result.TaxOnCurrentInclArrears)));
+        lines.Add(new("5. Tax on total income at (3)", Money(result.TaxOnCurrentExclArrears)));
+        lines.Add(PdfLine.Subtotal("6. Tax on the arrears  [(4) - (5)]", Money(result.AdditionalTaxCurrentYear)));
+
+        if (arrears.Count > 0)
+        {
+            lines.Add(PdfLine.Heading("Table A - Spread of the arrears over the earlier years"));
+            foreach (var a in arrears)
+            {
+                var arrear = System.Math.Max(0m, a.ArrearsForThatYear);
+                var withoutArrear = Form10ECalculator.TaxOnIncome(a.TotalIncomeOfThatYear);
+                var withArrear = Form10ECalculator.TaxOnIncome(a.TotalIncomeOfThatYear + arrear);
+                lines.Add(PdfLine.Detail(
+                    $"FY {a.FinancialYear}: income {Money(a.TotalIncomeOfThatYear)} + arrears {Money(arrear)}",
+                    Money(withArrear - withoutArrear)));
+            }
+            lines.Add(PdfLine.Subtotal("7. Tax on the arrears per Table A", Money(result.AdditionalTaxEarlierYears)));
+        }
+
+        lines.Add(PdfLine.Total("Relief u/s 89(1)  [(6) - (7)]", Money(result.ReliefUs89)));
+        lines.Add(PdfLine.Spacer());
+        lines.Add(PdfLine.Note("Old-regime estimate. Submit Form 10E on the income-tax portal BEFORE filing your "
+            + "return to claim this relief (s.89). System-generated - verify the figures before submission."));
         return lines;
     }
 

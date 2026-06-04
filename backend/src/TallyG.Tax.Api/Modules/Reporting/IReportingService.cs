@@ -1,4 +1,5 @@
 using TallyG.Tax.Domain.Common;
+using TallyG.Tax.Domain.TaxEngine;
 
 namespace TallyG.Tax.Api.Modules.Reporting;
 
@@ -20,6 +21,10 @@ public interface IReportingService
 
     /// <summary>GET /payments/{id}/invoice:pdf — the GST tax-invoice PDF for a captured payment.</summary>
     Task<GeneratedFile> GetInvoiceAsync(Guid paymentId, CancellationToken ct = default);
+
+    /// <summary>POST /tax/form-10e — the Form 10E (s.89 arrears-relief) PDF for the current user.</summary>
+    Task<GeneratedFile> GetForm10EAsync(
+        decimal currentYearTotalIncome, IReadOnlyList<ArrearYearAllocation> arrears, CancellationToken ct = default);
 
     /// <summary>GET /returns/{id}/documents — the generated artifacts registered against a return.</summary>
     Task<IReadOnlyList<GeneratedDocumentDto>> ListReturnDocumentsAsync(Guid returnId, CancellationToken ct = default);

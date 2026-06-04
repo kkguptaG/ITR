@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -6,6 +7,7 @@ using TallyG.Tax.Api.Modules.Reporting;
 using TallyG.Tax.Domain.Abstractions;
 using TallyG.Tax.Domain.Entities;
 using TallyG.Tax.Domain.Enums;
+using TallyG.Tax.Domain.TaxEngine;
 using TallyG.Tax.Infrastructure.Services;
 using Xunit;
 
@@ -64,6 +66,26 @@ public class ComputationStatementTests
         // 234C is zero and AMT did not apply ⇒ neither line is emitted.
         lines.Should().NotContain(l => l.Label.Contains("234C"));
         lines.Should().NotContain(l => l.Label.Contains("Alternate Minimum Tax"));
+    }
+
+    [Fact]
+    public void Form10E_lays_out_annexure_I_table_A_and_the_relief()
+    {
+        // The verified Help-page example: this year 12L incl. 2L arrears relating to FY 2021-22 (income 8L)
+        // ⇒ extra tax this year 62,400, extra tax in 2021-22 41,600, relief 20,800.
+        var user = new User { FullName = "Demo Taxpayer", PanMasked = "ABCDE1234F" };
+        var arrears = new List<ArrearYearAllocation> { new("2021-22", 800_000m, 200_000m) };
+        var result = Form10ECalculator.Compute(1_200_000m, arrears);
+
+        var lines = ReportContent.Form10E(user, ay: null, 1_200_000m, arrears, result);
+
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label.Contains("Annexure I"));
+        lines.Should().Contain(l => l.Label.StartsWith("1.") && l.Value == "Rs. 12,00,000");
+        lines.Should().Contain(l => l.Label.StartsWith("2.") && l.Value == "Rs. 2,00,000");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Subtotal && l.Label.StartsWith("6.") && l.Value == "Rs. 62,400");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label.Contains("Table A"));
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Detail && l.Label.Contains("FY 2021-22") && l.Value == "Rs. 41,600");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Total && l.Label.Contains("Relief u/s 89(1)") && l.Value == "Rs. 20,800");
     }
 
     [Fact]

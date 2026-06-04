@@ -8,12 +8,15 @@
 
 import { api } from '@/lib/api';
 
-async function downloadPdf(url: string, suggestedName: string): Promise<void> {
-  const res = await api.get(url, { responseType: 'blob' });
-  const blob = res.data as Blob;
+interface BlobResponse {
+  data: Blob;
+  headers: Record<string, string>;
+}
 
-  // Prefer the server-provided filename if present.
-  const disposition = (res.headers as Record<string, string>)['content-disposition'] ?? '';
+/** Save a streamed PDF blob, preferring the server's Content-Disposition filename. */
+function saveBlob(res: BlobResponse, suggestedName: string): void {
+  const blob = res.data;
+  const disposition = res.headers['content-disposition'] ?? '';
   const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
   const fileName = match ? decodeURIComponent(match[1]) : suggestedName;
 
@@ -28,6 +31,16 @@ async function downloadPdf(url: string, suggestedName: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
+async function downloadPdf(url: string, suggestedName: string): Promise<void> {
+  const res = await api.get(url, { responseType: 'blob' });
+  saveBlob({ data: res.data as Blob, headers: res.headers as Record<string, string> }, suggestedName);
+}
+
+async function downloadPdfPost(url: string, body: unknown, suggestedName: string): Promise<void> {
+  const res = await api.post(url, body, { responseType: 'blob' });
+  saveBlob({ data: res.data as Blob, headers: res.headers as Record<string, string> }, suggestedName);
+}
+
 /** GET /returns/{id}/acknowledgment — the ITR-V acknowledgment PDF. */
 export const downloadAcknowledgment = (returnId: string) =>
   downloadPdf(`/returns/${returnId}/acknowledgment`, `ITR-V-${returnId}.pdf`);
@@ -39,3 +52,11 @@ export const downloadComputation = (returnId: string) =>
 /** GET /payments/{id}/invoice:pdf — the GST tax-invoice PDF. */
 export const downloadInvoice = (paymentId: string) =>
   downloadPdf(`/payments/${paymentId}/invoice:pdf`, `invoice-${paymentId}.pdf`);
+
+/** POST /tax/form-10e — the filled Form 10E (s.89 arrears relief) PDF for the signed-in user. */
+export interface Form10ERequest {
+  currentYearTotalIncome: number;
+  arrears: { financialYear: string; totalIncomeOfThatYear: number; arrearsForThatYear: number }[];
+}
+export const downloadForm10E = (body: Form10ERequest) =>
+  downloadPdfPost('/tax/form-10e', body, 'Form10E.pdf');
