@@ -28,6 +28,7 @@ import type { CapitalGainFormValues } from '@/features/filing/schemas';
 import { CapitalGainForm } from '@/features/filing/components/income-forms';
 import { CgSummaryDashboard } from '@/features/capital-gains/CgSummaryDashboard';
 import { CG_CATEGORIES, categoryOfRow, type CgCategoryKey } from '@/features/capital-gains/categories';
+import { GuidedAssistant } from '@/features/capital-gains/GuidedAssistant';
 
 function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
   return {
@@ -74,6 +75,8 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
   // null = list view; { row } = editing existing; { defaults } = adding new (category pre-set).
   const [editing, setEditing] = useState<{ row?: CapitalGainDto; defaults?: Partial<CapitalGainFormValues> } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [catFilter, setCatFilter] = useState<'all' | CgCategoryKey>('all');
+  const [search, setSearch] = useState('');
 
   const detailQ = useQuery({ queryKey: filingKeys.detail(returnId), queryFn: () => getReturn(returnId) });
   const gainsQ = useQuery({ queryKey: filingKeys.gains(returnId), queryFn: () => listCapitalGains(returnId) });
@@ -83,6 +86,17 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
   const compute = computeQ.data;
   const regime = detailQ.data?.regime ?? compute?.recommendedRegime ?? 'New';
   const c = compute ? (regime === 'Old' ? compute.old : compute.new) : null;
+
+  // Smart transaction grid: category filter + free-text search (scrip/section/amount).
+  const q = search.trim().toLowerCase();
+  const filteredGains = gains.filter(
+    (g) =>
+      (catFilter === 'all' || categoryOfRow(g) === catFilter) &&
+      (q === '' ||
+        g.assetType.toLowerCase().includes(q) ||
+        (g.taxSection ?? '').toLowerCase().includes(q) ||
+        String(g.gain).includes(q)),
+  );
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: filingKeys.gains(returnId) });
@@ -171,7 +185,8 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
           />
         </div>
       ) : (
-        <>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+         <div className="space-y-5">
           {/* Summary dashboard */}
           {c ? (
             <CgSummaryDashboard result={c} gains={gains} />
@@ -216,17 +231,35 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
             </div>
           </div>
 
-          {/* Pro mode: full transaction list with inline edit/delete */}
+          {/* Pro mode: smart transaction grid (filter by category + search) with inline edit/delete */}
           {mode === 'pro' && gains.length > 0 ? (
             <div className="rounded-2xl border border-ink-200 bg-white shadow-card">
-              <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-                <h2 className="text-sm font-semibold text-ink-900">{t('txnsTitle')}</h2>
+              <div className="flex flex-wrap items-center gap-2 border-b border-ink-100 px-4 py-3">
+                <h2 className="mr-auto text-sm font-semibold text-ink-900">{t('txnsTitle')}</h2>
+                <select
+                  value={catFilter}
+                  onChange={(e) => setCatFilter(e.target.value as 'all' | CgCategoryKey)}
+                  className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs text-ink-700"
+                >
+                  <option value="all">{t('filterAll')}</option>
+                  {CG_CATEGORIES.map((cat) => (
+                    <option key={cat.key} value={cat.key}>
+                      {t(`cat.${cat.key}`)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('searchPlaceholder')}
+                  className="w-40 rounded-lg border border-ink-200 px-2 py-1 text-xs text-ink-800 placeholder:text-ink-400"
+                />
                 <Button size="sm" variant="outline" onClick={() => setEditing({ defaults: {} })}>
                   <Plus className="h-4 w-4" aria-hidden="true" /> {t('add')}
                 </Button>
               </div>
               <ul className="divide-y divide-ink-100">
-                {gains.map((g) => (
+                {filteredGains.map((g) => (
                   <li key={g.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink-800">
@@ -260,6 +293,9 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
                   </li>
                 ))}
               </ul>
+              {filteredGains.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-ink-500">{t('noMatches')}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -272,7 +308,13 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
               <Calculator className="h-4 w-4" aria-hidden="true" /> {t('viewComputation')}
             </Link>
           </div>
-        </>
+         </div>
+
+          {/* Guided tax assistant rail */}
+          <aside className="h-max xl:sticky xl:top-4">
+            <GuidedAssistant gains={gains} result={c} />
+          </aside>
+        </div>
       )}
     </div>
   );
