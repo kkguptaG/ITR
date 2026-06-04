@@ -169,7 +169,10 @@ export default function DashboardPage() {
                   <CardTitle>{tr('latestActivity')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StatusTimeline status={latest.status} />
+                  <StatusTimeline
+                    status={latest.status}
+                    eVerified={!!latestDetailQuery.data?.eVerifiedAt}
+                  />
                 </CardContent>
               </Card>
             </>

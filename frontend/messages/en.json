@@ -192,6 +192,7 @@
     "timelineComputed": "Tax computed",
     "timelinePaid": "Fee paid",
     "timelineFiled": "E-filed",
+    "timelineEverified": "E-verified",
     "timelineProcessed": "Processed by ITD",
     "timelineFailed": "Something went wrong — please retry from the return."
   },

@@ -13,9 +13,9 @@ import { Check, CircleDot, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReturnStatus } from '@/lib/api-types';
 
-type StepKey = 'started' | 'computed' | 'paid' | 'filed' | 'processed';
+type StepKey = 'started' | 'computed' | 'paid' | 'filed' | 'everified' | 'processed';
 
-const STEP_ORDER: StepKey[] = ['started', 'computed', 'paid', 'filed', 'processed'];
+const STEP_ORDER: StepKey[] = ['started', 'computed', 'paid', 'filed', 'everified', 'processed'];
 
 /** Which timeline step a given status currently sits on. */
 const STATUS_STEP: Record<ReturnStatus, StepKey> = {
@@ -31,7 +31,7 @@ const STATUS_STEP: Record<ReturnStatus, StepKey> = {
   Failed: 'filed', // stalled at the e-file step (unless payment-due, handled below)
 };
 
-export function StatusTimeline({ status }: { status: ReturnStatus }) {
+export function StatusTimeline({ status, eVerified = false }: { status: ReturnStatus; eVerified?: boolean }) {
   const t = useTranslations('returns');
 
   const labels: Record<StepKey, string> = {
@@ -39,12 +39,17 @@ export function StatusTimeline({ status }: { status: ReturnStatus }) {
     computed: t('timelineComputed'),
     paid: t('timelinePaid'),
     filed: t('timelineFiled'),
+    everified: t('timelineEverified'),
     processed: t('timelineProcessed'),
   };
 
   const isFailed = status === 'Failed';
-  // A payment-due failure (rare) stalls earlier; otherwise treat Failed as e-file failure.
-  const currentStep = status === 'PendingPayment' ? 'computed' : STATUS_STEP[status];
+  // The current (in-progress) step. A payment-due failure stalls at computed; a Filed return's next
+  // action is e-verification (then CPC processing) — so it advances past "filed" only once verified.
+  const currentStep: StepKey =
+    status === 'PendingPayment' ? 'computed'
+      : status === 'Filed' ? (eVerified ? 'processed' : 'everified')
+      : STATUS_STEP[status];
   const currentIndex = STEP_ORDER.indexOf(currentStep);
 
   return (
