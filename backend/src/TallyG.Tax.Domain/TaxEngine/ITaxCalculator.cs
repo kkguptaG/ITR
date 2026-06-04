@@ -269,8 +269,51 @@ public sealed record ComputationResult
     public decimal CapitalGainsNetIncome { get; init; }
     public decimal OtherSourcesNetIncome { get; init; }
 
+    /// <summary>Rate-wise split of capital-gains + casual income taxed OUTSIDE the normal slab — the
+    /// granular "income chargeable at special rates" lines (s.111A / 112A / 112 / 115BBH / 115BB) a
+    /// CA-grade computation sheet itemises. All zero for a return with no capital gains/winnings.</summary>
+    public SpecialIncomeDetail SpecialIncome { get; init; } = new();
+
+    /// <summary>Tax on the normal (slab-rate) income, before rebate.</summary>
+    public decimal TaxAtNormalRates { get; init; }
+
+    /// <summary>Tax on income charged at special rates (capital gains 111A/112A/112/115BBH + casual 115BB).</summary>
+    public decimal TaxAtSpecialRates { get; init; }
+
+    /// <summary>Net agricultural income — exempt, but aggregated for the rate (partial integration). 0 when none.</summary>
+    public decimal NetAgriculturalIncome { get; init; }
+
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();
+}
+
+/// <summary>
+/// The rate-wise breakdown of income taxed outside the normal slab — the "income chargeable to tax at
+/// special rates" block of the ITD computation (Schedule SI). <see cref="SlabRateCapitalGains"/> is the
+/// only capital-gains component still taxed at the slab rate; the rest carry their statutory flat rates.
+/// </summary>
+public sealed record SpecialIncomeDetail
+{
+    /// <summary>Short-term capital gains taxed at the normal slab rate (e.g. debt MF, unlisted, property STCG).</summary>
+    public decimal SlabRateCapitalGains { get; init; }
+
+    /// <summary>STCG on listed equity / equity MF (STT-paid), taxed at the s.111A rate (15% / 20%).</summary>
+    public decimal Stcg111A { get; init; }
+
+    /// <summary>Taxable LTCG on listed equity (s.112A, after the exempt threshold), taxed at 10% / 12.5%.</summary>
+    public decimal Ltcg112A { get; init; }
+
+    /// <summary>LTCG taxed under s.112 (property / other assets), at 20% (with indexation) or 12.5%.</summary>
+    public decimal Ltcg112 { get; init; }
+
+    /// <summary>Virtual digital asset (crypto/NFT) gains taxed at the flat s.115BBH rate (30%).</summary>
+    public decimal Vda115BBH { get; init; }
+
+    /// <summary>Winnings / casual income taxed at the flat s.115BB rate (30%): lottery, betting, online games.</summary>
+    public decimal Casual115BB { get; init; }
+
+    /// <summary>Total income charged at special (non-slab) rates — excludes <see cref="SlabRateCapitalGains"/>.</summary>
+    public decimal Total => Stcg111A + Ltcg112A + Ltcg112 + Vda115BBH + Casual115BB;
 }
 
 /// <summary>One explainable step in the computation pipeline.</summary>

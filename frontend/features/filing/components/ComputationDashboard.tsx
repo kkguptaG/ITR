@@ -23,7 +23,7 @@ import { computeTax, validateReturn, filingKeys } from '../api';
 import { incomeHeads } from '../steps';
 import type { Regime, TaxComputationResultDto } from '../types';
 
-type RowKind = 'head' | 'subtotal' | 'deduction' | 'tax' | 'prepaid' | 'result' | 'minor';
+type RowKind = 'head' | 'subtotal' | 'deduction' | 'tax' | 'prepaid' | 'result' | 'minor' | 'subline';
 
 interface Row {
   key: string;
@@ -99,16 +99,41 @@ export function ComputationDashboard({
   // entered is ever silently dropped from the computation.
   const heads = incomeHeads(detail.itrType);
   const showHead = (relevant: boolean, amount: number) => relevant || amount !== 0;
+
+  // Rate-wise capital-gains + casual sub-lines (ITD Schedule SI), itemised under their head so the
+  // dashboard mirrors a CA-grade computation sheet. Each appears only when its bucket is non-zero.
+  const si = c?.specialIncome;
+  const sub = (key: string, label: string, amount: number): Row[] =>
+    amount !== 0 ? [{ key, label, amount, kind: 'subline' as const, indent: true }] : [];
+  const cgSubLines: Row[] = si
+    ? [
+        ...sub('cg-slab', 'STCG, other assets (slab rate)', v(si.slabRateCapitalGains)),
+        ...sub('cg-111a', 'STCG, listed equity (s.111A)', v(si.stcg111A)),
+        ...sub('cg-112a', 'LTCG, listed equity (s.112A)', v(si.ltcg112A)),
+        ...sub('cg-112', 'LTCG, other assets (s.112)', v(si.ltcg112)),
+        ...sub('cg-vda', 'VDA / crypto (s.115BBH)', v(si.vda115BBH)),
+      ]
+    : [];
+  const winningsSubLine: Row[] = sub('os-115bb', 'Winnings / lottery (s.115BB)', v(si?.casual115BB));
+
   const rows: Row[] = [
     ...(showHead(heads.salary, v(c?.salaryNetIncome)) ? [{ key: 'salary', label: 'Salary', amount: v(c?.salaryNetIncome), kind: 'head' as const, href: incomeHref('salary') }] : []),
     ...(showHead(heads.business, v(c?.businessNetIncome)) ? [{ key: 'business', label: 'Income from Business or Profession', amount: v(c?.businessNetIncome), kind: 'head' as const, href: incomeHref('business') }] : []),
     ...(showHead(heads.houseProperty, v(c?.housePropertyNetIncome)) ? [{ key: 'house', label: 'Income from House Property', amount: v(c?.housePropertyNetIncome), kind: 'head' as const, href: incomeHref('house') }] : []),
-    ...(showHead(heads.capitalGains, v(c?.capitalGainsNetIncome)) ? [{ key: 'cg', label: 'Capital Gains', amount: v(c?.capitalGainsNetIncome), kind: 'head' as const, href: incomeHref('capitalGains') }] : []),
-    ...(showHead(heads.otherSources, v(c?.otherSourcesNetIncome)) ? [{ key: 'other', label: 'Income from Other Sources', amount: v(c?.otherSourcesNetIncome), kind: 'head' as const, href: incomeHref('other') }] : []),
+    ...(showHead(heads.capitalGains, v(c?.capitalGainsNetIncome)) ? [{ key: 'cg', label: 'Capital Gains', amount: v(c?.capitalGainsNetIncome), kind: 'head' as const, href: incomeHref('capitalGains') }, ...cgSubLines] : []),
+    ...(showHead(heads.otherSources, v(c?.otherSourcesNetIncome)) ? [{ key: 'other', label: 'Income from Other Sources', amount: v(c?.otherSourcesNetIncome), kind: 'head' as const, href: incomeHref('other') }, ...winningsSubLine] : []),
     { key: 'gti', label: 'Gross Total Income', amount: v(c?.grossTotalIncome), kind: 'subtotal' as const },
     { key: 'via', label: 'Less: Deductions under Chapter VI-A', amount: v(c?.totalDeductions), kind: 'deduction' as const, href: `/returns/${returnId}/file/deductions` },
     { key: 'taxable', label: 'Taxable Income', amount: v(c?.taxableIncome), kind: 'subtotal' as const },
     { key: 'taxbefore', label: 'Income Tax', amount: v(c?.taxBeforeRebate), kind: 'tax' as const },
+    // Split the tax into its slab-rate vs special-rate components — only meaningful when some income
+    // is charged at special rates (capital gains / winnings).
+    ...(v(c?.taxAtSpecialRates) > 0
+      ? [
+          { key: 'tax-normal', label: 'on income at normal (slab) rates', amount: v(c?.taxAtNormalRates), kind: 'subline' as const, indent: true },
+          { key: 'tax-special', label: 'on income at special rates', amount: v(c?.taxAtSpecialRates), kind: 'subline' as const, indent: true },
+        ]
+      : []),
     ...(v(c?.rebate87A) > 0 ? [{ key: 'r87a', label: 'Less: Rebate u/s 87A', amount: v(c?.rebate87A), kind: 'tax' as const, indent: true }] : []),
     ...(v(c?.surcharge) > 0 ? [{ key: 'sur', label: 'Add: Surcharge', amount: v(c?.surcharge), kind: 'tax' as const, indent: true }] : []),
     { key: 'cess', label: 'Add: Health & Education Cess', amount: v(c?.cess), kind: 'tax' as const, indent: true },
@@ -222,13 +247,18 @@ export function ComputationDashboard({
                         'flex w-full items-center justify-between gap-3 px-1 py-2 text-left text-sm',
                         clickable && 'group hover:bg-brand-50/60 rounded-lg cursor-pointer',
                         row.kind === 'subtotal' && 'bg-ink-50 font-semibold text-ink-900 rounded-lg px-2',
+                        row.kind === 'subline' && 'py-1 text-xs',
                         row.indent && 'pl-5',
                       )}
                     >
                       <span
                         className={cn(
                           'flex items-center gap-1.5',
-                          row.kind === 'subtotal' ? 'text-ink-900' : 'text-ink-700',
+                          row.kind === 'subtotal'
+                            ? 'text-ink-900'
+                            : row.kind === 'subline'
+                              ? 'text-ink-400'
+                              : 'text-ink-700',
                           row.kind === 'head' && 'font-medium',
                         )}
                       >
@@ -249,7 +279,11 @@ export function ComputationDashboard({
                         <span
                           className={cn(
                             'shrink-0 tabular-nums',
-                            row.kind === 'subtotal' ? 'font-semibold text-ink-900' : 'text-ink-700',
+                            row.kind === 'subtotal'
+                              ? 'font-semibold text-ink-900'
+                              : row.kind === 'subline'
+                                ? 'text-ink-400'
+                                : 'text-ink-700',
                             row.amount === 0 && 'text-ink-300',
                           )}
                         >

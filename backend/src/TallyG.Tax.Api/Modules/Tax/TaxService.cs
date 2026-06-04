@@ -414,6 +414,16 @@ public sealed class TaxService : ITaxService
             r.BusinessNetIncome,
             r.CapitalGainsNetIncome,
             r.OtherSourcesNetIncome,
+            new SpecialIncomeDto(
+                r.SpecialIncome.SlabRateCapitalGains,
+                r.SpecialIncome.Stcg111A,
+                r.SpecialIncome.Ltcg112A,
+                r.SpecialIncome.Ltcg112,
+                r.SpecialIncome.Vda115BBH,
+                r.SpecialIncome.Casual115BB),
+            r.TaxAtNormalRates,
+            r.TaxAtSpecialRates,
+            r.NetAgriculturalIncome,
             r.Trace.Select(t => new TraceLineDto(t.Step, t.Description, t.Amount, t.RuleRef)).ToList());
 
     private static RegimeSlabsDto ToRegimeSlabsDto(RegimeRules rr)

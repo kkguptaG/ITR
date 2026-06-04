@@ -232,6 +232,18 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     businessNetIncome: 0,
     capitalGainsNetIncome: 0,
     otherSourcesNetIncome: 0,
+    // The persisted summary doesn't carry the rate-wise split; the live dashboard query supplies it.
+    specialIncome: {
+      slabRateCapitalGains: 0,
+      stcg111A: 0,
+      ltcg112A: 0,
+      ltcg112: 0,
+      vda115BBH: 0,
+      casual115BB: 0,
+    },
+    taxAtNormalRates: 0,
+    taxAtSpecialRates: 0,
+    netAgriculturalIncome: 0,
     trace: [],
   };
 }

@@ -140,7 +140,20 @@ public sealed record TaxComputationResultDto(
     decimal BusinessNetIncome,
     decimal CapitalGainsNetIncome,
     decimal OtherSourcesNetIncome,
+    SpecialIncomeDto SpecialIncome,
+    decimal TaxAtNormalRates,
+    decimal TaxAtSpecialRates,
+    decimal NetAgriculturalIncome,
     IReadOnlyList<TraceLineDto> Trace);
+
+/// <summary>Rate-wise split of income taxed outside the slab (Schedule SI) for the computation dashboard.</summary>
+public sealed record SpecialIncomeDto(
+    decimal SlabRateCapitalGains,
+    decimal Stcg111A,
+    decimal Ltcg112A,
+    decimal Ltcg112,
+    decimal Vda115BBH,
+    decimal Casual115BB);
 
 /// <summary>One explainable line of the computation pipeline.</summary>
 public sealed record TraceLineDto(string Step, string Description, decimal Amount, string? RuleRef);

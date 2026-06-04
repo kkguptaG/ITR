@@ -240,6 +240,20 @@ public sealed class TaxCalculator : ITaxCalculator
             BusinessNetIncome = setOff.BusinessAfter,
             CapitalGainsNetIncome = specialRateIncome + slabRateCgIncome,
             OtherSourcesNetIncome = setOff.OtherSourcesAfter + casual115BB,
+            // Rate-wise split of the special-rate income + the normal/special tax split, so the
+            // computation dashboard can itemise capital gains the way a CA-grade sheet (Schedule SI) does.
+            SpecialIncome = new SpecialIncomeDetail
+            {
+                SlabRateCapitalGains = slabRateCgIncome,
+                Stcg111A = specialBuckets.Stcg111A,
+                Ltcg112A = specialBuckets.Ltcg112ATaxable,
+                Ltcg112 = specialBuckets.Ltcg112,
+                Vda115BBH = specialBuckets.Crypto115Bbh,
+                Casual115BB = casual115BB,
+            },
+            TaxAtNormalRates = taxOnNormal,
+            TaxAtSpecialRates = specialTax + casualTax,
+            NetAgriculturalIncome = agriculturalIncome,
             Trace = trace,
         };
     }

@@ -307,7 +307,31 @@ export interface TaxComputationResultDto {
   businessNetIncome: number;
   capitalGainsNetIncome: number;
   otherSourcesNetIncome: number;
+  /** Rate-wise split of income taxed outside the slab (Schedule SI) — drives the dashboard's capital-gains sub-lines. */
+  specialIncome: SpecialIncomeDto;
+  /** Tax on normal (slab-rate) income, before rebate. */
+  taxAtNormalRates: number;
+  /** Tax on income charged at special rates (CG 111A/112A/112/115BBH + casual 115BB). */
+  taxAtSpecialRates: number;
+  /** Net agricultural income — exempt, aggregated for the rate. */
+  netAgriculturalIncome: number;
   trace: TraceLineDto[];
+}
+
+/** Rate-wise breakdown of income taxed outside the normal slab (ITD Schedule SI). */
+export interface SpecialIncomeDto {
+  /** STCG taxed at the normal slab rate (debt MF, unlisted, property STCG). */
+  slabRateCapitalGains: number;
+  /** STCG on listed equity (s.111A) @ 15% / 20%. */
+  stcg111A: number;
+  /** Taxable LTCG on listed equity (s.112A) @ 10% / 12.5%. */
+  ltcg112A: number;
+  /** LTCG on property / other (s.112) @ 20% / 12.5%. */
+  ltcg112: number;
+  /** Virtual digital asset gains (s.115BBH) @ 30%. */
+  vda115BBH: number;
+  /** Winnings / casual income (s.115BB) @ 30%. */
+  casual115BB: number;
 }
 /** POST /tax/compute and /tax/regime-compare response (both regimes + recommendation). */
 export interface ComputeResponse {
