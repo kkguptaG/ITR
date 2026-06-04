@@ -473,6 +473,34 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Updated_return_requires_a_tier_and_original_ack_when_previously_filed()
+    {
+        ItrFilingContext Updated(ItrType form, int tier, bool prevFiled, string? ack) => new()
+        {
+            Return = new TaxReturn { ItrType = form, Regime = Regime.Old, RuleSetVersion = "AY2024-25",
+                FilingSection = ReturnFilingSection.Updated, UpdatedReturnTier = tier,
+                OriginalReturnPreviouslyFiled = prevFiled, OriginalAcknowledgmentNumber = ack,
+                OriginalFilingDate = new DateOnly(2025, 7, 1) },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 850_000m, TotalTax = 80_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+        };
+        // ITR-1 doesn't support ITR-U.
+        Has(Svc.Validate(Updated(ItrType.ITR1, 1, true, "123456789012345"), StubJson), "FILING.UPDATED_FORM_UNSUPPORTED").Should().BeTrue();
+        // No tier → error.
+        Has(Svc.Validate(Updated(ItrType.ITR2, 0, false, null), StubJson), "FILING.UPDATED_NO_TIER").Should().BeTrue();
+        // Previously filed but no ack → error.
+        Has(Svc.Validate(Updated(ItrType.ITR2, 1, true, null), StubJson), "FILING.UPDATED_NO_ORIGINAL_ACK").Should().BeTrue();
+        // Complete ITR-2 updated return → none of the updated errors.
+        var ok = Svc.Validate(Updated(ItrType.ITR2, 1, true, "123456789012345"), StubJson);
+        Has(ok, "FILING.UPDATED_FORM_UNSUPPORTED").Should().BeFalse();
+        Has(ok, "FILING.UPDATED_NO_TIER").Should().BeFalse();
+        Has(ok, "FILING.UPDATED_NO_ORIGINAL_ACK").Should().BeFalse();
+    }
+
+    [Fact]
     public void Chapter_VIA_deductions_exceeding_GTI_warn()
     {
         // GTI is ₹8L in the fixture; ₹9L of deductions can't be allowed in full (s.80A(2)).

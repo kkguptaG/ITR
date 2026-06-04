@@ -534,6 +534,37 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- updated return (s.139(8A) / ITR-U) eligibility + completeness ---
+        if (ctx.Return.FilingSection == ReturnFilingSection.Updated)
+        {
+            if (ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3))
+            {
+                Err("FILING.UPDATED_FORM_UNSUPPORTED", "$..PartA_139_8A",
+                    $"An updated return (ITR-U, s.139(8A)) is only supported on ITR-2 / ITR-3, not {ctx.ItrType}.",
+                    "File the updated return on ITR-2 or ITR-3.");
+            }
+
+            var tier = ctx.Return.UpdatedReturnTier;
+            if (tier is < 1 or > 4)
+            {
+                Err("FILING.UPDATED_NO_TIER", "$..PartA_139_8A.UpdatedReturnDuringPeriod",
+                    "An updated return needs the time period (within 12 / 24 / 36 / 48 months of the AY end).",
+                    "Pick the period in the Personal step — it sets the s.140B additional tax (25 / 50 / 60 / 70%).");
+            }
+
+            // If the original return was previously filed, its ack + date are required for Applicable_139_8A.
+            if (ctx.Return.OriginalReturnPreviouslyFiled)
+            {
+                var ack = ctx.Return.OriginalAcknowledgmentNumber?.Trim() ?? string.Empty;
+                if (ack.Length != 15 || !ack.All(char.IsDigit))
+                {
+                    Err("FILING.UPDATED_NO_ORIGINAL_ACK", "$..PartA_139_8A.Applicable_139_8A.AcknowledgementNo",
+                        "An updated return that revises a previously-filed return needs that return's 15-digit acknowledgment number.",
+                        "Enter the original return's acknowledgment number, or unset \"previously filed\" if no return was filed for this AY.");
+                }
+            }
+        }
+
         // --- official ITD schema conformance (JSON Schema draft-04), when a schema is bundled for this AY + form ---
         var schemaResult = ItrSchemaValidator.Validate(ctx.AyCode, ctx.ItrType, json);
         if (schemaResult.SchemaAvailable)

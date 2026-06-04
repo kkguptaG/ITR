@@ -32,10 +32,15 @@ public sealed record UpdateReturnRequest(
     decimal? ForeignIncomeDoublyTaxed = null,
     decimal? ForeignTaxPaid = null,
     bool? ForeignDtaaApplies = null,
-    // s.139 filing section (original / belated / revised) + the original return's details (revised only).
+    // s.139 filing section (original / belated / revised / updated) + the original return's details.
     ReturnFilingSection? FilingSection = null,
     string? OriginalAcknowledgmentNumber = null,
-    DateOnly? OriginalFilingDate = null);
+    DateOnly? OriginalFilingDate = null,
+    // Updated return (ITR-U) specifics.
+    string? UpdatedReturnReason = null,
+    int? UpdatedReturnTier = null,
+    bool? OriginalReturnPreviouslyFiled = null,
+    decimal? OriginalTaxPaid = null);
 
 /// <summary>List-row projection for GET /returns.</summary>
 public sealed record ReturnSummaryDto(
@@ -91,7 +96,11 @@ public sealed record ReturnDetailDto(
     bool ForeignDtaaApplies,
     ReturnFilingSection FilingSection = ReturnFilingSection.Original,
     string? OriginalAcknowledgmentNumber = null,
-    DateOnly? OriginalFilingDate = null);
+    DateOnly? OriginalFilingDate = null,
+    string? UpdatedReturnReason = null,
+    int UpdatedReturnTier = 0,
+    bool OriginalReturnPreviouslyFiled = false,
+    decimal OriginalTaxPaid = 0m);
 
 // ----------------------------------------------------------------- income sources
 

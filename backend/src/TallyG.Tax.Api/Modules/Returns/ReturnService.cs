@@ -277,6 +277,16 @@ public sealed class ReturnService : IReturnService
         }
         if (request.OriginalFilingDate is { } ofd) ret.OriginalFilingDate = ofd;
 
+        // Updated return (ITR-U) specifics.
+        if (request.UpdatedReturnReason is not null)
+        {
+            var reason = request.UpdatedReturnReason.Trim();
+            ret.UpdatedReturnReason = reason.Length == 0 ? null : reason;
+        }
+        if (request.UpdatedReturnTier is { } tier) ret.UpdatedReturnTier = Math.Clamp(tier, 0, 4);
+        if (request.OriginalReturnPreviouslyFiled is { } prev) ret.OriginalReturnPreviouslyFiled = prev;
+        if (request.OriginalTaxPaid is { } otp) ret.OriginalTaxPaid = Math.Max(0m, otp);
+
         // Touching the working draft moves it out of the pristine Draft state.
         if (ret.Status == ReturnStatus.Draft)
         {
@@ -1171,7 +1181,11 @@ public sealed class ReturnService : IReturnService
             ret.ForeignDtaaApplies,
             ret.FilingSection,
             ret.OriginalAcknowledgmentNumber,
-            ret.OriginalFilingDate);
+            ret.OriginalFilingDate,
+            ret.UpdatedReturnReason,
+            ret.UpdatedReturnTier,
+            ret.OriginalReturnPreviouslyFiled,
+            ret.OriginalTaxPaid);
     }
 
     /// <summary>
