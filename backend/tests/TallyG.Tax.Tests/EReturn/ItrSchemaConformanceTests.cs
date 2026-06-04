@@ -124,7 +124,7 @@ public class ItrSchemaConformanceTests
 
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var fs = doc.RootElement.GetProperty("ITR").GetProperty("ITR2").GetProperty("PartA_GEN1").GetProperty("FilingStatus");
-        fs.GetProperty("ReturnFileSec").GetInt32().Should().Be(13, "139(5) revised");
+        fs.GetProperty("ReturnFileSec").GetInt32().Should().Be(17, "ITD code 17 = 139(5) revised (13 is 142(1))");
         fs.GetProperty("ReceiptNo").GetString().Should().Be("123456789012345");
         fs.GetProperty("OrigRetFiledDate").GetString().Should().Be("2025-07-20");
     }

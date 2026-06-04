@@ -13,6 +13,9 @@ public enum ReturnFilingSection
     /// <summary>s.139(4) — belated return after the due date. ITD code 12.</summary>
     Belated = 12,
 
-    /// <summary>s.139(5) — revised return (corrects an earlier filing). ITD code 13.</summary>
-    Revised = 13,
+    /// <summary>
+    /// s.139(5) — revised return (corrects an earlier filing). ITD code 17.
+    /// (Code 13 is 142(1) — a notice-response return — NOT revised.)
+    /// </summary>
+    Revised = 17,
 }
