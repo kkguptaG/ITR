@@ -17,6 +17,7 @@ export {
 export { Badge, StatusBadge, statusTone, type BadgeProps } from './Badge';
 export { Alert, type AlertProps } from './Alert';
 export { Spinner, type SpinnerProps } from './Spinner';
+export { ProgressRing, type ProgressRingProps } from './ProgressRing';
 export { Stepper, type StepperProps, type StepperStep } from './Stepper';
 export { Table, THead, TBody, TR, TH, TD } from './Table';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
