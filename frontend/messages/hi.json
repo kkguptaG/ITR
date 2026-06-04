@@ -447,9 +447,11 @@
       "EquityMutualFund": "इक्विटी म्यूचुअल फंड",
       "DebtMutualFund": "डेट म्यूचुअल फंड",
       "UnlistedShares": "असूचीबद्ध शेयर",
-      "ImmovableProperty": "अचल संपत्ति",
+      "ImmovableProperty": "अचल संपत्ति (मकान / भूमि)",
+      "AgriculturalLand": "कृषि भूमि",
       "Bonds": "बॉन्ड / डिबेंचर",
       "Gold": "स्वर्ण",
+      "Jewellery": "आभूषण / सर्राफा",
       "CryptoVda": "क्रिप्टो / वर्चुअल डिजिटल एसेट",
       "Other": "अन्य परिसंपत्ति"
     }

@@ -113,14 +113,23 @@ export const capitalGainSchema = z.object({
     'DebtMutualFund',
     'UnlistedShares',
     'ImmovableProperty',
+    'AgriculturalLand',
     'Bonds',
     'Gold',
+    'Jewellery',
     'CryptoVda',
     'Other',
   ]),
   term: z.enum(['Short', 'Long']),
+  // How the asset was acquired. Gift / Inheritance / Will step in the previous owner's cost (s.49(1))
+  // and holding period (s.2(42A)) — captured via previousOwner* below.
+  acquisitionMode: z.enum(['Purchase', 'Gift', 'Inheritance', 'Will', 'Other']).default('Purchase'),
   acquisitionDate: z.string().optional().or(z.literal('')),
   transferDate: z.string().optional().or(z.literal('')),
+  previousOwnerAcquisitionDate: z.string().optional().or(z.literal('')),
+  previousOwnerCost: optionalMoney,
+  // Rural agricultural land is not a capital asset (s.2(14)) — the gain is fully exempt.
+  isRuralAgriculturalLand: z.boolean().default(false),
   salePrice: money,
   costOfAcquisition: optionalMoney,
   costOfImprovement: optionalMoney,

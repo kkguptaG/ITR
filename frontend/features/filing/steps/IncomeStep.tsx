@@ -286,8 +286,12 @@ export function IncomeStep() {
                       ? {
                           assetType: item.assetType,
                           term: item.term,
+                          acquisitionMode: item.acquisitionMode ?? 'Purchase',
                           acquisitionDate: item.acquisitionDate ?? '',
                           transferDate: item.transferDate ?? '',
+                          previousOwnerAcquisitionDate: item.previousOwnerAcquisitionDate ?? '',
+                          previousOwnerCost: item.previousOwnerCost ?? 0,
+                          isRuralAgriculturalLand: item.isRuralAgriculturalLand ?? false,
                           salePrice: item.salePrice,
                           costOfAcquisition: item.costOfAcquisition,
                           costOfImprovement: item.costOfImprovement,
@@ -306,6 +310,7 @@ export function IncomeStep() {
                       ...v,
                       acquisitionDate: v.acquisitionDate || null,
                       transferDate: v.transferDate || null,
+                      previousOwnerAcquisitionDate: v.previousOwnerAcquisitionDate || null,
                     };
                     const op = item
                       ? gains.updateMutation.mutateAsync({ id: item.id, body })

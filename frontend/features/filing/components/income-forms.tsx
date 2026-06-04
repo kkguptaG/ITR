@@ -356,11 +356,29 @@ const ASSET_OPTIONS = [
   'DebtMutualFund',
   'UnlistedShares',
   'ImmovableProperty',
+  'AgriculturalLand',
   'Bonds',
   'Gold',
+  'Jewellery',
   'CryptoVda',
   'Other',
 ] as const;
+
+// Holding-period thresholds (months) above which a gain is long-term — a client-side mirror of the
+// rule-set's holding_months (s.2(42A)), used only for the informational "auto term" hint. The backend
+// engine derives the authoritative term from the captured dates.
+const HOLDING_MONTHS: Record<string, number> = {
+  ListedEquity: 12,
+  EquityMutualFund: 12,
+  Bonds: 12,
+  DebtMutualFund: 24,
+  UnlistedShares: 24,
+  ImmovableProperty: 24,
+  AgriculturalLand: 24,
+  Gold: 24,
+  Jewellery: 24,
+  Other: 24,
+};
 
 /**
  * Type-ahead helper that fills the s.112A grandfathered FMV from the bundled NSE
@@ -431,7 +449,9 @@ export function CapitalGainForm({
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CapitalGainFormValues>({
     resolver: zodResolver(capitalGainSchema),
     defaultValues: {
-      assetType: 'ListedEquity', term: 'Long', acquisitionDate: '', transferDate: '',
+      assetType: 'ListedEquity', term: 'Long', acquisitionMode: 'Purchase',
+      acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
+      isRuralAgriculturalLand: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
       exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0,
       ...defaultValues,
@@ -439,12 +459,37 @@ export function CapitalGainForm({
   });
 
   const assetType = watch('assetType');
+  const acquisitionMode = watch('acquisitionMode');
+  // Gift / inheritance / will step in the previous owner's cost (s.49(1)) + holding period (s.2(42A)).
+  const stepIn = acquisitionMode === 'Gift' || acquisitionMode === 'Inheritance' || acquisitionMode === 'Will';
+  const isAgriLand = assetType === 'AgriculturalLand';
+  const isRural = isAgriLand && watch('isRuralAgriculturalLand');
+  // Land/building (incl. urban agri land) can claim the 20%-with-indexation option for pre-23-Jul-2024 buys.
+  const isLandBuilding = assetType === 'ImmovableProperty' || isAgriLand;
   // s.112A grandfathering applies only to listed equity / equity MF held long-term.
   const is112AEligible = watch('term') === 'Long'
     && (assetType === 'ListedEquity' || assetType === 'EquityMutualFund');
   // Virtual digital assets (s.115BBH): flat 30%, ONLY cost of acquisition is deductible — no improvement,
   // transfer expense, exemption or reinvestment relief, and no loss set-off. Hide the inapplicable fields.
   const isVda = assetType === 'CryptoVda';
+
+  // Client-side mirror of the backend's dynamic holding-term derivation — an informational hint only; the
+  // engine derives the authoritative term (and the s.48 indexed cost) from these dates at compute time.
+  const effectiveAcqDate = (stepIn ? watch('previousOwnerAcquisitionDate') : watch('acquisitionDate')) || '';
+  const transferDate = watch('transferDate') || '';
+  const derivedTerm = (() => {
+    if (!effectiveAcqDate || !transferDate) return null;
+    const a = new Date(effectiveAcqDate);
+    const tr = new Date(transferDate);
+    if (Number.isNaN(a.getTime()) || Number.isNaN(tr.getTime()) || tr < a) return null;
+    const months = Math.max(
+      0,
+      (tr.getFullYear() - a.getFullYear()) * 12 + (tr.getMonth() - a.getMonth()) - (tr.getDate() < a.getDate() ? 1 : 0),
+    );
+    const cutoff = new Date(a);
+    cutoff.setMonth(cutoff.getMonth() + (HOLDING_MONTHS[assetType] ?? 24));
+    return { long: tr > cutoff, months };
+  })();
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
@@ -458,61 +503,129 @@ export function CapitalGainForm({
             ))}
           </Select>
         </Field>
-        <Field label={t('term')} error={errors.term?.message} required>
-          <Select {...register('term')}>
-            <option value="Short">{t('shortTerm')}</option>
-            <option value="Long">{t('longTerm')}</option>
+        <Field label="How was it acquired?">
+          <Select {...register('acquisitionMode')}>
+            <option value="Purchase">Purchased</option>
+            <option value="Gift">Received as gift</option>
+            <option value="Inheritance">Inherited</option>
+            <option value="Will">Received under a will</option>
+            <option value="Other">Other</option>
           </Select>
         </Field>
-        <Field label={t('acquisitionDate')}>
-          <Input type="date" {...register('acquisitionDate')} />
-        </Field>
-        <Field label={t('transferDate')}>
-          <Input type="date" {...register('transferDate')} />
-        </Field>
-        <MoneyField control={control} name="salePrice" label={t('saleConsideration')} error={errors.salePrice?.message} />
-        <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
-        {is112AEligible ? (
-          <>
-            <GrandfatherFmvLookup
-              onPick={(fmv) => setValue('fairMarketValue31Jan2018', fmv, { shouldValidate: true, shouldDirty: true })}
-            />
-            <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
-          </>
-        ) : null}
-        {!isVda ? (
-          <>
-            <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
-            <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
-            <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
-            <Field label="Reinvestment exemption section">
-              <Select {...register('exemptionSection')}>
-                <option value="">None / manual amount</option>
-                <option value="54">54 — residential house</option>
-                <option value="54F">54F — any asset (proportionate)</option>
-                <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+      </div>
+
+      {isAgriLand ? (
+        <label className="flex items-start gap-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3 text-sm">
+          <input
+            type="checkbox"
+            {...register('isRuralAgriculturalLand')}
+            className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600"
+          />
+          <span>
+            <span className="font-medium text-ink-800">This is rural agricultural land</span>
+            <span className="block text-xs text-ink-500">
+              Rural agricultural land is not a “capital asset” (s.2(14)) — the gain is fully exempt.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
+      {isRural ? (
+        <Alert variant="success">
+          Rural agricultural land is <strong>exempt</strong> from capital gains tax — it is not a “capital
+          asset” under s.2(14). It is recorded for completeness and won&apos;t be added to your taxable income.
+        </Alert>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t('term')} error={errors.term?.message} required>
+              <Select {...register('term')}>
+                <option value="Short">{t('shortTerm')}</option>
+                <option value="Long">{t('longTerm')}</option>
               </Select>
             </Field>
-            <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54F/54EC)" />
-          </>
-        ) : null}
-      </div>
-      {isVda ? (
-        <Alert variant="warning">
-          Virtual digital assets (crypto / NFTs) are taxed at a flat <strong>30%</strong> under s.115BBH on
-          (sale consideration − cost of acquisition). No other deduction — cost of improvement, transfer
-          expenses — and <strong>no exemption or loss set-off</strong> is allowed: a loss on one VDA can&apos;t
-          even offset a gain on another, and VDA losses can&apos;t be carried forward.
-        </Alert>
-      ) : null}
-      {!isVda && watch('exemptionSection') ? (
-        <Alert variant="warning">
-          Reinvestment exemptions carry strict conditions &amp; timelines — <strong>54EC</strong>: NHAI/REC
-          bonds within 6 months, capped ₹50L, 5‑yr lock‑in; <strong>54 / 54F</strong>: buy a house 1 yr before
-          or 2 yr after the sale (or construct within 3 yr), parking the amount in the Capital Gains Account
-          Scheme until then. Claim only if you genuinely meet the conditions and hold proof.
-        </Alert>
-      ) : null}
+            <Field label={t('acquisitionDate')}>
+              <Input type="date" {...register('acquisitionDate')} />
+            </Field>
+            <Field label={t('transferDate')}>
+              <Input type="date" {...register('transferDate')} />
+            </Field>
+            {stepIn ? (
+              <>
+                <Field label="Previous owner's acquisition date">
+                  <Input type="date" {...register('previousOwnerAcquisitionDate')} />
+                </Field>
+                <MoneyField control={control} name="previousOwnerCost" label="Previous owner's cost (s.49(1))" />
+              </>
+            ) : null}
+            <MoneyField control={control} name="salePrice" label={t('saleConsideration')} error={errors.salePrice?.message} />
+            <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
+            {is112AEligible ? (
+              <>
+                <GrandfatherFmvLookup
+                  onPick={(fmv) => setValue('fairMarketValue31Jan2018', fmv, { shouldValidate: true, shouldDirty: true })}
+                />
+                <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
+              </>
+            ) : null}
+            {!isVda ? (
+              <>
+                <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
+                <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
+                <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
+                <Field label="Reinvestment exemption section">
+                  <Select {...register('exemptionSection')}>
+                    <option value="">None / manual amount</option>
+                    <option value="54">54 — residential house</option>
+                    {isAgriLand ? <option value="54B">54B — new agricultural land</option> : null}
+                    <option value="54F">54F — any asset (proportionate)</option>
+                    <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+                  </Select>
+                </Field>
+                <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54B/54F/54EC)" />
+              </>
+            ) : null}
+          </div>
+
+          {derivedTerm ? (
+            <Alert variant="info">
+              From the dates entered, this looks like a{' '}
+              <strong>{derivedTerm.long ? 'long-term' : 'short-term'}</strong> gain (held ~{derivedTerm.months}{' '}
+              {derivedTerm.months === 1 ? 'month' : 'months'}). The holding rule, applicable section and
+              indexation are applied automatically when we compute your tax.
+            </Alert>
+          ) : null}
+          {stepIn ? (
+            <Alert variant="info">
+              For a gifted / inherited / will asset we use the <strong>previous owner&apos;s cost</strong> (s.49(1))
+              and count the holding period from when <strong>they</strong> acquired it (s.2(42A)).
+            </Alert>
+          ) : null}
+          {isLandBuilding && !isVda ? (
+            <p className="text-xs text-ink-500">
+              Indexed cost (Cost Inflation Index, s.48) is applied automatically for land/building acquired
+              before 23-Jul-2024 — we keep the lower of 20% with indexation and 12.5% without.
+            </p>
+          ) : null}
+          {isVda ? (
+            <Alert variant="warning">
+              Virtual digital assets (crypto / NFTs) are taxed at a flat <strong>30%</strong> under s.115BBH on
+              (sale consideration − cost of acquisition). No other deduction — cost of improvement, transfer
+              expenses — and <strong>no exemption or loss set-off</strong> is allowed: a loss on one VDA can&apos;t
+              even offset a gain on another, and VDA losses can&apos;t be carried forward.
+            </Alert>
+          ) : null}
+          {!isVda && watch('exemptionSection') ? (
+            <Alert variant="warning">
+              Reinvestment exemptions carry strict conditions &amp; timelines — <strong>54EC</strong>: NHAI/REC
+              bonds within 6 months, capped ₹50L, 5‑yr lock‑in; <strong>54 / 54F</strong>: buy a house 1 yr before
+              or 2 yr after the sale (or construct within 3 yr); <strong>54B</strong>: buy new agricultural land
+              within 2 years — parking the amount in the Capital Gains Account Scheme until then. Claim only if
+              you genuinely meet the conditions and hold proof.
+            </Alert>
+          ) : null}
+        </>
+      )}
       <FormActions onCancel={onCancel} loading={loading} submitLabel={tc('save')} />
     </form>
   );

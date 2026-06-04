@@ -44,11 +44,14 @@ export type CapitalGainAssetType =
   | 'DebtMutualFund'
   | 'UnlistedShares'
   | 'ImmovableProperty'
+  | 'AgriculturalLand'
   | 'Bonds'
   | 'Gold'
+  | 'Jewellery'
   | 'CryptoVda'
   | 'Other';
 export type CapitalGainTerm = 'Short' | 'Long';
+export type CapitalGainAcquisitionMode = 'Purchase' | 'Gift' | 'Inheritance' | 'Will' | 'Other';
 export type IncomeType =
   | 'Salary'
   | 'HouseProperty'
@@ -157,13 +160,21 @@ export interface CapitalGainDto {
   gain: number;
   isin: string | null;
   fairMarketValue31Jan2018: number;
+  acquisitionMode: CapitalGainAcquisitionMode;
+  previousOwnerAcquisitionDate: string | null;
+  previousOwnerCost: number;
+  isRuralAgriculturalLand: boolean;
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
   term: CapitalGainTerm;
   taxSection?: string | null;
+  acquisitionMode?: CapitalGainAcquisitionMode;
   acquisitionDate?: string | null;
   transferDate?: string | null;
+  previousOwnerAcquisitionDate?: string | null;
+  previousOwnerCost?: number;
+  isRuralAgriculturalLand?: boolean;
   salePrice: number;
   costOfAcquisition: number;
   costOfImprovement: number;

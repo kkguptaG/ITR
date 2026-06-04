@@ -447,9 +447,11 @@
       "EquityMutualFund": "Equity mutual funds",
       "DebtMutualFund": "Debt mutual funds",
       "UnlistedShares": "Unlisted shares",
-      "ImmovableProperty": "Immovable property",
+      "ImmovableProperty": "Immovable property (house / land)",
+      "AgriculturalLand": "Agricultural land",
       "Bonds": "Bonds / debentures",
       "Gold": "Gold",
+      "Jewellery": "Jewellery / bullion",
       "CryptoVda": "Crypto / virtual digital assets",
       "Other": "Other asset"
     }
