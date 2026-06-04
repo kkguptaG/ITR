@@ -19,7 +19,7 @@ import { formatAssessmentYear, formatDateTime } from '@/lib/format';
 import { formatItrType } from '@/features/returns/helpers';
 import { filingKeys, getReturn } from './api';
 import type { TaxComputationDto } from './types';
-import { downloadAcknowledgment, downloadComputation, downloadReturnPdf } from './download';
+import { downloadAcknowledgment, downloadComputation, downloadReturnPdf, downloadChallan280 } from './download';
 import { isReturnLocked } from './useReturn';
 import { TaxSummaryPanel } from './components/TaxSummaryPanel';
 import { BusinessIncomeSummaryCard } from './components/BusinessIncomeSummaryCard';
@@ -145,6 +145,12 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
             <Download className="h-4 w-4" aria-hidden="true" />
             Computation statement
           </Button>
+          {comp.refundOrPayable < 0 && (
+            <Button variant="outline" className="flex-1" onClick={() => void downloadChallan280(returnId)}>
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Tax payment slip (Challan 280)
+            </Button>
+          )}
         </div>
       )}
 

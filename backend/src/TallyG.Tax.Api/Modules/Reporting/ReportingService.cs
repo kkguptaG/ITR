@@ -132,6 +132,32 @@ public sealed class ReportingService : IReportingService
             taxReturn.TenantId, taxReturn.UserId, returnId, "return_summary", title, lines, fileName, ct);
     }
 
+    // -------------------------------------------------------------- challan 280
+
+    public async Task<GeneratedFile> GetChallan280Async(Guid returnId, CancellationToken ct = default)
+    {
+        var taxReturn = await LoadReturnAsync(returnId, ct);
+        var computation = await LatestComputationAsync(taxReturn, ct)
+            ?? throw AppException.NotFound(
+                "No finalized computation exists for this return yet.", "REPORT.NO_COMPUTATION");
+
+        if (computation.RefundOrPayable >= 0m)
+        {
+            throw AppException.Conflict(
+                "No self-assessment tax is payable - a refund or nil balance is due.", "REPORT.NO_TAX_PAYABLE");
+        }
+
+        var taxpayer = await LoadUserAsync(taxReturn.UserId, ct);
+        var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
+
+        var title = $"Challan 280 - Self-Assessment Tax - {ay?.Code ?? "AY"}";
+        var lines = ReportContent.Challan280(taxReturn, taxpayer, ay, computation);
+        var fileName = $"Challan280-{taxReturn.Id:N}.pdf";
+
+        return await RenderStoreStreamAsync(
+            taxReturn.TenantId, taxReturn.UserId, taxReturn.Id, "challan_280", title, lines, fileName, ct);
+    }
+
     // ------------------------------------------------------------------ invoice
 
     public async Task<GeneratedFile> GetInvoiceAsync(Guid paymentId, CancellationToken ct = default)

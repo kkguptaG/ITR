@@ -47,6 +47,16 @@ public sealed class ReturnReportsController : ControllerBase
         return File(file.Content, file.ContentType, file.FileName);
     }
 
+    /// <summary>Download the self-assessment tax payment slip (Challan 280) when a balance is payable.</summary>
+    [HttpGet("{id:guid}/challan-280")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Challan280([FromRoute] Guid id, CancellationToken ct)
+    {
+        var file = await _reporting.GetChallan280Async(id, ct);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
     /// <summary>List the generated take-away artifacts registered against a return.</summary>
     [HttpGet("{id:guid}/documents")]
     [ProducesResponseType(typeof(IReadOnlyList<GeneratedDocumentDto>), StatusCodes.Status200OK)]

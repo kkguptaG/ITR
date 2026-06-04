@@ -89,6 +89,29 @@ public class ComputationStatementTests
     }
 
     [Fact]
+    public void Challan280_breaks_the_balance_into_tax_interest_and_fee()
+    {
+        var ret = new TaxReturn { ItrType = ItrType.ITR2, Status = ReturnStatus.ComputedReady };
+        var user = new User { FullName = "Demo Taxpayer", PanMasked = "ABCDE1234F" };
+        var ay = new AssessmentYear { Code = "AY2025-26", FyCode = "FY2024-25" };
+        var c = new TaxComputation
+        {
+            TotalTax = 1_873_433m, InterestPenalty = 38_593m, LateFee234F = 5_000m,
+            TdsPaid = 1_525_000m, AdvanceTax = 200_000m,
+            RefundOrPayable = -192_026m, // balance payable
+        };
+
+        var lines = ReportContent.Challan280(ret, user, ay, c);
+
+        // Balance 1,92,026 = tax 1,48,433 + interest 38,593 + fee 5,000.
+        lines.Should().Contain(l => l.Label == "Tax" && l.Value == "Rs. 1,48,433");
+        lines.Should().Contain(l => l.Label.Contains("234A/B/C") && l.Value == "Rs. 38,593");
+        lines.Should().Contain(l => l.Label.Contains("234F") && l.Value == "Rs. 5,000");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Total && l.Label == "Total Amount Payable" && l.Value == "Rs. 1,92,026");
+        lines.Should().Contain(l => l.Label.Contains("(300) Self-Assessment"));
+    }
+
+    [Fact]
     public void Return_summary_renders_particulars_income_deductions_and_verification()
     {
         var ret = new TaxReturn

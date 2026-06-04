@@ -53,6 +53,10 @@ export const downloadComputation = (returnId: string) =>
 export const downloadReturnPdf = (returnId: string) =>
   downloadPdf(`/returns/${returnId}/return-pdf`, `return-${returnId}.pdf`);
 
+/** GET /returns/{id}/challan-280 — the self-assessment tax payment slip (when tax is payable). */
+export const downloadChallan280 = (returnId: string) =>
+  downloadPdf(`/returns/${returnId}/challan-280`, `challan-280-${returnId}.pdf`);
+
 /** GET /payments/{id}/invoice:pdf — the GST tax-invoice PDF. */
 export const downloadInvoice = (paymentId: string) =>
   downloadPdf(`/payments/${paymentId}/invoice:pdf`, `invoice-${paymentId}.pdf`);

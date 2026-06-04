@@ -229,6 +229,44 @@ internal static class ReportContent
         return lines;
     }
 
+    /// <summary>
+    /// Challan No./ITNS 280 — self-assessment tax payment slip. Shows the assessee header (PAN/name/AY),
+    /// the breakup of the balance payable into tax / interest (s.234A/B/C) / fee (s.234F), and how to pay
+    /// it via the e-Pay Tax facility. Only meaningful when a balance is payable (refund ⇒ no challan).
+    /// </summary>
+    public static IReadOnlyList<PdfLine> Challan280(
+        TaxReturn taxReturn,
+        User taxpayer,
+        AssessmentYear? ay,
+        TaxComputation c)
+    {
+        var balance = System.Math.Max(0m, -c.RefundOrPayable);          // payable when RefundOrPayable < 0
+        var taxPortion = System.Math.Max(0m, balance - c.InterestPenalty - c.LateFee234F);
+
+        var lines = new List<PdfLine>
+        {
+            PdfLine.Note("CHALLAN No./ITNS 280  -  Payment of Income-Tax"),
+            PdfLine.Note("Tax Applicable: (0021) Income-Tax (Other than Companies)   |   Type of Payment: (300) Self-Assessment Tax"),
+            PdfLine.Spacer(),
+            new("PAN", taxpayer.PanMasked ?? "XXXXX____X"),
+            new("Full Name", taxpayer.FullName),
+            new("Assessment Year", ay?.Code ?? "-"),
+            new("Financial Year", ay?.FyCode ?? "-"),
+        };
+
+        lines.Add(PdfLine.Heading("Amount Payable - Self-Assessment Tax"));
+        lines.Add(new("Tax", Money(taxPortion)));
+        if (c.InterestPenalty > 0m) lines.Add(PdfLine.Detail("Interest (s.234A/B/C)", Money(c.InterestPenalty)));
+        if (c.LateFee234F > 0m) lines.Add(PdfLine.Detail("Fee (s.234F)", Money(c.LateFee234F)));
+        lines.Add(PdfLine.Total("Total Amount Payable", Money(balance)));
+
+        lines.Add(PdfLine.Spacer());
+        lines.Add(PdfLine.Note("To pay: incometax.gov.in -> e-File -> e-Pay Tax. Select Assessment Year above, "
+            + "(0021) Income-Tax (Other than Companies), (300) Self-Assessment Tax, and enter the amounts shown."));
+        lines.Add(PdfLine.Note("System-generated payment slip - verify the figures before paying."));
+        return lines;
+    }
+
     /// <summary>Fee tax-invoice fields (docs 09 §9.2).</summary>
     public static IReadOnlyList<PdfLine> Invoice(
         Invoice invoice,
