@@ -181,6 +181,11 @@ public sealed class ReturnsController : ControllerBase
     public Task<CapitalGainImportResult> ImportCapitalGains(Guid id, [FromBody] CapitalGainImportRequest request, CancellationToken ct)
         => _returns.ImportCapitalGainsAsync(id, request, ct);
 
+    [HttpGet("{id:guid}/capital-gains/insights")]
+    [ProducesResponseType(typeof(TallyG.Tax.Domain.TaxEngine.CgInsightsResult), StatusCodes.Status200OK)]
+    public Task<TallyG.Tax.Domain.TaxEngine.CgInsightsResult> CapitalGainInsights(Guid id, CancellationToken ct)
+        => _returns.GetCapitalGainInsightsAsync(id, ct);
+
     // ------------------------------------------------------------- immovable-property buyers (s.194-IA)
 
     [HttpGet("{id:guid}/capital-gains/{gainId:guid}/buyers")]

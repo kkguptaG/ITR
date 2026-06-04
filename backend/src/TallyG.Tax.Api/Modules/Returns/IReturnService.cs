@@ -44,6 +44,9 @@ public interface IReturnService
     /// <summary>Preview (Commit=false) or commit (Commit=true) a bulk CSV import of capital-gain rows.</summary>
     Task<CapitalGainImportResult> ImportCapitalGainsAsync(Guid id, CapitalGainImportRequest request, CancellationToken ct = default);
 
+    /// <summary>Risk alerts + optimisation tips + a compliance score (heatmap) over the captured capital gains.</summary>
+    Task<TallyG.Tax.Domain.TaxEngine.CgInsightsResult> GetCapitalGainInsightsAsync(Guid id, CancellationToken ct = default);
+
     // --- immovable-property buyers (s.194-IA) attached to a capital gain ---
     Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default);
     Task<CapitalGainBuyerDto> AddCapitalGainBuyerAsync(Guid id, Guid gainId, UpsertCapitalGainBuyerRequest request, CancellationToken ct = default);

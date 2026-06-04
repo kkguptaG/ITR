@@ -19,6 +19,7 @@ import type {
   CapitalGainDto,
   CapitalGainImportRequest,
   CapitalGainImportResult,
+  CgInsightsResult,
   CompleteUploadRequest,
   ComputeRequest,
   ComputeResponse,
@@ -148,6 +149,8 @@ export const deleteCapitalGain = (id: string, gainId: string) =>
   api.delete(`/returns/${id}/capital-gains/${gainId}`).then(() => undefined);
 export const importCapitalGains = (id: string, body: CapitalGainImportRequest) =>
   apiPost<CapitalGainImportResult>(`/returns/${id}/capital-gains/import`, body);
+export const getCapitalGainInsights = (id: string) =>
+  apiGet<CgInsightsResult>(`/returns/${id}/capital-gains/insights`);
 
 // --------------------------------------------------------------- business income
 export const listBusinessIncomes = (id: string) =>

@@ -235,6 +235,20 @@ export interface CapitalGainImportResult {
   rows: ImportedCgRow[];
 }
 
+// --- Intelligence layer (P6) ---
+export type CgComplianceLevel = 'Green' | 'Yellow' | 'Red';
+export type CgInsightSeverity = 'Info' | 'Tip' | 'Warning' | 'Risk';
+export interface CgInsight {
+  code: string;
+  severity: CgInsightSeverity;
+  count: number;
+}
+export interface CgInsightsResult {
+  compliance: CgComplianceLevel;
+  score: number;
+  insights: CgInsight[];
+}
+
 export interface BusinessFinancialParticulars {
   partnerCapital: number;
   securedLoans: number;

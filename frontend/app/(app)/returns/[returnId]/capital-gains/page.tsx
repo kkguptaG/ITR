@@ -21,6 +21,7 @@ import {
   addCapitalGain,
   updateCapitalGain,
   deleteCapitalGain,
+  getCapitalGainInsights,
   filingKeys,
 } from '@/features/filing/api';
 import type { CapitalGainDto } from '@/features/filing/types';
@@ -83,6 +84,7 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
   const detailQ = useQuery({ queryKey: filingKeys.detail(returnId), queryFn: () => getReturn(returnId) });
   const gainsQ = useQuery({ queryKey: filingKeys.gains(returnId), queryFn: () => listCapitalGains(returnId) });
   const computeQ = useQuery({ queryKey: filingKeys.compute(returnId), queryFn: () => computeTax({ returnId }), retry: false });
+  const insightsQ = useQuery({ queryKey: ['cg-insights', returnId], queryFn: () => getCapitalGainInsights(returnId) });
 
   const gains = gainsQ.data ?? [];
   const compute = computeQ.data;
@@ -103,6 +105,7 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: filingKeys.gains(returnId) });
     void qc.invalidateQueries({ queryKey: filingKeys.compute(returnId) });
+    void qc.invalidateQueries({ queryKey: ['cg-insights', returnId] });
   };
 
   async function save(v: CapitalGainFormValues) {
@@ -154,6 +157,27 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
           </Link>
           <h1 className="mt-1 text-xl font-bold text-ink-900">{t('title')}</h1>
           <p className="text-sm text-ink-500">{t('subtitle')}</p>
+          {insightsQ.data
+            ? (() => {
+                const ins = insightsQ.data;
+                const alerts = ins.insights.filter((i) => i.severity === 'Warning' || i.severity === 'Risk').length;
+                const tone =
+                  ins.compliance === 'Green'
+                    ? 'border-money-200 bg-money-50 text-money-700'
+                    : ins.compliance === 'Yellow'
+                      ? 'border-payable-200 bg-payable-50 text-payable-800'
+                      : 'border-red-200 bg-red-50 text-red-700';
+                const dot =
+                  ins.compliance === 'Green' ? 'bg-money-500' : ins.compliance === 'Yellow' ? 'bg-payable-500' : 'bg-red-500';
+                return (
+                  <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
+                    <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
+                    {t(`compliance.${ins.compliance}`)} · {ins.score}/100
+                    {alerts > 0 ? ` · ${t('alerts', { count: alerts })}` : ''}
+                  </span>
+                );
+              })()
+            : null}
         </div>
         {/* Actions */}
         <div className="flex items-center gap-2">

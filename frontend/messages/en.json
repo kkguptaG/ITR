@@ -870,6 +870,8 @@
     "importStatus": "Status",
     "importStatusOk": "Ready",
     "importStatusDupe": "Duplicate",
+    "compliance": { "Green": "Looks compliant", "Yellow": "Review recommended", "Red": "Likely issues" },
+    "alerts": "{count} to review",
     "glossStcg": { "t": "STCG (short-term)", "d": "Gains on assets held a short time — 15/20% on listed equity, otherwise your slab rate." },
     "glossLtcg": { "t": "LTCG (long-term)", "d": "Gains on assets held beyond the threshold — 12.5% (with the ₹1.25L equity exemption) or 20% with indexation for older property." },
     "glossIndex": { "t": "Indexation", "d": "Inflating the purchase cost by the Cost Inflation Index so tax applies only to the real gain (land/building bought before 23-Jul-2024)." },

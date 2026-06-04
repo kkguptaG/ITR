@@ -723,6 +723,17 @@ public sealed class ReturnService : IReturnService
             Rows: rows);
     }
 
+    public async Task<TallyG.Tax.Domain.TaxEngine.CgInsightsResult> GetCapitalGainInsightsAsync(Guid id, CancellationToken ct = default)
+    {
+        await LoadOwnedReturnAsync(id, ct);
+        var gains = await _db.CapitalGains.Where(c => c.TaxReturnId == id).ToListAsync(ct);
+        var inputs = gains.Select(c => new TallyG.Tax.Domain.TaxEngine.CgInsightInput(
+            c.AssetType, c.Term, c.AcquisitionDate, c.TransferDate, c.SalePrice, c.Gain,
+            c.ExemptionSection, c.TdsOnSale,
+            Foreign: c.SubType is { } st && TallyG.Tax.Domain.TaxEngine.CapitalGainTaxonomy.IsForeign(st))).ToList();
+        return TallyG.Tax.Domain.TaxEngine.CapitalGainInsightsEngine.Analyze(inputs);
+    }
+
     // =========================================================== immovable-property buyers (s.194-IA)
 
     public async Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default)
