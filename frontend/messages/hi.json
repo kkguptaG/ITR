@@ -378,6 +378,7 @@
     "section44AE": "माल वाहन",
     "natureCode": "व्यवसाय की प्रकृति कोड",
     "natureCodeHint": "ITD व्यवसाय/पेशा कोड। खाली छोड़ने पर अनुभाग का डिफ़ॉल्ट उपयोग होगा।",
+    "presumptiveIncomePreview": "अनुमानित आय (deemed)",
     "accountingMethod": "लेखांकन पद्धति",
     "accountingMethodHint": "आपकी पुस्तकें जो पद्धति अपनाती हैं (Schedule PARTA प्रकटन)।",
     "mercantile": "व्यापारिक (उपार्जन)",

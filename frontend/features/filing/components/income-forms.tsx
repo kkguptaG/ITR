@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Button, CurrencyInput, Field, Input, Select } from '@/components/ui';
 import { Alert } from '@/components/ui/Alert';
+import { formatInr } from '@/lib/format';
 import {
   businessIncomeSchema,
   capitalGainSchema,
@@ -491,6 +492,28 @@ export function BusinessIncomeForm({
 
   const vehicles = useFieldArray({ control, name: 'goodsCarriage' });
 
+  // Live preview of the deemed presumptive income, mirroring the backend's PresumptiveIncome math.
+  const wTurnover = watch('turnover');
+  const wDigital = watch('grossReceiptsDigital');
+  const wVehicles = watch('goodsCarriage');
+  const presumptivePreview = (() => {
+    if (!isPresumptive) return null;
+    const turnover = Number(wTurnover) || 0;
+    const digital = Number(wDigital) || 0;
+    if (section === '44ADA') return Math.round(turnover * 0.5);
+    if (section === '44AE') {
+      return (wVehicles ?? []).reduce((sum, v) => {
+        const tonnage = Number(v?.tonnage) || 0;
+        const months = Math.min(Math.max(Number(v?.months) || 12, 1), 12);
+        const perMonth = tonnage > 12 ? 1000 * tonnage : 7500;
+        return sum + Math.max(7500, perMonth) * months;
+      }, 0);
+    }
+    // 44AD: 6% on digital, 8% on the rest of turnover.
+    const cashPlusOther = Math.max(0, turnover - digital);
+    return Math.round(digital * 0.06 + cashPlusOther * 0.08);
+  })();
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
       {!presumptiveOnly && (
@@ -577,6 +600,14 @@ export function BusinessIncomeForm({
             <MoneyField control={control} name="netProfit" label={t('netProfit')} hint={t('netProfitHint')} error={errors.netProfit?.message} allowNegative />
           </div>
         </>
+      )}
+
+      {/* Live deemed-income preview for presumptive sections */}
+      {isPresumptive && presumptivePreview !== null && presumptivePreview > 0 && (
+        <div className="flex items-center justify-between rounded-xl bg-money-50 px-3.5 py-2.5 text-sm">
+          <span className="text-money-800">{t('presumptiveIncomePreview')}</span>
+          <span className="font-semibold tabular-nums text-money-700">{formatInr(presumptivePreview)}</span>
+        </div>
       )}
 
       {/* Financial particulars (ITR-4 no-account case + ITR-3 books) */}

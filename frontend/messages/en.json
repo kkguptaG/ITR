@@ -378,6 +378,7 @@
     "section44AE": "goods carriage",
     "natureCode": "Nature of business code",
     "natureCodeHint": "The ITD business/profession code. Leave blank to use a default for the section.",
+    "presumptiveIncomePreview": "Deemed presumptive income",
     "accountingMethod": "Accounting method",
     "accountingMethodHint": "The method your books follow (Schedule PARTA disclosure).",
     "mercantile": "Mercantile (accrual)",
