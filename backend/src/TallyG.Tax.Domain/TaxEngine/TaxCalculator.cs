@@ -233,6 +233,13 @@ public sealed class TaxCalculator : ITaxCalculator
             ShortTermCapitalLossCarriedForward = capitalGains.CurrentShortTermLossCarried,
             LongTermCapitalLossCarriedForward = capitalGains.CurrentLongTermLossCarried,
             UnabsorbedDepreciationCarriedForward = unabsorbedDepCarried,
+            // Per-head net income as it flows into GTI (after current-year + b/f set-offs) — drives the
+            // line-by-line computation dashboard. Sums (with casual + special CG) to GrossTotalIncome.
+            SalaryNetIncome = setOff.SalaryAfter,
+            HousePropertyNetIncome = setOff.HousePropertyAfter,
+            BusinessNetIncome = setOff.BusinessAfter,
+            CapitalGainsNetIncome = specialRateIncome + slabRateCgIncome,
+            OtherSourcesNetIncome = setOff.OtherSourcesAfter + casual115BB,
             Trace = trace,
         };
     }

@@ -409,6 +409,11 @@ public sealed class TaxService : ITaxService
             r.ShortTermCapitalLossCarriedForward,
             r.LongTermCapitalLossCarriedForward,
             r.UnabsorbedDepreciationCarriedForward,
+            r.SalaryNetIncome,
+            r.HousePropertyNetIncome,
+            r.BusinessNetIncome,
+            r.CapitalGainsNetIncome,
+            r.OtherSourcesNetIncome,
             r.Trace.Select(t => new TraceLineDto(t.Step, t.Description, t.Amount, t.RuleRef)).ToList());
 
     private static RegimeSlabsDto ToRegimeSlabsDto(RegimeRules rr)

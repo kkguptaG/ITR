@@ -39,6 +39,22 @@ public class TaxEngineGoldenTests
     }
 
     [Fact]
+    public void Per_head_net_incomes_sum_to_gross_total_income()
+    {
+        // Salary ₹6L net + a ₹50k savings-interest other-source = GTI built from two heads.
+        var input = RuleSetFixture.Salaried(600_000m);
+        var withOther = input with { OtherIncomes = new[] { new OtherIncomeInput("SB interest", 50_000m, "savings_interest") } };
+        var r = _engine.Compute(withOther, Regime.New);
+
+        // Salary net = 6L − 75k std = 5.25L; other sources = 50k → GTI 5.75L.
+        r.SalaryNetIncome.Should().Be(525_000m);
+        r.OtherSourcesNetIncome.Should().Be(50_000m);
+        (r.SalaryNetIncome + r.HousePropertyNetIncome + r.BusinessNetIncome
+         + r.CapitalGainsNetIncome + r.OtherSourcesNetIncome)
+            .Should().Be(r.GrossTotalIncome, "the per-head net incomes must reconcile to GTI");
+    }
+
+    [Fact]
     public void New_salaried_10L()
     {
         // 10,00,000 − 75,000 = 9,25,000 taxable.

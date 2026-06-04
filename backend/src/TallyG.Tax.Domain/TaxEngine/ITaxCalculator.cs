@@ -260,6 +260,15 @@ public sealed record ComputationResult
     /// indefinitely. 0 when none b/f or fully absorbed.</summary>
     public decimal UnabsorbedDepreciationCarriedForward { get; init; }
 
+    // --- Per-head net income as it flows into GTI (after current-year + brought-forward set-offs). ---
+    // These drive the line-by-line computation dashboard; together with casual + special-rate CG they
+    // sum to GrossTotalIncome.
+    public decimal SalaryNetIncome { get; init; }
+    public decimal HousePropertyNetIncome { get; init; }
+    public decimal BusinessNetIncome { get; init; }
+    public decimal CapitalGainsNetIncome { get; init; }
+    public decimal OtherSourcesNetIncome { get; init; }
+
     /// <summary>Line-by-line explanation of how each figure was derived.</summary>
     public IReadOnlyList<TraceLine> Trace { get; init; } = Array.Empty<TraceLine>();
 }
