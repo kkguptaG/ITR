@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowDownToLine, ArrowUpFromLine, CalendarClock, ChevronRight, Sparkles } from 'lucide-react';
 import { Card, ProgressRing } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -15,20 +16,20 @@ import type { ReturnSummaryDto } from '@/features/returns/types';
 import { returnHref } from '@/features/returns/helpers';
 import type { DeadlineInfo } from '../deadlines';
 
-/** Map a return's lifecycle status to a coarse completion % + label for the gauge. */
-export function filingProgress(status: ReturnSummaryDto['status']): { pct: number; label: string } {
+/** Map a return's lifecycle status to a coarse completion % + a translation key for the gauge. */
+export function filingProgress(status: ReturnSummaryDto['status']): { pct: number; key: string } {
   switch (status) {
-    case 'Draft': return { pct: 15, label: 'Draft' };
-    case 'InProgress': return { pct: 45, label: 'In progress' };
-    case 'ComputedReady': return { pct: 65, label: 'Computed' };
-    case 'PendingPayment': return { pct: 70, label: 'Payment due' };
-    case 'Paid': return { pct: 80, label: 'Paid' };
-    case 'UnderCaReview': return { pct: 82, label: 'Under CA review' };
-    case 'ReadyToFile': return { pct: 85, label: 'Ready to file' };
-    case 'Filed': return { pct: 92, label: 'Filed' };
-    case 'Processed': return { pct: 100, label: 'Processed' };
-    case 'Failed': return { pct: 45, label: 'Action needed' };
-    default: return { pct: 10, label: 'Not started' };
+    case 'Draft': return { pct: 15, key: 'Draft' };
+    case 'InProgress': return { pct: 45, key: 'InProgress' };
+    case 'ComputedReady': return { pct: 65, key: 'ComputedReady' };
+    case 'PendingPayment': return { pct: 70, key: 'PendingPayment' };
+    case 'Paid': return { pct: 80, key: 'Paid' };
+    case 'UnderCaReview': return { pct: 82, key: 'UnderCaReview' };
+    case 'ReadyToFile': return { pct: 85, key: 'ReadyToFile' };
+    case 'Filed': return { pct: 92, key: 'Filed' };
+    case 'Processed': return { pct: 100, key: 'Processed' };
+    case 'Failed': return { pct: 45, key: 'Failed' };
+    default: return { pct: 10, key: 'NotStarted' };
   }
 }
 
@@ -61,6 +62,7 @@ export function StatusCards({
   regime: string | null;
   deadline: DeadlineInfo | null;
 }) {
+  const t = useTranslations('home');
   const progress = filingProgress(latest.status);
   const isRefund = (refundOrPayable ?? 0) >= 0;
   const amount = Math.abs(refundOrPayable ?? 0);
@@ -74,14 +76,14 @@ export function StatusCards({
           <span className="text-lg font-semibold tabular-nums text-ink-900">{progress.pct}%</span>
         </ProgressRing>
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm font-medium text-ink-500">Filing status</p>
-          <p className="text-base font-semibold text-ink-900">{progress.label}</p>
-          <CardLink href={href}>{progress.pct >= 92 ? 'View return' : 'Continue filing'}</CardLink>
+          <p className="text-sm font-medium text-ink-500">{t('filingStatus')}</p>
+          <p className="text-base font-semibold text-ink-900">{t(`progress.${progress.key}`)}</p>
+          <CardLink href={href}>{progress.pct >= 92 ? t('viewReturn') : t('continueFiling')}</CardLink>
         </div>
       </Card>
 
       {/* Estimated refund / payable */}
-      <MiniCard label={isRefund ? 'Estimated refund' : 'Tax payable'}>
+      <MiniCard label={isRefund ? t('estimatedRefund') : t('taxPayable')}>
         <div className="flex items-center gap-2">
           {isRefund ? (
             <ArrowDownToLine className="h-5 w-5 text-money-600" aria-hidden="true" />
@@ -92,12 +94,12 @@ export function StatusCards({
             {formatInr(amount)}
           </span>
         </div>
-        <p className="text-xs text-ink-500">{regime ? `Under ${regime} regime` : 'Computed from your return'}</p>
-        <CardLink href={href}>View details</CardLink>
+        <p className="text-xs text-ink-500">{regime ? t('underRegime', { regime }) : t('computedFromReturn')}</p>
+        <CardLink href={href}>{t('viewDetails')}</CardLink>
       </MiniCard>
 
       {/* Due date */}
-      <MiniCard label="Filing due date">
+      <MiniCard label={t('filingDueDate')}>
         <div className="flex items-center gap-2">
           <CalendarClock className="h-5 w-5 text-brand-600" aria-hidden="true" />
           <span className="text-2xl font-semibold tabular-nums text-ink-900">
@@ -107,21 +109,21 @@ export function StatusCards({
         <p className={cn('text-xs', deadline?.isPastDue ? 'text-payable-700' : 'text-ink-500')}>
           {deadline
             ? deadline.isPastDue
-              ? 'Due date has passed'
-              : `${deadline.daysToDue} days to go`
-            : 'Non-audit ITR due date'}
+              ? t('dueDatePassed')
+              : t('daysToGo', { days: deadline.daysToDue })
+            : t('nonAuditDueDate')}
         </p>
-        <CardLink href={href}>View return</CardLink>
+        <CardLink href={href}>{t('viewReturn')}</CardLink>
       </MiniCard>
 
       {/* Filing mode */}
-      <MiniCard label="Filing mode">
+      <MiniCard label={t('filingMode')}>
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-brand-600" aria-hidden="true" />
-          <span className="text-base font-semibold text-ink-900">Self filing</span>
+          <span className="text-base font-semibold text-ink-900">{t('selfFiling')}</span>
         </div>
-        <p className="text-xs text-ink-500">Get a CA to review &amp; file for you.</p>
-        <CardLink href="/support">Explore expert help</CardLink>
+        <p className="text-xs text-ink-500">{t('expertHelpHint')}</p>
+        <CardLink href="/support">{t('exploreExpertHelp')}</CardLink>
       </MiniCard>
     </div>
   );

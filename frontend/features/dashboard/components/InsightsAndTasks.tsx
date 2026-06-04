@@ -5,15 +5,17 @@
 // e-verify status, filing progress) — no fabricated data.
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { CheckCircle2, Circle, Lightbulb, ShieldAlert, Wallet, PiggyBank, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { formatInr } from '@/lib/format';
 import type { TaxComputationResultDto } from '@/features/filing/types';
 import type { ReturnSummaryDto } from '@/features/returns/types';
-import { returnHref } from '@/features/returns/helpers';
 
 const SECTION_80C_CAP = 150_000;
+
+type T = ReturnType<typeof useTranslations>;
 
 interface Insight {
   icon: typeof Lightbulb;
@@ -23,62 +25,42 @@ interface Insight {
   tone: 'brand' | 'money' | 'payable';
 }
 
-function deriveInsights(result: TaxComputationResultDto, latest: ReturnSummaryDto): Insight[] {
+function deriveInsights(result: TaxComputationResultDto, latest: ReturnSummaryDto, t: T): Insight[] {
   const out: Insight[] = [];
   const ret = `/returns/${latest.id}`;
 
   if (result.regime === 'Old' && result.totalDeductions < SECTION_80C_CAP) {
     out.push({
       icon: PiggyBank,
-      text: `You can claim up to ${formatInr(SECTION_80C_CAP - result.totalDeductions)} more under Section 80C.`,
+      text: t('insight80c', { amount: formatInr(SECTION_80C_CAP - result.totalDeductions) }),
       href: `/returns/${latest.id}/file/deductions`,
-      cta: 'Add deductions',
+      cta: t('insightAddDeductions'),
       tone: 'brand',
     });
   }
   if (latest.status === 'Filed' && !latest.eVerifiedAt) {
-    out.push({
-      icon: ShieldAlert,
-      text: "Your filed return isn't e-verified yet — verify within 30 days or it won't be processed.",
-      href: ret,
-      cta: 'E-verify now',
-      tone: 'payable',
-    });
+    out.push({ icon: ShieldAlert, text: t('insightEverify'), href: ret, cta: t('insightEverifyCta'), tone: 'payable' });
   }
   if (result.refundOrPayable > 0) {
-    out.push({
-      icon: Wallet,
-      text: `You have an estimated refund of ${formatInr(result.refundOrPayable)} this year.`,
-      href: ret,
-      cta: 'View details',
-      tone: 'money',
-    });
+    out.push({ icon: Wallet, text: t('insightRefund', { amount: formatInr(result.refundOrPayable) }), href: ret, cta: t('viewDetails'), tone: 'money' });
   } else if (result.refundOrPayable < 0) {
-    out.push({
-      icon: Wallet,
-      text: `A balance tax of ${formatInr(-result.refundOrPayable)} is payable before you file.`,
-      href: ret,
-      cta: 'Review',
-      tone: 'payable',
-    });
+    out.push({ icon: Wallet, text: t('insightPayable', { amount: formatInr(-result.refundOrPayable) }), href: ret, cta: t('review'), tone: 'payable' });
   }
   if (out.length === 0) {
-    out.push({ icon: Lightbulb, text: 'Your return looks complete. Review and file before the due date.', href: ret, cta: 'Review', tone: 'brand' });
+    out.push({ icon: Lightbulb, text: t('insightComplete'), href: ret, cta: t('review'), tone: 'brand' });
   }
   return out.slice(0, 3);
 }
 
-function deriveTasks(result: TaxComputationResultDto, latest: ReturnSummaryDto): { label: string; done: boolean }[] {
+function deriveTasks(result: TaxComputationResultDto, latest: ReturnSummaryDto, t: T): { label: string; done: boolean }[] {
   const filed = latest.status === 'Filed' || latest.status === 'Processed';
   const tasks = [
-    { label: 'Add your income details', done: result.grossTotalIncome > 0 },
-    { label: 'Claim eligible deductions', done: result.totalDeductions > 0 },
-    { label: 'Review & compute tax', done: !['Draft', 'InProgress'].includes(latest.status) },
-    { label: 'File your return', done: filed },
+    { label: t('taskAddIncome'), done: result.grossTotalIncome > 0 },
+    { label: t('taskClaimDeductions'), done: result.totalDeductions > 0 },
+    { label: t('taskReviewCompute'), done: !['Draft', 'InProgress'].includes(latest.status) },
+    { label: t('taskFile'), done: filed },
   ];
-  if (filed) {
-    tasks.push({ label: 'E-verify your return', done: !!latest.eVerifiedAt });
-  }
+  if (filed) tasks.push({ label: t('taskEverify'), done: !!latest.eVerifiedAt });
   return tasks;
 }
 
@@ -89,9 +71,10 @@ const toneText: Record<Insight['tone'], string> = {
 };
 
 export function InsightsAndTasks({ result, latest }: { result: TaxComputationResultDto; latest: ReturnSummaryDto }) {
-  const insights = deriveInsights(result, latest);
-  const tasks = deriveTasks(result, latest);
-  const pending = tasks.filter((t) => !t.done).length;
+  const t = useTranslations('home');
+  const insights = deriveInsights(result, latest, t);
+  const tasks = deriveTasks(result, latest, t);
+  const pending = tasks.filter((task) => !task.done).length;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -99,8 +82,8 @@ export function InsightsAndTasks({ result, latest }: { result: TaxComputationRes
       <Card>
         <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <Lightbulb className="h-5 w-5 text-brand-600" aria-hidden="true" />
-          <CardTitle>Smart insights</CardTitle>
-          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">Beta</span>
+          <CardTitle>{t('smartInsights')}</CardTitle>
+          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">{t('beta')}</span>
         </CardHeader>
         <CardContent className="space-y-3">
           {insights.map((ins, i) => (
@@ -121,8 +104,8 @@ export function InsightsAndTasks({ result, latest }: { result: TaxComputationRes
       {/* My tasks */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-          <CardTitle>My tasks</CardTitle>
-          <span className="text-xs text-ink-500">{pending} pending</span>
+          <CardTitle>{t('myTasks')}</CardTitle>
+          <span className="text-xs text-ink-500">{t('pending', { count: pending })}</span>
         </CardHeader>
         <CardContent className="space-y-1">
           {tasks.map((task) => (

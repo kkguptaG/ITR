@@ -4,6 +4,7 @@
 // processing status. Real data from GET /documents.
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { FileText, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
 import type { BadgeProps } from '@/components/ui';
@@ -35,12 +36,13 @@ const STATUS_TONE: Record<DocumentStatus, BadgeProps['tone']> = {
 };
 
 export function DocumentStatusCard({ documents }: { documents: DocumentDto[] }) {
+  const t = useTranslations('home');
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle>Documents</CardTitle>
+        <CardTitle>{t('documents')}</CardTitle>
         <Link href="/documents" className="text-sm font-medium text-brand-600 hover:text-brand-700">
-          Manage
+          {t('manage')}
         </Link>
       </CardHeader>
       <CardContent>
@@ -50,7 +52,7 @@ export function DocumentStatusCard({ documents }: { documents: DocumentDto[] }) 
             className="flex items-center gap-3 rounded-xl bg-ink-50 p-4 text-sm text-ink-600 transition-colors hover:bg-ink-100"
           >
             <FileText className="h-5 w-5 shrink-0 text-ink-400" aria-hidden="true" />
-            <span className="flex-1">Upload your Form 16, AIS / 26AS and proofs to auto-fill your return.</span>
+            <span className="flex-1">{t('uploadDocsPrompt')}</span>
             <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
           </Link>
         ) : (

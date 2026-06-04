@@ -5,6 +5,7 @@
 // Chapter VI-A deductions.
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Briefcase, Home, LineChart, PiggyBank, Wallet, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -37,12 +38,13 @@ export function DashboardSummary({
   deductions: DeductionDto[];
   returnId: string;
 }) {
+  const t = useTranslations('home');
   const heads = [
-    { label: 'Salary', icon: Briefcase, amount: result.salaryNetIncome },
-    { label: 'House Property', icon: Home, amount: result.housePropertyNetIncome },
-    { label: 'Business / Profession', icon: Wallet, amount: result.businessNetIncome },
-    { label: 'Capital Gains', icon: LineChart, amount: result.capitalGainsNetIncome },
-    { label: 'Other Sources', icon: PiggyBank, amount: result.otherSourcesNetIncome },
+    { label: t('head.salary'), icon: Briefcase, amount: result.salaryNetIncome },
+    { label: t('head.house'), icon: Home, amount: result.housePropertyNetIncome },
+    { label: t('head.business'), icon: Wallet, amount: result.businessNetIncome },
+    { label: t('head.capitalGains'), icon: LineChart, amount: result.capitalGainsNetIncome },
+    { label: t('head.other'), icon: PiggyBank, amount: result.otherSourcesNetIncome },
   ].filter((h) => Math.abs(h.amount) > 0);
 
   const topDeductions = [...deductions]
@@ -58,14 +60,14 @@ export function DashboardSummary({
       {/* Income summary */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Income summary</CardTitle>
+          <CardTitle>{t('incomeSummary')}</CardTitle>
           <Link href={`/returns/${returnId}`} className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Details
+            {t('details')}
           </Link>
         </CardHeader>
         <CardContent>
           {heads.length === 0 ? (
-            <p className="py-2 text-sm text-ink-500">No income captured yet.</p>
+            <p className="py-2 text-sm text-ink-500">{t('noIncomeYet')}</p>
           ) : (
             <div className="space-y-0.5">
               {heads.map(({ label, icon: Icon, amount }) => (
@@ -77,7 +79,7 @@ export function DashboardSummary({
                   <span className="tabular-nums text-ink-900">{formatInr(amount)}</span>
                 </div>
               ))}
-              <Row label="Gross total income" value={formatInr(result.grossTotalIncome)} strong />
+              <Row label={t('grossTotalIncome')} value={formatInr(result.grossTotalIncome)} strong />
             </div>
           )}
         </CardContent>
@@ -86,23 +88,23 @@ export function DashboardSummary({
       {/* Top deductions */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Top deductions</CardTitle>
+          <CardTitle>{t('topDeductions')}</CardTitle>
           <Link href={`/returns/${returnId}/file/deductions`} className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Manage
+            {t('manage')}
           </Link>
         </CardHeader>
         <CardContent>
           {topDeductions.length === 0 ? (
             <div className="flex items-start gap-2 rounded-xl bg-brand-50/60 p-3 text-sm text-brand-900">
               <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>No deductions claimed yet — you may be able to save under 80C, 80D and more.</span>
+              <span>{t('noDeductionsYet')}</span>
             </div>
           ) : (
             <div className="space-y-0.5">
               {topDeductions.map((d) => (
                 <Row key={d.section} label={d.section} value={formatInr(d.amount)} />
               ))}
-              <Row label="Total deductions" value={formatInr(result.totalDeductions)} strong />
+              <Row label={t('totalDeductions')} value={formatInr(result.totalDeductions)} strong />
             </div>
           )}
         </CardContent>
@@ -111,18 +113,18 @@ export function DashboardSummary({
       {/* Tax summary */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle>Tax summary</CardTitle>
-          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">{result.regime} regime</span>
+          <CardTitle>{t('taxSummary')}</CardTitle>
+          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">{t('regimeLabel', { regime: result.regime })}</span>
         </CardHeader>
         <CardContent>
           <div className="space-y-0.5">
-            <Row label="Total income" value={formatInr(result.grossTotalIncome)} />
-            <Row label="Total deductions" value={formatInr(result.totalDeductions)} />
-            <Row label="Taxable income" value={formatInr(result.taxableIncome)} />
-            <Row label="Total tax" value={formatInr(result.totalTax)} />
-            <Row label="TDS / TCS" value={formatInr(result.tdsPaid + result.tcsPaid)} />
+            <Row label={t('totalIncome')} value={formatInr(result.grossTotalIncome)} />
+            <Row label={t('totalDeductions')} value={formatInr(result.totalDeductions)} />
+            <Row label={t('taxableIncome')} value={formatInr(result.taxableIncome)} />
+            <Row label={t('totalTax')} value={formatInr(result.totalTax)} />
+            <Row label={t('tdsTcs')} value={formatInr(result.tdsPaid + result.tcsPaid)} />
             <Row
-              label={refund ? 'Estimated refund' : 'Balance payable'}
+              label={refund ? t('estimatedRefund') : t('balancePayable')}
               value={formatInr(Math.abs(result.refundOrPayable))}
               tone={refund ? 'money' : 'payable'}
               strong

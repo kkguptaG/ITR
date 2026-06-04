@@ -39,6 +39,7 @@ const RECENT_PAGE_SIZE = 5;
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
   const tr = useTranslations('returns');
+  const th = useTranslations('home');
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -100,7 +101,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           {latest?.itrType && (
             <span className="hidden items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm sm:inline-flex">
-              <span className="text-ink-500">Return</span>
+              <span className="text-ink-500">{th('returnLabel')}</span>
               <span className="font-semibold text-ink-900">{formatItrType(latest.itrType)}</span>
               <span className="text-ink-400">·</span>
               <span className="text-ink-600">{formatAssessmentYear(latest.assessmentYear)}</span>
@@ -176,23 +177,24 @@ function GetStarted({ onNew, title, body, cta }: { onNew: () => void; title: str
 }
 
 const TRUST = [
-  { icon: ShieldCheck, title: '100% Secure', sub: 'Bank-grade encryption · data in India' },
-  { icon: TrendingUp, title: 'Maximum Refund', sub: 'We help you claim everything you can' },
-  { icon: Headphones, title: 'Expert Assistance', sub: 'CA support available anytime' },
-  { icon: CalendarCheck, title: 'On-time Filing', sub: 'File before the due date, every time' },
-];
+  { icon: ShieldCheck, key: 'Secure' },
+  { icon: TrendingUp, key: 'Refund' },
+  { icon: Headphones, key: 'Expert' },
+  { icon: CalendarCheck, key: 'Ontime' },
+] as const;
 
 function TrustFooter() {
+  const th = useTranslations('home');
   return (
     <div className="grid gap-4 rounded-2xl border border-ink-200 bg-white p-5 shadow-card sm:grid-cols-2 lg:grid-cols-4">
-      {TRUST.map(({ icon: Icon, title, sub }) => (
-        <div key={title} className="flex items-start gap-3">
+      {TRUST.map(({ icon: Icon, key }) => (
+        <div key={key} className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-money-50 text-money-600">
             <Icon className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-ink-900">{title}</p>
-            <p className="text-xs text-ink-500">{sub}</p>
+            <p className="text-sm font-semibold text-ink-900">{th(`trust${key}Title`)}</p>
+            <p className="text-xs text-ink-500">{th(`trust${key}Sub`)}</p>
           </div>
         </div>
       ))}
