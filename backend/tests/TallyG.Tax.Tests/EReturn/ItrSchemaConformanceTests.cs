@@ -114,6 +114,38 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Updated_return_emits_partA_139_8A_and_partB_ATI_with_140B_additional_tax()
+    {
+        var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withUpdated: true);
+        var json = _gen.Generate(ctx).Json;
+
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR2, json);
+        result.Errors.Should().BeEmpty("an updated ITR-2 (ITR-U) must conform. Violations:\n" + Format(result));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var itr2 = doc.RootElement.GetProperty("ITR").GetProperty("ITR2");
+
+        // ReturnFileSec 21 = 139(8A) updated.
+        itr2.GetProperty("PartA_GEN1").GetProperty("FilingStatus").GetProperty("ReturnFileSec").GetInt32().Should().Be(21);
+
+        var pa = itr2.GetProperty("PartA_139_8A");
+        pa.GetProperty("PreviouslyFiledForThisAY").GetString().Should().Be("Y");
+        pa.GetProperty("UpdatedReturnDuringPeriod").GetString().Should().Be("1");
+        pa.GetProperty("ITRFormUpdatingInc").GetString().Should().Be("ITR2");
+        pa.GetProperty("Applicable_139_8A").GetProperty("AcknowledgementNo").GetString().Should().Be("555666777888999");
+        pa.GetProperty("UpdatingInc").GetProperty("ReasonsForUpdatingIncDtls")[0]
+            .GetProperty("ReasonsForUpdatingIncome").GetString().Should().Be("2");
+
+        // PartB-ATI: aggregate = updatedTax(41,600) − originalTaxPaid(20,000) = 21,600;
+        // additional @25% = 5,400; taxDue = 27,000.
+        var ati = itr2.GetProperty("PartB-ATI");
+        ati.GetProperty("UpdatedTotInc").GetInt64().Should().Be(925_000);
+        ati.GetProperty("AggrLiabilityNoRefund").GetInt64().Should().Be(21_600);
+        ati.GetProperty("AddtnlIncTax").GetInt64().Should().Be(5_400);
+        ati.GetProperty("TaxDue10_11").GetInt64().Should().Be(27_000);
+    }
+
+    [Fact]
     public void Revised_return_emits_section_13_with_original_ack_and_date()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withRevised: true);
@@ -1402,7 +1434,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false, bool withUpdated = false)
     {
         var user = new User
         {
@@ -1474,6 +1506,17 @@ public class ItrSchemaConformanceTests
             ret.IsRevised = true;
             ret.OriginalAcknowledgmentNumber = "123456789012345";
             ret.OriginalFilingDate = new DateOnly(2025, 7, 20);
+        }
+
+        if (withUpdated)
+        {
+            ret.FilingSection = ReturnFilingSection.Updated;
+            ret.OriginalReturnPreviouslyFiled = true;
+            ret.OriginalAcknowledgmentNumber = "555666777888999";
+            ret.OriginalFilingDate = new DateOnly(2025, 7, 25);
+            ret.UpdatedReturnReason = "2";          // income not reported correctly
+            ret.UpdatedReturnTier = 1;              // ≤12 months → 25% additional tax
+            ret.OriginalTaxPaid = 20_000m;          // original tax < updated tax → additional liability
         }
 
         if (withCarryForward)

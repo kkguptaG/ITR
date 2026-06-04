@@ -36,11 +36,24 @@ public class TaxReturn : BaseEntity, ITenantScoped, ISoftDeletable
     /// <summary>The s.139 section this return is furnished under (original / belated / revised). Drives ReturnFileSec.</summary>
     public ReturnFilingSection FilingSection { get; set; } = ReturnFilingSection.Original;
 
-    /// <summary>15-digit acknowledgment number of the original return (revised returns only → ITD ReceiptNo).</summary>
+    /// <summary>15-digit acknowledgment number of the original return (revised/updated returns → ITD ReceiptNo).</summary>
     public string? OriginalAcknowledgmentNumber { get; set; }
 
-    /// <summary>Filing date of the original return (revised returns only → ITD OrigRetFiledDate).</summary>
+    /// <summary>Filing date of the original return (revised/updated returns → ITD OrigRetFiledDate).</summary>
     public DateOnly? OriginalFilingDate { get; set; }
+
+    // --- Updated return (ITR-U, s.139(8A)) ---
+    /// <summary>Reason code for updating income (ITD "1".."7" / "OTH"). Updated returns only.</summary>
+    public string? UpdatedReturnReason { get; set; }
+
+    /// <summary>Time tier 1-4 (≤12 / 12-24 / 24-36 / 36-48 months from AY end) → 25/50/60/70% additional tax.</summary>
+    public int UpdatedReturnTier { get; set; }
+
+    /// <summary>Whether the original return was previously filed for this AY (ITR-U PreviouslyFiledForThisAY).</summary>
+    public bool OriginalReturnPreviouslyFiled { get; set; }
+
+    /// <summary>Tax already paid with the original return (subtracted before the s.140B additional tax).</summary>
+    public decimal OriginalTaxPaid { get; set; }
 
     public string? AcknowledgmentNumber { get; set; }
     public DateTimeOffset? SubmittedAt { get; set; }

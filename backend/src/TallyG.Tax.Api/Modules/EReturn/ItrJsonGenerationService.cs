@@ -379,6 +379,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleFsiTr(root, ctx);
         AddScheduleFa(root, ctx);
         AddTaxesPaidSchedulesDetailed(root, ctx);
+        AddUpdatedReturnSections(root, ctx);
         return root;
     }
 
@@ -427,6 +428,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         AddScheduleFsiTr(skel, ctx);
         AddScheduleFa(skel, ctx);
         AddTaxesPaidSchedulesDetailed(skel, ctx);
+        AddUpdatedReturnSections(skel, ctx);
         return skel;
     }
 
@@ -495,6 +497,100 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         }
 
         return filingStatus;
+    }
+
+    /// <summary>Additional-tax rate u/s 140B by the ITR-U time tier (1-4): 25/50/60/70%.</summary>
+    private static decimal AdditionalTaxRate(int tier) => tier switch
+    {
+        1 => 0.25m,
+        2 => 0.50m,
+        3 => 0.60m,
+        4 => 0.70m,
+        _ => 0.25m,
+    };
+
+    /// <summary>
+    /// PartA_139_8A + PartB-ATI for an updated return (ITR-U, s.139(8A)) — ITR-2/3 only. PartA_139_8A
+    /// carries the eligibility, the reason for updating, the time tier and (when previously filed) the
+    /// original return's acknowledgment + date. PartB-ATI computes the additional tax u/s 140B:
+    /// the aggregate additional liability over the original tax, plus the tier% additional income tax.
+    /// All figures are provisional pending CA review (the validator already flags this).
+    /// </summary>
+    private static void AddUpdatedReturnSections(Dictionary<string, object?> root, ItrFilingContext ctx)
+    {
+        if (ctx.Return.FilingSection != ReturnFilingSection.Updated
+            || ctx.ItrType is not (ItrType.ITR2 or ItrType.ITR3))
+        {
+            return;
+        }
+
+        var c = ctx.Computation;
+        var formCode = ctx.ItrType == ItrType.ITR3 ? "ITR3" : "ITR2";
+        var (firstName, lastName) = SplitName(ctx.User.FullName, ctx.Profile);
+        var fullName = Trunc(NonEmpty($"{firstName} {lastName}".Trim(), "NA"), 125);
+        var previouslyFiled = ctx.Return.OriginalReturnPreviouslyFiled
+                              && !string.IsNullOrWhiteSpace(ctx.Return.OriginalAcknowledgmentNumber);
+        var reason = NonEmpty(ctx.Return.UpdatedReturnReason, "2");   // default: income not reported correctly
+        var tier = Math.Clamp(ctx.Return.UpdatedReturnTier <= 0 ? 1 : ctx.Return.UpdatedReturnTier, 1, 4);
+
+        var partA = new Dictionary<string, object?>
+        {
+            ["PAN"] = ctx.User.PanMasked ?? string.Empty,
+            ["Name"] = fullName,
+            ["AssessmentYear"] = AyStartYear(ctx.AyCode),
+            ["PreviouslyFiledForThisAY"] = previouslyFiled ? "Y" : "N",
+            ["LaidOutIn_139_8A"] = "Y",
+            ["ITRFormUpdatingInc"] = formCode,
+            ["UpdatingInc"] = new Dictionary<string, object?>
+            {
+                ["ReasonsForUpdatingIncDtls"] = new List<object?>
+                {
+                    new Dictionary<string, object?> { ["ReasonsForUpdatingIncome"] = reason },
+                },
+            },
+            ["UpdatedReturnDuringPeriod"] = tier.ToString(),
+            ["RetrntoRedCarriedFL"] = new Dictionary<string, object?> { ["UnabsorbedDepreciation"] = "N" },
+        };
+        if (previouslyFiled)
+        {
+            partA["PreviouslyFiledForThisAY_139_8A"] = "1";   // original was filed u/s 139(1)
+            partA["Applicable_139_8A"] = new Dictionary<string, object?>
+            {
+                ["ITRForm"] = formCode,
+                ["AcknowledgementNo"] = ctx.Return.OriginalAcknowledgmentNumber!.Trim(),
+                ["OrigRetFiledDate"] = ctx.Return.OriginalFilingDate?.ToString("yyyy-MM-dd") ?? "2025-07-31",
+            };
+        }
+        root["PartA_139_8A"] = partA;
+
+        // --- PartB-ATI: additional tax u/s 140B ---
+        var updatedTaxableInc = TaxMath0(c?.TaxableIncome ?? 0m);
+        var relief89 = TaxMath0(c?.Relief89 ?? 0m);
+        var updatedTotalTax = TaxMath0(c?.TotalTax ?? 0m);                  // tax + cess + interest on updated income
+        var updatedPrepaid = TaxMath0((c?.TdsPaid ?? 0m) + ctx.Return.TcsPaid + (c?.AdvanceTax ?? 0m));
+        var originalTaxPaid = TaxMath0(ctx.Return.OriginalTaxPaid);
+        var amtPayableUpdated = TaxMath0(updatedTotalTax - updatedPrepaid);
+
+        // Aggregate additional liability: the updated tax over and above what the original return paid.
+        var aggregateAdditional = TaxMath0(updatedTotalTax - relief89 - originalTaxPaid);
+        var additionalIncomeTax = Math.Round(AdditionalTaxRate(tier) * aggregateAdditional, MidpointRounding.AwayFromZero);
+        var taxDue = aggregateAdditional + additionalIncomeTax;            // total payable incl. the 140B additional
+        var tax140BPaid = TaxMath0(updatedPrepaid - originalTaxPaid);      // fresh taxes paid toward the updated return
+        var netPayable = TaxMath0(taxDue - tax140BPaid);
+
+        root["PartB-ATI"] = new Dictionary<string, object?>
+        {
+            ["UpdatedTotInc"] = R(updatedTaxableInc),
+            ["AmtPayable"] = R(amtPayableUpdated),
+            ["FeeIncUS234F"] = 0L,
+            ["ReleifUS89"] = R(relief89),
+            ["AggrLiabilityRefund"] = 0L,
+            ["AggrLiabilityNoRefund"] = R(aggregateAdditional),
+            ["AddtnlIncTax"] = R(additionalIncomeTax),
+            ["TaxDue10_11"] = R(taxDue),
+            ["TaxUS140B"] = R(tax140BPaid),
+            ["NetPayable"] = R(netPayable),
+        };
     }
 
     private static Dictionary<string, object?> FilingStatus(ItrFilingContext ctx) => WithRevisedReturn(new()

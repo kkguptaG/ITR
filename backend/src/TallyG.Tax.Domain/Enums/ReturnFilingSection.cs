@@ -18,4 +18,10 @@ public enum ReturnFilingSection
     /// (Code 13 is 142(1) — a notice-response return — NOT revised.)
     /// </summary>
     Revised = 17,
+
+    /// <summary>
+    /// s.139(8A) — updated return (ITR-U): correct/disclose income up to 48 months after the AY,
+    /// paying additional tax u/s 140B (25/50/60/70% by time tier). ITD code 21. ITR-2/3 only.
+    /// </summary>
+    Updated = 21,
 }
