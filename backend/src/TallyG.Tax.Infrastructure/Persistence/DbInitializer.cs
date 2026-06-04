@@ -519,11 +519,13 @@ public static class DbInitializer
         });
 
         // Regular-books profession (non-presumptive): the ₹25L net profit is the ITR-3 business income.
+        // Financial particulars (no formal books) drive PARTA_BS.NoBooksOfAccBS.
         db.BusinessIncomes.Add(new BusinessIncome
         {
             TenantId = RetailTenantId, TaxReturnId = returnId, IsPresumptive = false,
             NatureOfBusinessCode = "16019", AccountingMethod = "mercantile",
             Turnover = 12_000_000m, NetProfit = 2_500_000m,
+            SundryDebtors = 800_000m, SundryCreditors = 350_000m, Inventory = 600_000m, CashBalance = 250_000m,
         });
 
         // Depreciable assets (Schedule DPM / DOA / DEP): a 15% plant & machinery block + a 10% building block.
