@@ -30,6 +30,8 @@ export interface ReturnSummaryDto {
   acknowledgmentNumber: string | null;
   createdAt: IsoDateTime;
   submittedAt: IsoDateTime | null;
+  /** Set once the filed return is e-verified; null ⇒ verification still pending. */
+  eVerifiedAt: IsoDateTime | null;
   /** Positive = refund due, negative = payable; null when not yet computed. */
   refundOrPayable: number | null;
 }

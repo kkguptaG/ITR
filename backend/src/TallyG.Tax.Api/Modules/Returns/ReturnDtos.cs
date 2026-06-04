@@ -52,6 +52,8 @@ public sealed record ReturnSummaryDto(
     string? AcknowledgmentNumber,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SubmittedAt,
+    /// <summary>Set once the filed return is e-verified; null ⇒ verification still pending (within 30 days).</summary>
+    DateTimeOffset? EVerifiedAt,
     /// <summary>From the recommended computation (positive = refund, negative = payable). Null when not yet computed.</summary>
     decimal? RefundOrPayable = null);
 

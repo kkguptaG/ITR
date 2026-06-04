@@ -191,6 +191,7 @@ public sealed class ReturnService : IReturnService
             r.AcknowledgmentNumber,
             r.CreatedAt,
             r.SubmittedAt,
+            r.EVerifiedAt,
             // Recommended computation's refund/payable — positive = refund, negative = payable.
             r.Computations
                 .Where(c => c.IsRecommended)

@@ -46,7 +46,12 @@ export function ReturnsTable({ items }: { items: ReturnSummaryDto[] }) {
                   )}
                 </TD>
                 <TD>
-                  <ReturnStatusBadge status={item.status} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <ReturnStatusBadge status={item.status} />
+                    {item.status === 'Filed' && !item.eVerifiedAt && (
+                      <Badge tone="warning">{t('verifyPending')}</Badge>
+                    )}
+                  </div>
                 </TD>
                 <TD className="text-right">
                   {item.refundOrPayable == null ? (
@@ -83,7 +88,12 @@ export function ReturnsTable({ items }: { items: ReturnSummaryDto[] }) {
                   {item.itrType ? formatItrType(item.itrType) : t('itrPending')}
                 </p>
               </div>
-              <ReturnStatusBadge status={item.status} />
+              <div className="flex flex-col items-end gap-1">
+                <ReturnStatusBadge status={item.status} />
+                {item.status === 'Filed' && !item.eVerifiedAt && (
+                  <Badge tone="warning">{t('verifyPending')}</Badge>
+                )}
+              </div>
             </div>
             {item.refundOrPayable != null && (
               <div className="mt-2">
