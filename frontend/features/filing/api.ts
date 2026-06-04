@@ -27,6 +27,7 @@ import type {
   DeductionDto,
   DocumentDto,
   ExtractionDto,
+  GrandfatherFmvRecord,
   HousePropertyDto,
   IncomeSourceDto,
   InitiateUploadRequest,
@@ -256,5 +257,10 @@ export const submitReturn = (id: string) =>
   apiPost<SubmitReturnResponse>(`/returns/${id}:submit`, {}, {
     headers: { 'Idempotency-Key': idempotencyKey() },
   });
+
+// --------------------------------------------------------------- securities reference
+/** Type-ahead search of NSE symbols (with their 31-Jan-2018 FMV) for s.112A grandfathering. */
+export const searchGrandfatherFmv = (q: string) =>
+  apiGet<GrandfatherFmvRecord[]>(`/reference/grandfather-fmv?q=${encodeURIComponent(q)}`);
 
 export type { AssignmentDto };

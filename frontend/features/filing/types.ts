@@ -510,4 +510,10 @@ export interface AssignmentDto {
 
 // Convenience: the filing mode the user chooses on the final step.
 export type FilingMode = 'self' | 'ca';
+
+/** One NSE symbol's 31-Jan-2018 FMV (s.112A grandfathering), from the bundled master. */
+export interface GrandfatherFmvRecord {
+  symbol: string;
+  fmv: number;
+}
 export type { ItrType, Regime, ReturnStatus, Guid };

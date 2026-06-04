@@ -7,12 +7,15 @@
 // step composes them with <EditableList/>.
 // ---------------------------------------------------------------------------
 
+import { useState } from 'react';
 import { Controller, useFieldArray, useForm, type Control, type DefaultValues, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Button, CurrencyInput, Field, Input, Select } from '@/components/ui';
 import { Alert } from '@/components/ui/Alert';
 import { formatInr } from '@/lib/format';
+import { searchGrandfatherFmv } from '../api';
 import {
   businessIncomeSchema,
   capitalGainSchema,
@@ -359,6 +362,59 @@ const ASSET_OPTIONS = [
   'Other',
 ] as const;
 
+/**
+ * Type-ahead helper that fills the s.112A grandfathered FMV from the bundled NSE
+ * 31-Jan-2018 master: enter an NSE symbol, pick a match, and its highest quoted
+ * price that day (the grandfathered cost) is filled into the FMV field.
+ */
+function GrandfatherFmvLookup({ onPick }: { onPick: (fmv: number) => void }) {
+  const [symbol, setSymbol] = useState('');
+  const q = symbol.trim().toUpperCase();
+  const search = useQuery({
+    queryKey: ['grandfather-fmv', q],
+    queryFn: () => searchGrandfatherFmv(q),
+    enabled: q.length >= 1,
+    staleTime: 60_000,
+  });
+  const results = search.data ?? [];
+
+  return (
+    <div className="space-y-1.5 rounded-xl border border-ink-200 bg-ink-50/60 p-3 sm:col-span-2">
+      <label className="text-xs font-medium text-ink-700">Find 31-Jan-2018 FMV by NSE symbol</label>
+      <Input
+        value={symbol}
+        onChange={(e) => setSymbol(e.target.value)}
+        placeholder="e.g. INFY, RELIANCE, TCS"
+        className="h-9"
+        autoComplete="off"
+      />
+      {q.length >= 1 ? (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {search.isFetching ? (
+            <span className="text-xs text-ink-500">Searching…</span>
+          ) : results.length === 0 ? (
+            <span className="text-xs text-payable-700">No NSE symbol starts with &ldquo;{q}&rdquo;.</span>
+          ) : (
+            results.map((r) => (
+              <button
+                key={r.symbol}
+                type="button"
+                onClick={() => {
+                  onPick(r.fmv);
+                  setSymbol('');
+                }}
+                className="rounded-full border border-ink-300 bg-white px-2.5 py-1 text-xs text-ink-800 hover:border-brand-400 hover:bg-brand-50"
+              >
+                {r.symbol} · {formatInr(r.fmv)}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CapitalGainForm({
   defaultValues,
   onSubmit,
@@ -372,7 +428,7 @@ export function CapitalGainForm({
 }) {
   const t = useTranslations('income');
   const tc = useTranslations('common');
-  const { control, register, handleSubmit, watch, formState: { errors } } = useForm<CapitalGainFormValues>({
+  const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<CapitalGainFormValues>({
     resolver: zodResolver(capitalGainSchema),
     defaultValues: {
       assetType: 'ListedEquity', term: 'Long', acquisitionDate: '', transferDate: '',
@@ -417,7 +473,12 @@ export function CapitalGainForm({
         <MoneyField control={control} name="salePrice" label={t('saleConsideration')} error={errors.salePrice?.message} />
         <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
         {is112AEligible ? (
-          <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
+          <>
+            <GrandfatherFmvLookup
+              onPick={(fmv) => setValue('fairMarketValue31Jan2018', fmv, { shouldValidate: true, shouldDirty: true })}
+            />
+            <MoneyField control={control} name="fairMarketValue31Jan2018" label="FMV on 31-Jan-2018" hint="For grandfathering of equity acquired on/before 31-Jan-2018 (s.112A)" />
+          </>
         ) : null}
         {!isVda ? (
           <>
