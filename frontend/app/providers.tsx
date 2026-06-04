@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NextIntlClientProvider, type AbstractIntlMessages } from 'next-intl';
 import { AuthProvider } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { ChunkReloadGuard } from '@/components/ChunkReloadGuard';
 
 export interface ProvidersProps {
   children: ReactNode;
@@ -48,6 +49,7 @@ export function Providers({ children, locale, messages, now }: ProvidersProps) {
       now={now ? new Date(now) : undefined}
     >
       <QueryClientProvider client={queryClient}>
+        <ChunkReloadGuard />
         <AuthProvider>{children}</AuthProvider>
       </QueryClientProvider>
     </NextIntlClientProvider>
