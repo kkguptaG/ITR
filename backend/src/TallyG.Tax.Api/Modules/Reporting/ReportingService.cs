@@ -68,10 +68,11 @@ public sealed class ReportingService : IReportingService
 
         var taxpayer = await LoadUserAsync(taxReturn.UserId, ct);
         var ay = await LoadAyAsync(taxReturn.AssessmentYearId, ct);
+        var profile = await _db.UserProfiles.FirstOrDefaultAsync(p => p.UserId == taxReturn.UserId, ct);
         var computation = await LatestComputationAsync(taxReturn, ct);
 
         var title = $"ITR-V Acknowledgment - {ay?.Code ?? "AY"}";
-        var lines = ReportContent.Acknowledgment(taxReturn, taxpayer, ay, computation);
+        var lines = ReportContent.Acknowledgment(taxReturn, taxpayer, profile, ay, computation);
         var fileName = $"ITRV-{taxReturn.AcknowledgmentNumber}.pdf";
 
         return await RenderStoreStreamAsync(

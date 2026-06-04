@@ -89,6 +89,35 @@ public class ComputationStatementTests
     }
 
     [Fact]
+    public void Itrv_acknowledgment_has_the_official_blocks_and_income_tax_table()
+    {
+        var ret = new TaxReturn
+        {
+            ItrType = ItrType.ITR2, Status = ReturnStatus.Filed, FilingMode = "self",
+            AcknowledgmentNumber = "1234567890123456",
+        };
+        var user = new User { FullName = "Demo Taxpayer", PanMasked = "ABCDE1234F" };
+        var profile = new UserProfile { AddressLine1 = "B-12 Greenwood", City = "Pune", Pincode = "411045", ResidentialStatus = "resident" };
+        var ay = new AssessmentYear { Code = "AY2025-26", FyCode = "FY2024-25" };
+        var c = new TaxComputation
+        {
+            GrossTotalIncome = 1_000_000m, TotalDeductions = 150_000m, TaxableIncome = 850_000m,
+            TotalTax = 80_000m, TdsPaid = 50_000m, RefundOrPayable = -30_000m,
+        };
+
+        var lines = ReportContent.Acknowledgment(ret, user, profile, ay, c);
+
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label == "Assessee");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Heading && l.Label == "Income & Tax");
+        lines.Should().Contain(l => l.Label.StartsWith("1.") && l.Value == "Rs. 10,00,000");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Subtotal && l.Label.Contains("Total Income") && l.Value == "Rs. 8,50,000");
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Total && l.Label == "Tax Payable" && l.Value == "Rs. 30,000");
+        lines.Should().Contain(l => l.Label == "Acknowledgment Number" && l.Value == "1234567890123456");
+        // Not e-verified ⇒ the CPC / e-verify reminder note is shown.
+        lines.Should().Contain(l => l.Kind == PdfLineKind.Note && l.Label.Contains("E-verify within 30 days"));
+    }
+
+    [Fact]
     public void Challan280_breaks_the_balance_into_tax_interest_and_fee()
     {
         var ret = new TaxReturn { ItrType = ItrType.ITR2, Status = ReturnStatus.ComputedReady };

@@ -43,39 +43,71 @@ internal static class ReportContent
     private static string Date(DateTimeOffset? value)
         => value is { } v ? Date(v) : "-";
 
-    /// <summary>ITR-V acknowledgment fields (docs 09 §9.2). Mirrors the ITD-prescribed contents.</summary>
+    /// <summary>
+    /// Indian Income-Tax Return Acknowledgment (ITR-V), laid out like the ITD-prescribed form: assessee
+    /// block, the Part B-TI/TTI income-and-tax table, the filing/e-verification details, and the
+    /// verification footer. Projected from the persisted return + computation snapshot.
+    /// </summary>
     public static IReadOnlyList<PdfLine> Acknowledgment(
         TaxReturn taxReturn,
         User taxpayer,
+        UserProfile? profile,
         AssessmentYear? ay,
-        TaxComputation? computation)
+        TaxComputation? c)
     {
         var lines = new List<PdfLine>
         {
-            new("Acknowledgment Number", taxReturn.AcknowledgmentNumber ?? "(pending)"),
-            new("Assessment Year", ay?.Code ?? "-"),
-            new("Financial Year", ay?.FyCode ?? "-"),
-            new("ITR Form", taxReturn.ItrType?.ToString() ?? "-"),
-            new("Name", taxpayer.FullName),
-            new("PAN", taxpayer.PanMasked ?? "XXXXX____X"),
-            new("Filing Mode", taxReturn.FilingMode),
-            new("Regime", taxReturn.Regime?.ToString() ?? "-"),
-            new("Status", taxReturn.Status.ToString()),
-            new("E-Filing Date", Date(taxReturn.SubmittedAt)),
-            new("E-Verification Date", Date(taxReturn.EVerifiedAt))
+            PdfLine.Note("INDIAN INCOME-TAX RETURN ACKNOWLEDGEMENT - ITR-V"),
+            PdfLine.Note("[Where the data of the Return of Income in Form ITR-1 to ITR-7 is filed and verified electronically]"),
+            PdfLine.Spacer(),
         };
 
-        if (computation is not null)
+        lines.Add(PdfLine.Heading("Assessee"));
+        lines.Add(new("Name", taxpayer.FullName));
+        lines.Add(new("PAN", taxpayer.PanMasked ?? "XXXXX____X"));
+        var addr = string.Join(", ", new[]
+            { profile?.AddressLine1, profile?.AddressLine2, profile?.City, profile?.Pincode }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (addr.Length > 0)
         {
-            lines.Add(new PdfLine("Gross Total Income", Money(computation.GrossTotalIncome)));
-            lines.Add(new PdfLine("Total Income", Money(computation.TaxableIncome)));
-            lines.Add(new PdfLine("Total Tax & Cess", Money(computation.TotalTax)));
-            lines.Add(new PdfLine(
-                computation.RefundOrPayable >= 0 ? "Refund Due" : "Tax Payable",
-                Money(Math.Abs(computation.RefundOrPayable))));
+            lines.Add(new("Address", addr));
+        }
+        lines.Add(new("Status", profile?.ResidentialStatus ?? "Individual"));
+        lines.Add(new("ITR Form", taxReturn.ItrType?.ToString() ?? "-"));
+        lines.Add(new("Assessment Year", ay?.Code ?? "-"));
+        lines.Add(new("Financial Year", ay?.FyCode ?? "-"));
+
+        if (c is not null)
+        {
+            lines.Add(PdfLine.Heading("Income & Tax"));
+            lines.Add(new("1. Gross Total Income", Money(c.GrossTotalIncome)));
+            lines.Add(new("2. Total Deductions (Chapter VI-A)", Money(c.TotalDeductions)));
+            lines.Add(PdfLine.Subtotal("3. Total Income", Money(c.TaxableIncome)));
+            lines.Add(new("4. Total Tax Liability", Money(c.TotalTax)));
+            if (c.InterestPenalty > 0m || c.LateFee234F > 0m)
+            {
+                lines.Add(new("5. Interest & Fee (s.234A/B/C, 234F)", Money(c.InterestPenalty + c.LateFee234F)));
+            }
+            lines.Add(new("6. Taxes Paid (TDS/TCS + advance/SAT)", Money(c.TdsPaid + c.AdvanceTax)));
+            lines.Add(PdfLine.Total(
+                c.RefundOrPayable >= 0m ? "Refund Due" : "Tax Payable",
+                Money(Math.Abs(c.RefundOrPayable))));
         }
 
-        lines.Add(new PdfLine("Verification", "This is a system-generated ITR-V acknowledgment."));
+        lines.Add(PdfLine.Heading("Filing"));
+        lines.Add(new("Acknowledgment Number", taxReturn.AcknowledgmentNumber ?? "(pending)"));
+        lines.Add(new("Filing Mode", taxReturn.FilingMode));
+        lines.Add(new("E-Filing Date", Date(taxReturn.SubmittedAt)));
+        lines.Add(new("E-Verification Date", Date(taxReturn.EVerifiedAt)));
+
+        lines.Add(PdfLine.Heading("Verification"));
+        lines.Add(PdfLine.Note($"I, {taxpayer.FullName}, holding PAN {taxpayer.PanMasked ?? "XXXXX____X"}, "
+            + "solemnly declare that the return has been filed as above and is correct and complete."));
+        lines.Add(PdfLine.Spacer());
+        lines.Add(PdfLine.Note(taxReturn.EVerifiedAt is null
+            ? "Not yet e-verified. E-verify within 30 days of filing (Aadhaar OTP / net-banking / EVC), or "
+              + "sign this ITR-V and post it to CPC, Bengaluru - 560500. System-generated acknowledgment."
+            : "E-verified - no further action needed. System-generated acknowledgment."));
         return lines;
     }
 
