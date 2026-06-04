@@ -17,7 +17,8 @@ public sealed record ReconciliationInputs(
     decimal TdsPaid,
     decimal AdvanceTaxPaid,
     decimal SelfAssessmentTaxPaid,
-    decimal TcsPaid);
+    decimal TcsPaid,
+    decimal ImmovablePropertySaleValue = 0m);
 
 /// <summary>
 /// Pure reconciliation logic (I/O-free → unit-testable): compares each return-side head against the
@@ -65,6 +66,9 @@ public static class ReconciliationEngine
         // so compare it against the total sale consideration the return declares for those assets. A shortfall
         // means a sale (often an overlooked mutual-fund redemption) the department knows about is missing.
         Compare("capital_gains", "Securities / MF sales (sale value)", r.SecuritiesSaleValue, ais, "ais.sft_sale_of_securities", "AIS");
+        // Sale of immovable property (SFT-012) — a leading §143(1) mismatch: AIS knows about the sale
+        // (reported by the registrar) but the return often omits the capital gain.
+        Compare("capital_gains", "Immovable property sale (sale value)", r.ImmovablePropertySaleValue, ais, "ais.sft_sale_of_immovable_property", "AIS");
 
         // ---- prepaid taxes (26AS) ----
         // TDS + TCS are claim-vs-available (you want to claim all the credit the department holds); advance

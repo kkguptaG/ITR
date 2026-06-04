@@ -18,8 +18,8 @@ public class ReconciliationEngineTests
     private static ReconciliationInputs Inputs(
         decimal grossSalary = 0, decimal savings = 0, decimal fd = 0, decimal otherInterest = 0,
         decimal refundInterest = 0, decimal dividend = 0, decimal rent = 0, decimal securities = 0,
-        decimal tds = 0, decimal advance = 0, decimal sat = 0, decimal tcs = 0)
-        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, securities, tds, advance, sat, tcs);
+        decimal tds = 0, decimal advance = 0, decimal sat = 0, decimal tcs = 0, decimal immovable = 0)
+        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, securities, tds, advance, sat, tcs, immovable);
 
     private static ReconLineDto Line(ReconciliationReportDto r, string label) => r.Lines.Single(l => l.Label == label);
 
@@ -121,6 +121,20 @@ public class ReconciliationEngineTests
 
         r.MismatchCount.Should().Be(2);
         r.UnderReportedCount.Should().Be(1, "only the salary is under-reported; dividend is over-reported");
+    }
+
+    [Fact]
+    public void Immovable_property_sale_in_AIS_not_in_the_return_is_flagged_under_reported()
+    {
+        // The registrar reported a ₹90L property sale (SFT-012) but the return declares no such sale —
+        // a leading §143(1) mismatch.
+        var ais = new Dictionary<string, decimal> { ["ais.sft_sale_of_immovable_property"] = 9_000_000m };
+        var r = ReconciliationEngine.BuildReport(Inputs(immovable: 0m), ais, Empty);
+
+        var line = Line(r, "Immovable property sale (sale value)");
+        line.Status.Should().Be("under_reported");
+        line.Source.Should().Be("AIS");
+        r.UnderReportedCount.Should().Be(1);
     }
 
     [Fact]

@@ -60,6 +60,11 @@ public sealed class ReconciliationService : IReconciliationService
             .Where(g => g.TaxReturnId == returnId && securitiesTypes.Contains(g.AssetType))
             .SumAsync(g => (decimal?)g.SalePrice, ct) ?? 0m;
 
+        // Sale consideration of immovable property (land/building) — what the registrar's SFT-012 reports.
+        var immovableSaleValue = await _db.CapitalGains
+            .Where(g => g.TaxReturnId == returnId && g.AssetType == CapitalGainAssetType.ImmovableProperty)
+            .SumAsync(g => (decimal?)g.SalePrice, ct) ?? 0m;
+
         var inputs = new ReconciliationInputs(
             GrossSalary: salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu),
             SavingsInterest: OtherByNature(others, "savings_interest"),
@@ -72,7 +77,8 @@ public sealed class ReconciliationService : IReconciliationService
             TdsPaid: ret.TdsPaid,
             AdvanceTaxPaid: ret.AdvanceTaxPaid,
             SelfAssessmentTaxPaid: ret.SelfAssessmentTaxPaid,
-            TcsPaid: ret.TcsPaid);
+            TcsPaid: ret.TcsPaid,
+            ImmovablePropertySaleValue: immovableSaleValue);
 
         return ReconciliationEngine.BuildReport(inputs, ais, as26);
     }
