@@ -38,6 +38,7 @@ import { PassThroughIncomeCard } from '@/features/pass-through-income';
 import { SpouseApportionmentCard } from '@/features/spouse-apportionment';
 import { DepreciationCard, UnabsorbedDepreciationCard } from '@/features/depreciation';
 import { EVerifyCard } from '@/features/e-verify';
+import { RefundCard } from '@/features/refunds';
 
 export function ReturnDetailView({ returnId }: { returnId: string }) {
   const t = useTranslations('wizard');
@@ -137,6 +138,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
 
       {/* E-verification — a filed return is not valid until verified within 30 days. */}
       {locked && <EVerifyCard returnId={returnId} />}
+
+      {/* Income-tax refund / demand status — appears once CPC processes the return. */}
+      {locked && <RefundCard returnId={returnId} />}
 
       {/* Take-away downloads available once computed (pre-filing too). */}
       {comp && !locked && (

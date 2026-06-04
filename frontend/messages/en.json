@@ -533,6 +533,44 @@
       "ItrV": "Post signed ITR-V to CPC"
     }
   },
+  "refund": {
+    "title": "Income-tax refund",
+    "subtitle": "Your refund (or demand) once the department processes the return.",
+    "processingTitle": "Return being processed",
+    "processingBody": "The Income Tax Department is processing your return. Your refund status will appear here once the s.143(1) intimation is issued.",
+    "amountLabel": "Refund amount",
+    "demandTitle": "Tax demand raised",
+    "demandBody": "A demand of {amount} was determined in your s.143(1) intimation.",
+    "noRefundTitle": "No refund or demand",
+    "noRefundBody": "Your return was processed and accepted as filed — nothing is due either way.",
+    "adjustedTitle": "Refund adjusted",
+    "adjustedBody": "Your refund of {amount} was set off against an outstanding demand (s.245).",
+    "failedTitle": "Refund credit failed",
+    "creditedTo": "Credited to",
+    "mode": "Mode",
+    "sequenceNo": "Refund reference",
+    "intimationDate": "Intimation date",
+    "paidOn": "Credited on",
+    "reissueCountLabel": "Re-issue attempts",
+    "reissue": "Request re-issue",
+    "refresh": "Check for updates",
+    "genericError": "Something went wrong. Please try again.",
+    "step": {
+      "RefundDetermined": "Determined",
+      "RefundSentToBank": "Sent to bank",
+      "RefundPaid": "Credited"
+    },
+    "status": {
+      "NotDetermined": "Not determined",
+      "NoRefundOrDemand": "No refund or demand",
+      "RefundDetermined": "Refund determined",
+      "RefundSentToBank": "Sent to bank",
+      "RefundPaid": "Credited",
+      "RefundFailed": "Credit failed",
+      "RefundAdjusted": "Adjusted against demand",
+      "DemandDetermined": "Demand raised"
+    }
+  },
   "caReview": {
     "queueTitle": "Review queue",
     "queueSubtitle": "Returns assigned to you for review, plus your firm's unassigned pool.",

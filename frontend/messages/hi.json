@@ -533,6 +533,44 @@
       "ItrV": "हस्ताक्षरित ITR-V CPC को भेजें"
     }
   },
+  "refund": {
+    "title": "आयकर रिफंड",
+    "subtitle": "विभाग द्वारा रिटर्न संसाधित करने के बाद आपका रिफंड (या मांग)।",
+    "processingTitle": "रिटर्न संसाधित हो रहा है",
+    "processingBody": "आयकर विभाग आपका रिटर्न संसाधित कर रहा है। s.143(1) सूचना जारी होते ही आपकी रिफंड स्थिति यहाँ दिखेगी।",
+    "amountLabel": "रिफंड राशि",
+    "demandTitle": "कर मांग जारी",
+    "demandBody": "आपकी s.143(1) सूचना में {amount} की मांग निर्धारित की गई।",
+    "noRefundTitle": "न रिफंड न मांग",
+    "noRefundBody": "आपका रिटर्न संसाधित हुआ और दाखिल अनुसार स्वीकार किया गया — कुछ भी देय नहीं है।",
+    "adjustedTitle": "रिफंड समायोजित",
+    "adjustedBody": "आपका {amount} का रिफंड बकाया मांग (s.245) के विरुद्ध समायोजित किया गया।",
+    "failedTitle": "रिफंड क्रेडिट विफल",
+    "creditedTo": "इसमें जमा",
+    "mode": "माध्यम",
+    "sequenceNo": "रिफंड संदर्भ",
+    "intimationDate": "सूचना तिथि",
+    "paidOn": "जमा तिथि",
+    "reissueCountLabel": "पुनः-जारी प्रयास",
+    "reissue": "पुनः-जारी का अनुरोध करें",
+    "refresh": "अपडेट जाँचें",
+    "genericError": "कुछ गड़बड़ हो गई। कृपया पुनः प्रयास करें।",
+    "step": {
+      "RefundDetermined": "निर्धारित",
+      "RefundSentToBank": "बैंक को भेजा",
+      "RefundPaid": "जमा"
+    },
+    "status": {
+      "NotDetermined": "अनिर्धारित",
+      "NoRefundOrDemand": "न रिफंड न मांग",
+      "RefundDetermined": "रिफंड निर्धारित",
+      "RefundSentToBank": "बैंक को भेजा",
+      "RefundPaid": "जमा",
+      "RefundFailed": "क्रेडिट विफल",
+      "RefundAdjusted": "मांग के विरुद्ध समायोजित",
+      "DemandDetermined": "मांग जारी"
+    }
+  },
   "caReview": {
     "queueTitle": "समीक्षा कतार",
     "queueSubtitle": "आपको समीक्षा के लिए सौंपे गए रिटर्न, साथ ही आपकी फर्म का बिना-सौंपा पूल।",
