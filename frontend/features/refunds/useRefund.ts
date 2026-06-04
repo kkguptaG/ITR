@@ -21,11 +21,11 @@ export function isRefundSettled(status: string | null | undefined): boolean {
   return !!status && (SETTLED as readonly string[]).includes(status);
 }
 
-export function useRefundStatus(returnId: string) {
+export function useRefundStatus(returnId: string, enabled = true) {
   return useQuery({
     queryKey: refundKeys.status(returnId),
     queryFn: () => getRefundStatus(returnId),
-    enabled: !!returnId,
+    enabled: !!returnId && enabled,
     staleTime: 30_000,
   });
 }

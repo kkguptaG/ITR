@@ -16,6 +16,8 @@ import { formatInr, formatAssessmentYear, toNumber } from '@/lib/format';
 import type { ReturnSummaryDto, TaxComputationDto } from '@/features/returns/types';
 import { ReturnStatusBadge } from '@/features/returns/components/ReturnStatusBadge';
 import { returnHref } from '@/features/returns/helpers';
+import { useRefundStatus } from '@/features/refunds';
+import type { RefundStatusDto } from '@/features/refunds';
 
 export interface RefundTrackerCardProps {
   latest: ReturnSummaryDto;
@@ -24,6 +26,12 @@ export interface RefundTrackerCardProps {
 
 export function RefundTrackerCard({ latest, computation }: RefundTrackerCardProps) {
   const t = useTranslations('returns');
+
+  // Once the return is filed/processed, surface the ACTUAL refund/demand state (determined → paid,
+  // demand, or no-refund) from the refund module — not just the pre-filing computed estimate.
+  const isFiledish = latest.status === 'Filed' || latest.status === 'Processed';
+  const refund = useRefundStatus(latest.id, isFiledish).data;
+  const showActual = !!refund?.isProcessed;
 
   const hasComputation = computation !== null;
   const amount = hasComputation ? toNumber(computation.refundOrPayable) : 0;
@@ -37,7 +45,9 @@ export function RefundTrackerCard({ latest, computation }: RefundTrackerCardProp
         <ReturnStatusBadge status={latest.status} />
       </CardHeader>
       <CardContent>
-        {!hasComputation ? (
+        {showActual && refund ? (
+          <ActualRefundBox refund={refund} />
+        ) : !hasComputation ? (
           <div className="flex items-start gap-3 rounded-xl bg-ink-50 p-4">
             <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-ink-400" aria-hidden="true" />
             <div>
@@ -85,5 +95,54 @@ export function RefundTrackerCard({ latest, computation }: RefundTrackerCardProp
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const REFUND_FLOW_STATES = ['RefundDetermined', 'RefundSentToBank', 'RefundPaid', 'RefundFailed'];
+
+/** The post-processing refund/demand headline (real ITD state), shown once the return is processed. */
+function ActualRefundBox({ refund }: { refund: RefundStatusDto }) {
+  const tr = useTranslations('refund');
+  const label = tr(`status.${refund.status}`);
+
+  if (refund.status === 'DemandDetermined') {
+    return (
+      <div className="rounded-xl bg-payable-50 p-4">
+        <div className="flex items-center gap-2">
+          <ArrowUpFromLine className="h-5 w-5 text-payable-600" aria-hidden="true" />
+          <span className="text-sm font-medium text-payable-700">{label}</span>
+        </div>
+        <p className="mt-1 text-3xl font-semibold tabular-nums text-payable-700">
+          {formatInr(refund.demandAmount)}
+        </p>
+      </div>
+    );
+  }
+
+  if (REFUND_FLOW_STATES.includes(refund.status)) {
+    const failed = refund.status === 'RefundFailed';
+    return (
+      <div className={cn('rounded-xl p-4', failed ? 'bg-red-50' : 'bg-money-50')}>
+        <div className="flex items-center gap-2">
+          <ArrowDownToLine className={cn('h-5 w-5', failed ? 'text-red-600' : 'text-money-600')} aria-hidden="true" />
+          <span className={cn('text-sm font-medium', failed ? 'text-red-700' : 'text-money-700')}>{label}</span>
+        </div>
+        <p className={cn('mt-1 text-3xl font-semibold tabular-nums', failed ? 'text-red-700' : 'text-money-700')}>
+          {formatInr(refund.determinedAmount)}
+        </p>
+      </div>
+    );
+  }
+
+  // NoRefundOrDemand / RefundAdjusted — neutral.
+  return (
+    <div className="rounded-xl bg-ink-50 p-4">
+      <span className="text-sm font-medium text-ink-700">{label}</span>
+      {refund.status === 'RefundAdjusted' && (
+        <p className="mt-1 text-2xl font-semibold tabular-nums text-ink-800">
+          {formatInr(refund.determinedAmount)}
+        </p>
+      )}
+    </div>
   );
 }
