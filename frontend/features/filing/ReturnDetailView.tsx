@@ -101,6 +101,9 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           <Button variant="outline" onClick={() => router.push(`/returns/${returnId}/workspace`)}>
             Computation workspace
           </Button>
+          <Button variant="outline" onClick={() => router.push(`/returns/${returnId}/capital-gains`)}>
+            Capital gains
+          </Button>
           {!locked && (
             <Button onClick={() => router.push(`/returns/${returnId}/file/personal`)}>
               {tr('continue')}

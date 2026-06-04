@@ -52,6 +52,15 @@ export type CapitalGainAssetType =
   | 'Other';
 export type CapitalGainTerm = 'Short' | 'Long';
 export type CapitalGainAcquisitionMode = 'Purchase' | 'Gift' | 'Inheritance' | 'Will' | 'Other';
+export type CapitalGainSubType =
+  | 'ListedShare' | 'UnlistedShare' | 'IpoShare' | 'EsopShare' | 'RsuShare' | 'BonusShare' | 'RightsShare' | 'Buyback'
+  | 'EquityMutualFund' | 'DebtMutualFund' | 'HybridMutualFund' | 'InternationalFund'
+  | 'ResidentialHouse' | 'CommercialProperty' | 'Plot' | 'AgriculturalLand'
+  | 'PhysicalGold' | 'GoldEtf' | 'SovereignGoldBond' | 'Jewellery' | 'OtherBullion'
+  | 'ListedBond' | 'Debenture' | 'GovernmentSecurity' | 'TaxFreeBond'
+  | 'Crypto' | 'Nft'
+  | 'ForeignShare' | 'UsStock' | 'ForeignEtf' | 'ForeignRsu' | 'AdrGdr'
+  | 'Goodwill' | 'IntangibleAsset' | 'ArtCollectible' | 'Vehicle' | 'IpRights' | 'SlumpSale' | 'Other';
 export type IncomeType =
   | 'Salary'
   | 'HouseProperty'
@@ -164,6 +173,11 @@ export interface CapitalGainDto {
   previousOwnerAcquisitionDate: string | null;
   previousOwnerCost: number;
   isRuralAgriculturalLand: boolean;
+  subType: CapitalGainSubType | null;
+  sttPaid: boolean;
+  tdsOnSale: number;
+  tdsSection: string | null;
+  coOwnerPercent: number;
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
@@ -184,6 +198,11 @@ export interface UpsertCapitalGainRequest {
   reinvestmentAmount?: number;
   isin?: string | null;
   fairMarketValue31Jan2018?: number;
+  subType?: CapitalGainSubType | null;
+  sttPaid?: boolean;
+  tdsOnSale?: number;
+  tdsSection?: string | null;
+  coOwnerPercent?: number;
 }
 
 export interface BusinessFinancialParticulars {
