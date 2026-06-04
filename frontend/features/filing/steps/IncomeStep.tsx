@@ -85,11 +85,32 @@ export function IncomeStep() {
   const heads = incomeHeads(detail.itrType);
 
   // Deep-link focus: the Computation Dashboard links here with ?focus=<head> to land on a section.
+  // The section renders only after the income data settles, and the wizard restores scroll to the
+  // top on mount — so a one-shot scroll races and misses. Defer past hydration, then poll a few
+  // frames for the section before scrolling it into view.
   const focus = useSearchParams().get('focus');
   useEffect(() => {
     if (!focus) return;
-    const el = document.getElementById(`income-${focus}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const deadline = Date.now() + 1500;
+    // Re-assert an *instant* scroll (a smooth one gets cancelled mid-animation by
+    // the router's scroll-restoration) until the section is actually settled at the
+    // top, which also covers the section rendering a few frames after navigation.
+    const tick = () => {
+      if (cancelled) return;
+      const el = document.getElementById(`income-${focus}`);
+      if (el) {
+        if (Math.abs(el.getBoundingClientRect().top) < 8) return; // already in place
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }
+      if (Date.now() < deadline) timer = setTimeout(tick, 120);
+    };
+    timer = setTimeout(tick, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [focus]);
 
   // ------- salary
