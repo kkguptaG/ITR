@@ -135,6 +135,22 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Presumptive_44AE_over_ten_vehicles_is_a_hard_error()
+    {
+        // 11 vehicles → over the s.44AE 10-vehicle eligibility cap.
+        var eleven = "[" + string.Join(",", Enumerable.Range(0, 11).Select(i =>
+            $"{{\"regNo\":\"DL{i:00}AB1234\",\"ownership\":\"OWN\",\"tonnage\":12,\"months\":12}}")) + "]";
+        var over = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 990_000m, GoodsCarriageJson = eleven } };
+        Has(Svc.Validate(Ctx(businesses: over), StubJson), "PRESUMPTIVE.44AE_VEHICLE_CAP").Should().BeTrue();
+
+        // 10 vehicles → within the cap, no error.
+        var ten = "[" + string.Join(",", Enumerable.Range(0, 10).Select(i =>
+            $"{{\"regNo\":\"DL{i:00}AB1234\",\"ownership\":\"OWN\",\"tonnage\":12,\"months\":12}}")) + "]";
+        var within = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 900_000m, GoodsCarriageJson = ten } };
+        Has(Svc.Validate(Ctx(businesses: within), StubJson), "PRESUMPTIVE.44AE_VEHICLE_CAP").Should().BeFalse();
+    }
+
+    [Fact]
     public void Financial_particulars_that_do_not_balance_warn()
     {
         // Liabilities ₹10L vs assets ₹3L — a >10% gap.

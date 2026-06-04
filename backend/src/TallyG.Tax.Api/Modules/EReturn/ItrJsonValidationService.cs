@@ -284,13 +284,19 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             {
                 // 44AE needs the per-vehicle goods-carriage list; without it the presumptive income
                 // can't be computed per s.44AE and the Schedule BP vehicle table is empty.
-                var hasVehicles = !string.IsNullOrWhiteSpace(b.GoodsCarriageJson)
-                                  && b.GoodsCarriageJson.Trim() is not ("[]" or "{}" or "");
-                if (!hasVehicles)
+                var vehicleCount = CountGoodsCarriage(b.GoodsCarriageJson);
+                if (vehicleCount == 0)
                 {
                     Warn("PRESUMPTIVE.44AE_NO_VEHICLES", "$..ScheduleBP.GoodsDtlsUs44AE",
                         "44AE (goods carriage) is selected but no vehicles are listed — the presumptive income can't be computed per-vehicle.",
                         "Add each goods-carriage vehicle (registration no, tonnage, months held) in the Income step. 44AE also caps at 10 vehicles owned at any time during the year.");
+                }
+                else if (vehicleCount > 10)
+                {
+                    // s.44AE eligibility ends if more than 10 goods carriages are owned at any time in the year.
+                    Err("PRESUMPTIVE.44AE_VEHICLE_CAP", "$..ScheduleBP.GoodsDtlsUs44AE",
+                        $"44AE lists {vehicleCount} vehicles — the scheme applies only when ≤10 goods carriages are owned at any time during the year.",
+                        "Above 10 vehicles you can't use 44AE — file under regular books (ITR-3) with a tax audit if applicable.");
                 }
             }
 
@@ -553,4 +559,23 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
     /// <summary>Sections sharing the single ₹1,50,000 ceiling (s.80CCE): 80C, 80CCC, 80CCD(1).</summary>
     private static bool Is80CBucket(string? section)
         => NormSection(section) is "80C" or "80CCC" or "80CCD(1)" or "80CCD1";
+
+    /// <summary>Count the vehicles in a 44AE goods-carriage JSON array (0 on blank/invalid).</summary>
+    private static int CountGoodsCarriage(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Trim() is "[]" or "{}" or "")
+        {
+            return 0;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Array ? doc.RootElement.GetArrayLength() : 0;
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
+    }
 }

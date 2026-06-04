@@ -162,6 +162,11 @@ export const businessIncomeSchema = z
   .refine((v) => v.presumptiveSection !== '44AD' || (v.turnover ?? 0) <= 30_000_000, {
     message: '44AD applies only when turnover is ₹3 crore or less.',
     path: ['turnover'],
+  })
+  // 44AE applies only when ≤10 goods carriages are owned at any time during the year.
+  .refine((v) => v.presumptiveSection !== '44AE' || (v.goodsCarriage?.length ?? 0) <= 10, {
+    message: '44AE applies only when you own 10 or fewer goods carriages — file ITR-3 above that.',
+    path: ['goodsCarriage'],
   });
 export type BusinessIncomeFormValues = z.infer<typeof businessIncomeSchema>;
 
