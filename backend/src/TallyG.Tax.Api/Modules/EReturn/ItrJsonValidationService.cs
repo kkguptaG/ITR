@@ -313,6 +313,22 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
             }
         }
 
+        // --- s.44AB tax-audit applicability (regular-books business turnover thresholds) ---
+        foreach (var b in ctx.Businesses.Where(x => !x.IsPresumptive && x.Turnover > 0m))
+        {
+            // Business: audit if turnover > ₹1cr, relaxed to ₹10cr when both cash receipts AND payments are
+            // ≤5% of turnover. We approximate the cash test from the captured cash-receipts share.
+            var cashShare = b.Turnover > 0m ? b.GrossReceiptsCash / b.Turnover : 0m;
+            var threshold = cashShare <= 0.05m ? 100_000_000m : 10_000_000m;   // ₹10cr (low-cash) else ₹1cr
+            if (b.Turnover > threshold)
+            {
+                Warn("AUDIT.44AB_TURNOVER", "$..ScheduleBP",
+                    $"Business turnover (₹{b.Turnover:N0}) exceeds the ₹{threshold:N0} s.44AB tax-audit threshold.",
+                    "A tax audit u/s 44AB and Form 3CA/3CB-3CD are required, with the return due 31 Oct. " +
+                    "A professional's audit threshold is lower (₹50 lakh of gross receipts).");
+            }
+        }
+
         // --- foreign-source income (Schedule FSI/TR) cross-checks ---
         if (ctx.ForeignSourceIncomes.Count > 0)
         {

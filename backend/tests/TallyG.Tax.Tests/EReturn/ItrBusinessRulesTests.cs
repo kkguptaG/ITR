@@ -124,6 +124,22 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Regular_books_business_over_the_44AB_threshold_warns_tax_audit()
+    {
+        // ₹1.2cr all-digital turnover (≤5% cash → ₹10cr threshold) → NO audit warning.
+        var lowCash = new[] { new BusinessIncome { IsPresumptive = false, Turnover = 12_000_000m, GrossReceiptsCash = 0m, NetProfit = 1_500_000m } };
+        Has(Svc.Validate(Ctx(businesses: lowCash), StubJson), "AUDIT.44AB_TURNOVER").Should().BeFalse();
+
+        // ₹1.5cr turnover with significant cash (>5%) → ₹1cr threshold breached → audit warning.
+        var highCash = new[] { new BusinessIncome { IsPresumptive = false, Turnover = 15_000_000m, GrossReceiptsCash = 5_000_000m, NetProfit = 1_500_000m } };
+        Has(Svc.Validate(Ctx(businesses: highCash), StubJson), "AUDIT.44AB_TURNOVER").Should().BeTrue();
+
+        // ₹11cr turnover all-digital → exceeds even the ₹10cr low-cash threshold → audit warning.
+        var huge = new[] { new BusinessIncome { IsPresumptive = false, Turnover = 110_000_000m, GrossReceiptsCash = 0m, NetProfit = 8_000_000m } };
+        Has(Svc.Validate(Ctx(businesses: huge), StubJson), "AUDIT.44AB_TURNOVER").Should().BeTrue();
+    }
+
+    [Fact]
     public void Presumptive_44AE_without_vehicles_warns()
     {
         var noVehicles = new[] { new BusinessIncome { IsPresumptive = true, PresumptiveSection = "44AE", NetProfit = 270_000m, GoodsCarriageJson = "[]" } };
