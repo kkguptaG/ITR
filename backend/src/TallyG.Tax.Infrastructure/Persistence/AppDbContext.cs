@@ -71,6 +71,7 @@ public class AppDbContext : DbContext
     public DbSet<CapitalGainBuyer> CapitalGainBuyers => Set<CapitalGainBuyer>();
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();
+    public DbSet<EVerification> EVerifications => Set<EVerification>();
 
     // --- Documents ---
     public DbSet<Document> Documents => Set<Document>();
@@ -155,6 +156,9 @@ public class AppDbContext : DbContext
             .WithOne(e => e.Voucher!)
             .HasForeignKey(e => e.VoucherId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // One (current) e-verification row per filed return — re-issuing a challenge replaces it.
+        b.Entity<EVerification>().HasIndex(e => e.TaxReturnId).IsUnique();
 
         b.Entity<Ledger>().HasIndex(l => new { l.TenantId, l.UserId });
         b.Entity<BankStatementImport>().HasIndex(i => new { i.TenantId, i.UserId });

@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddSingleton<INotificationSender, ConsoleNotificationSender>();
         services.AddSingleton<IPaymentGateway, RazorpayStub>();
         services.AddSingleton<IEFilingClient, MockEFilingClient>();
+        services.AddSingleton<IEVerificationClient, MockEVerificationClient>();
         services.AddSingleton<IPdfGenerator, SimplePdfGenerator>();
         services.AddSingleton<IBankStatementParser, BankStatementParser>();
 

@@ -1061,8 +1061,11 @@ public sealed class ReturnService : IReturnService
     {
         var ret = await LoadOwnedReturnAsync(id, ct);
 
-        // For a filed return, reconcile against the (stubbed) ERI processing status.
-        if (ret.Status == ReturnStatus.Filed && !string.IsNullOrEmpty(ret.AcknowledgmentNumber))
+        // For a filed AND e-verified return, reconcile against the (stubbed) ERI processing status.
+        // CPC never processes an unverified return, so a filed-but-unverified return stays Filed until
+        // the filer e-verifies (EVerifiedAt set by the EVerification module).
+        if (ret.Status == ReturnStatus.Filed && ret.EVerifiedAt is not null
+            && !string.IsNullOrEmpty(ret.AcknowledgmentNumber))
         {
             var remote = await _eFiling.GetStatusAsync(ret.AcknowledgmentNumber, ct);
             if (remote.Accepted)
