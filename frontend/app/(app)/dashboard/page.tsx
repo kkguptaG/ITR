@@ -38,6 +38,7 @@ import { isInProgress, refundOrPayable } from '@/features/returns/helpers';
 import { KpiCard } from '@/features/dashboard/components/KpiCard';
 import { RecentReturns } from '@/features/dashboard/components/RecentReturns';
 import { RefundTrackerCard } from '@/features/dashboard/components/RefundTrackerCard';
+import { EVerifyReminder } from '@/features/dashboard/components/EVerifyReminder';
 import { StatusTimeline } from '@/features/dashboard/components/StatusTimeline';
 import { DeadlinesCard } from '@/features/dashboard/components/DeadlinesCard';
 import { deadlineFor } from '@/features/dashboard/deadlines';
@@ -120,6 +121,9 @@ export default function DashboardPage() {
       </div>
 
       {listQuery.isError && <Alert variant="error">{tr('listError')}</Alert>}
+
+      {/* Action needed: e-verify a filed return before its 30-day window lapses. */}
+      <EVerifyReminder items={items} />
 
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

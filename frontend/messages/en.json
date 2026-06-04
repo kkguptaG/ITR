@@ -507,6 +507,9 @@
   "eVerify": {
     "title": "E-verify your return",
     "subtitle": "A filed return is valid only after e-verification.",
+    "reminderTitle": "Action needed: e-verify your return",
+    "reminderBody": "Your {ay} return is filed but not yet verified. E-verify by {date} ({days} days left) — an unverified return is treated as not filed.",
+    "reminderCta": "E-verify now",
     "pendingTitle": "E-verification pending",
     "pendingBody": "Verify this return within {days} days — by {date} — or it may be treated as not filed.",
     "overdueTitle": "E-verification overdue",
