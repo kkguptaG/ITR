@@ -95,10 +95,10 @@ export default function LandingPage() {
                     <ArrowRight className="h-5 w-5" aria-hidden="true" />
                   </Link>
                   <Link
-                    href="/login"
+                    href="#how-it-works"
                     className="inline-flex w-full items-center justify-center rounded-xl border border-ink-300 bg-white px-6 py-3 text-base font-semibold text-ink-800 transition-colors hover:bg-ink-50 sm:w-auto"
                   >
-                    {t('ctaLogin')}
+                    {t('ctaHowItWorks')}
                   </Link>
                 </div>
 
@@ -144,7 +144,7 @@ export default function LandingPage() {
         </section>
 
         {/* Steps */}
-        <section className="border-t border-ink-200 bg-white">
+        <section id="how-it-works" className="scroll-mt-16 border-t border-ink-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-16 lg:px-8 lg:py-24">
             <h2 className="text-center text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
               {t('stepsTitle')}
@@ -165,15 +165,6 @@ export default function LandingPage() {
                 );
               })}
             </ol>
-            <div className="mt-12 text-center">
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-base font-semibold text-white shadow-soft transition-colors hover:bg-brand-700"
-              >
-                {t('ctaStart')}
-                <ArrowRight className="h-5 w-5" aria-hidden="true" />
-              </Link>
-            </div>
           </div>
         </section>
       </main>
