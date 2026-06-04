@@ -18,7 +18,8 @@ public sealed record ReconciliationInputs(
     decimal AdvanceTaxPaid,
     decimal SelfAssessmentTaxPaid,
     decimal TcsPaid,
-    decimal ImmovablePropertySaleValue = 0m);
+    decimal ImmovablePropertySaleValue = 0m,
+    decimal BusinessTurnover = 0m);
 
 /// <summary>
 /// Pure reconciliation logic (I/O-free → unit-testable): compares each return-side head against the
@@ -29,12 +30,15 @@ public sealed record ReconciliationInputs(
 public static class ReconciliationEngine
 {
     private const decimal Tolerance = 100m;   // ignore sub-₹100 rounding differences
+    private static readonly IReadOnlyDictionary<string, decimal> EmptyMap = new Dictionary<string, decimal>();
 
     public static ReconciliationReportDto BuildReport(
         ReconciliationInputs r,
         IReadOnlyDictionary<string, decimal> ais,
-        IReadOnlyDictionary<string, decimal> as26)
+        IReadOnlyDictionary<string, decimal> as26,
+        IReadOnlyDictionary<string, decimal>? gst = null)
     {
+        gst ??= EmptyMap;
         var lines = new List<ReconLineDto>();
 
         void Compare(string category, string label, decimal inReturn, IReadOnlyDictionary<string, decimal> src, string srcKey, string srcName)
@@ -69,6 +73,11 @@ public static class ReconciliationEngine
         // Sale of immovable property (SFT-012) — a leading §143(1) mismatch: AIS knows about the sale
         // (reported by the registrar) but the return often omits the capital gain.
         Compare("capital_gains", "Immovable property sale (sale value)", r.ImmovablePropertySaleValue, ais, "ais.sft_sale_of_immovable_property", "AIS");
+
+        // ---- business turnover (GST) ----
+        // The GST portal's reported turnover (GSTR-3B) should not exceed the business turnover declared in
+        // the return — a return declaring less than the GST turnover is a common scrutiny trigger.
+        Compare("business", "Business turnover (GST)", r.BusinessTurnover, gst, "gst.turnover_total", "GST");
 
         // ---- prepaid taxes (26AS) ----
         // TDS + TCS are claim-vs-available (you want to claim all the credit the department holds); advance

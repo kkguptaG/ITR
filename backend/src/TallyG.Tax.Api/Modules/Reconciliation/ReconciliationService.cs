@@ -40,8 +40,9 @@ public sealed class ReconciliationService : IReconciliationService
 
         var ais = await LatestFieldMapAsync(returnId, DocumentKind.AIS, ct);
         var as26 = await LatestFieldMapAsync(returnId, DocumentKind.Form26AS, ct);
+        var gst = await LatestFieldMapAsync(returnId, DocumentKind.GstData, ct);
 
-        if (ais.Count == 0 && as26.Count == 0)
+        if (ais.Count == 0 && as26.Count == 0 && gst.Count == 0)
         {
             return new ReconciliationReportDto(false, Array.Empty<ReconLineDto>(), 0, 0,
                 "Upload your AIS and Form 26AS (Documents) and approve their extraction to reconcile this return against the department's records before filing.");
@@ -65,6 +66,11 @@ public sealed class ReconciliationService : IReconciliationService
             .Where(g => g.TaxReturnId == returnId && g.AssetType == CapitalGainAssetType.ImmovableProperty)
             .SumAsync(g => (decimal?)g.SalePrice, ct) ?? 0m;
 
+        // Business turnover declared in the return (compared against the GST-reported turnover).
+        var businessTurnover = await _db.BusinessIncomes
+            .Where(b => b.TaxReturnId == returnId)
+            .SumAsync(b => (decimal?)b.Turnover, ct) ?? 0m;
+
         var inputs = new ReconciliationInputs(
             GrossSalary: salaries.Sum(s => s.Gross + s.Perquisites + s.ProfitsInLieu),
             SavingsInterest: OtherByNature(others, "savings_interest"),
@@ -78,9 +84,10 @@ public sealed class ReconciliationService : IReconciliationService
             AdvanceTaxPaid: ret.AdvanceTaxPaid,
             SelfAssessmentTaxPaid: ret.SelfAssessmentTaxPaid,
             TcsPaid: ret.TcsPaid,
-            ImmovablePropertySaleValue: immovableSaleValue);
+            ImmovablePropertySaleValue: immovableSaleValue,
+            BusinessTurnover: businessTurnover);
 
-        return ReconciliationEngine.BuildReport(inputs, ais, as26);
+        return ReconciliationEngine.BuildReport(inputs, ais, as26, gst);
     }
 
     private async Task<IReadOnlyDictionary<string, decimal>> LatestFieldMapAsync(Guid returnId, DocumentKind kind, CancellationToken ct)

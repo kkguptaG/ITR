@@ -18,8 +18,8 @@ public class ReconciliationEngineTests
     private static ReconciliationInputs Inputs(
         decimal grossSalary = 0, decimal savings = 0, decimal fd = 0, decimal otherInterest = 0,
         decimal refundInterest = 0, decimal dividend = 0, decimal rent = 0, decimal securities = 0,
-        decimal tds = 0, decimal advance = 0, decimal sat = 0, decimal tcs = 0, decimal immovable = 0)
-        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, securities, tds, advance, sat, tcs, immovable);
+        decimal tds = 0, decimal advance = 0, decimal sat = 0, decimal tcs = 0, decimal immovable = 0, decimal businessTurnover = 0)
+        => new(grossSalary, savings, fd, otherInterest, refundInterest, dividend, rent, securities, tds, advance, sat, tcs, immovable, businessTurnover);
 
     private static ReconLineDto Line(ReconciliationReportDto r, string label) => r.Lines.Single(l => l.Label == label);
 
@@ -121,6 +121,19 @@ public class ReconciliationEngineTests
 
         r.MismatchCount.Should().Be(2);
         r.UnderReportedCount.Should().Be(1, "only the salary is under-reported; dividend is over-reported");
+    }
+
+    [Fact]
+    public void Business_turnover_below_the_GST_reported_turnover_is_flagged()
+    {
+        // GST portal shows ₹40L turnover but the return declares ₹25L — under-reported.
+        var gst = new Dictionary<string, decimal> { ["gst.turnover_total"] = 4_000_000m };
+        var r = ReconciliationEngine.BuildReport(Inputs(businessTurnover: 2_500_000m), Empty, Empty, gst);
+
+        var line = Line(r, "Business turnover (GST)");
+        line.Status.Should().Be("under_reported");
+        line.Source.Should().Be("GST");
+        r.UnderReportedCount.Should().Be(1);
     }
 
     [Fact]
