@@ -97,11 +97,16 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
           </div>
           <StatusBadge status={detail.status}>{ts(detail.status)}</StatusBadge>
         </div>
-        {!locked && (
-          <Button onClick={() => router.push(`/returns/${returnId}/file/personal`)}>
-            {tr('continue')}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => router.push(`/returns/${returnId}/workspace`)}>
+            Computation workspace
           </Button>
-        )}
+          {!locked && (
+            <Button onClick={() => router.push(`/returns/${returnId}/file/personal`)}>
+              {tr('continue')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filed acknowledgment + downloads */}

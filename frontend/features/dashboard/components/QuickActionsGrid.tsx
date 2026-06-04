@@ -25,12 +25,13 @@ interface Action {
 
 export function QuickActionsGrid({ returnId }: { returnId: string | null }) {
   const ret = returnId ? `/returns/${returnId}` : '/returns';
+  const workspace = returnId ? `/returns/${returnId}/workspace` : '/returns';
   const actions: Action[] = [
     { label: 'Upload Form 16', icon: Upload, href: '/documents' },
     { label: 'Import AIS / 26AS', icon: Landmark, href: '/documents' },
-    { label: 'Tax Calculator', icon: Calculator, href: ret },
+    { label: 'Tax Calculator', icon: Calculator, href: workspace },
     { label: 'Refund Status', icon: ReceiptText, href: ret },
-    { label: 'Tax Summary', icon: FileText, href: ret },
+    { label: 'Tax Summary', icon: FileText, href: workspace },
     { label: 'Notices & Letters', icon: BadgeCheck, href: '/support' },
     { label: 'Manage Documents', icon: FolderOpen, href: '/documents' },
     { label: 'E-Verify Return', icon: ShieldCheck, href: ret },
