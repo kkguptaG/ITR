@@ -424,6 +424,31 @@ public class ItrBusinessRulesTests
     }
 
     [Fact]
+    public void Revised_return_without_original_ack_or_date_errors()
+    {
+        ItrFilingContext Revised(string? ack, DateOnly? date) => new()
+        {
+            Return = new TaxReturn { ItrType = ItrType.ITR2, Regime = Regime.Old, RuleSetVersion = "AY2024-25",
+                FilingSection = ReturnFilingSection.Revised, OriginalAcknowledgmentNumber = ack, OriginalFilingDate = date },
+            User = new User { FullName = "Demo", Email = "demo@itrhelp.com", MobileE164 = "+919000000002" },
+            Profile = new UserProfile { City = "Pune", StateCode = "27", Pincode = "411001", Dob = new DateOnly(1990, 1, 1) },
+            Ay = new AssessmentYear { Code = "AY2024-25" },
+            Computation = new TaxComputation { Regime = Regime.Old, GrossTotalIncome = 1_000_000m, TaxableIncome = 800_000m },
+            Salaries = new[] { new SalaryDetail { Employer = "Acme", Gross = 1_000_000m } },
+        };
+
+        // Missing both → both errors.
+        var missing = Svc.Validate(Revised(null, null), StubJson);
+        Has(missing, "FILING.REVISED_NO_ORIGINAL_ACK").Should().BeTrue();
+        Has(missing, "FILING.REVISED_NO_ORIGINAL_DATE").Should().BeTrue();
+
+        // Complete original details → no revised errors.
+        var ok = Svc.Validate(Revised("123456789012345", new DateOnly(2025, 7, 20)), StubJson);
+        Has(ok, "FILING.REVISED_NO_ORIGINAL_ACK").Should().BeFalse();
+        Has(ok, "FILING.REVISED_NO_ORIGINAL_DATE").Should().BeFalse();
+    }
+
+    [Fact]
     public void Chapter_VIA_deductions_exceeding_GTI_warn()
     {
         // GTI is ₹8L in the fixture; ₹9L of deductions can't be allowed in full (s.80A(2)).

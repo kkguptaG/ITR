@@ -258,6 +258,25 @@ public sealed class ReturnService : IReturnService
         if (request.ForeignTaxPaid is { } ftp) ret.ForeignTaxPaid = Math.Max(0m, ftp);
         if (request.ForeignDtaaApplies is { } dtaa) ret.ForeignDtaaApplies = dtaa;
 
+        // s.139 filing section (original / belated / revised) + original-return details.
+        if (request.FilingSection is { } section)
+        {
+            ret.FilingSection = section;
+            ret.IsRevised = section == ReturnFilingSection.Revised;
+            if (section != ReturnFilingSection.Revised)
+            {
+                // Clear stale original-return details when switching away from revised.
+                ret.OriginalAcknowledgmentNumber = null;
+                ret.OriginalFilingDate = null;
+            }
+        }
+        if (request.OriginalAcknowledgmentNumber is not null)
+        {
+            var ack = request.OriginalAcknowledgmentNumber.Trim();
+            ret.OriginalAcknowledgmentNumber = ack.Length == 0 ? null : ack;
+        }
+        if (request.OriginalFilingDate is { } ofd) ret.OriginalFilingDate = ofd;
+
         // Touching the working draft moves it out of the pristine Draft state.
         if (ret.Status == ReturnStatus.Draft)
         {
@@ -1149,7 +1168,10 @@ public sealed class ReturnService : IReturnService
             ret.Relief89,
             ret.ForeignIncomeDoublyTaxed,
             ret.ForeignTaxPaid,
-            ret.ForeignDtaaApplies);
+            ret.ForeignDtaaApplies,
+            ret.FilingSection,
+            ret.OriginalAcknowledgmentNumber,
+            ret.OriginalFilingDate);
     }
 
     /// <summary>

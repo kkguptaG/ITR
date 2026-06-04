@@ -33,6 +33,15 @@ public class TaxReturn : BaseEntity, ITenantScoped, ISoftDeletable
     public bool IsRevised { get; set; }
     public Guid? OriginalReturnId { get; set; }
 
+    /// <summary>The s.139 section this return is furnished under (original / belated / revised). Drives ReturnFileSec.</summary>
+    public ReturnFilingSection FilingSection { get; set; } = ReturnFilingSection.Original;
+
+    /// <summary>15-digit acknowledgment number of the original return (revised returns only → ITD ReceiptNo).</summary>
+    public string? OriginalAcknowledgmentNumber { get; set; }
+
+    /// <summary>Filing date of the original return (revised returns only → ITD OrigRetFiledDate).</summary>
+    public DateOnly? OriginalFilingDate { get; set; }
+
     public string? AcknowledgmentNumber { get; set; }
     public DateTimeOffset? SubmittedAt { get; set; }
     public DateTimeOffset? EVerifiedAt { get; set; }

@@ -395,6 +395,12 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         if (skel["PartA_GEN1"] is Dictionary<string, object?> gen1)
         {
             gen1["PersonalInfo"] = PersonalInfoNonItr1(ctx); // keep the skeleton's FilingStatus (valid enums)
+            // Stamp the s.139 filing section (original/belated/revised) + original-return details.
+            if (gen1["FilingStatus"] is Dictionary<string, object?> fs)
+            {
+                fs["ReturnFileSec"] = ReturnFileSecCode(ctx);
+                WithRevisedReturn(fs, ctx);
+            }
         }
 
         skel["Verification"] = VerificationNonItr1(ctx, includeDate: true);
@@ -468,10 +474,32 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    private static Dictionary<string, object?> FilingStatus(ItrFilingContext ctx) => new()
+    /// <summary>The ITD ReturnFileSec code for the return's s.139 filing section (11/12/13).</summary>
+    private static int ReturnFileSecCode(ItrFilingContext ctx) => (int)ctx.Return.FilingSection;
+
+    /// <summary>
+    /// For a revised return (s.139(5)), stamp the original return's acknowledgment number (ReceiptNo)
+    /// and filing date (OrigRetFiledDate) onto a FilingStatus node. No-op for original/belated returns.
+    /// Returns the same dict for fluent use in an expression-bodied builder.
+    /// </summary>
+    private static Dictionary<string, object?> WithRevisedReturn(Dictionary<string, object?> filingStatus, ItrFilingContext ctx)
     {
-        // 11 = filed u/s 139(1) on or before due date (placeholder; reconcile with schema codes).
-        ["ReturnFileSec"] = 11,
+        if (ctx.Return.FilingSection == ReturnFilingSection.Revised
+            && !string.IsNullOrWhiteSpace(ctx.Return.OriginalAcknowledgmentNumber))
+        {
+            filingStatus["ReceiptNo"] = ctx.Return.OriginalAcknowledgmentNumber.Trim();
+            if (ctx.Return.OriginalFilingDate is { } d)
+            {
+                filingStatus["OrigRetFiledDate"] = d.ToString("yyyy-MM-dd");
+            }
+        }
+
+        return filingStatus;
+    }
+
+    private static Dictionary<string, object?> FilingStatus(ItrFilingContext ctx) => WithRevisedReturn(new()
+    {
+        ["ReturnFileSec"] = ReturnFileSecCode(ctx),
         ["NewTaxRegime"] = ctx.Computation?.Regime == Regime.New ? "Y" : "N",
         ["ResidentialStatus"] = ctx.Profile?.ResidentialStatus switch
         {
@@ -479,7 +507,7 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             "rnor" => "RNOR",
             _ => "RES"
         }
-    };
+    }, ctx);
 
     /// <summary>
     /// Schedule CFL — losses carried forward: brought-forward from earlier years (on the return) + the
@@ -684,21 +712,21 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         return addr;
     }
 
-    private static Dictionary<string, object?> FilingStatusItr1(ItrFilingContext ctx) => new()
+    private static Dictionary<string, object?> FilingStatusItr1(ItrFilingContext ctx) => WithRevisedReturn(new()
     {
-        ["ReturnFileSec"] = 11,                                            // 139(1), on/before due date
+        ["ReturnFileSec"] = ReturnFileSecCode(ctx),
         ["OptOutNewTaxRegime"] = ctx.Computation?.Regime == Regime.Old ? "Y" : "N",
         ["AsseseeRepFlg"] = "N",
         ["ItrFilingDueDate"] = DueDate(ctx),
-    };
+    }, ctx);
 
-    private static Dictionary<string, object?> FilingStatusItr4(ItrFilingContext ctx) => new()
+    private static Dictionary<string, object?> FilingStatusItr4(ItrFilingContext ctx) => WithRevisedReturn(new()
     {
-        ["ReturnFileSec"] = 11,
+        ["ReturnFileSec"] = ReturnFileSecCode(ctx),
         ["Form10IEAEarlierAYOldRegime"] = "NA",
         ["AsseseeRepFlg"] = "N",
         ["ItrFilingDueDate"] = DueDate(ctx),
-    };
+    }, ctx);
 
     private static Dictionary<string, object?> TaxComputationItr1(TaxComputation? c)
     {
@@ -2470,16 +2498,16 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         };
     }
 
-    private static Dictionary<string, object?> FilingStatusItr2(ItrFilingContext ctx) => new()
+    private static Dictionary<string, object?> FilingStatusItr2(ItrFilingContext ctx) => WithRevisedReturn(new()
     {
-        ["ReturnFileSec"] = 11,
+        ["ReturnFileSec"] = ReturnFileSecCode(ctx),
         ["OptOutNewTaxRegime"] = ctx.Computation?.Regime == Regime.Old ? "Y" : "N",
         ["SeventhProvisio139"] = "N",
         ["ResidentialStatus"] = ResidentialStatus(ctx.Profile),
         ["FiiFpiFlag"] = "N",
         ["HeldUnlistedEqShrPrYrFlg"] = "N",
         ["ItrFilingDueDate"] = DueDate(ctx),
-    };
+    }, ctx);
 
     private static string ResidentialStatus(UserProfile? p) => p?.ResidentialStatus switch
     {

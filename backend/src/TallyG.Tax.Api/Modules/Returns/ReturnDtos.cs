@@ -31,7 +31,11 @@ public sealed record UpdateReturnRequest(
     decimal? Relief89 = null,
     decimal? ForeignIncomeDoublyTaxed = null,
     decimal? ForeignTaxPaid = null,
-    bool? ForeignDtaaApplies = null);
+    bool? ForeignDtaaApplies = null,
+    // s.139 filing section (original / belated / revised) + the original return's details (revised only).
+    ReturnFilingSection? FilingSection = null,
+    string? OriginalAcknowledgmentNumber = null,
+    DateOnly? OriginalFilingDate = null);
 
 /// <summary>List-row projection for GET /returns.</summary>
 public sealed record ReturnSummaryDto(
@@ -84,7 +88,10 @@ public sealed record ReturnDetailDto(
     decimal Relief89,
     decimal ForeignIncomeDoublyTaxed,
     decimal ForeignTaxPaid,
-    bool ForeignDtaaApplies);
+    bool ForeignDtaaApplies,
+    ReturnFilingSection FilingSection = ReturnFilingSection.Original,
+    string? OriginalAcknowledgmentNumber = null,
+    DateOnly? OriginalFilingDate = null);
 
 // ----------------------------------------------------------------- income sources
 

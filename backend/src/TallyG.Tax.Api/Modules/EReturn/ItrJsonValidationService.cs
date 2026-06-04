@@ -508,6 +508,24 @@ public sealed class ItrJsonValidationService : IItrJsonValidationService
                 "Only regenerate if you intend to file a REVISED return; otherwise no action is needed.");
         }
 
+        // --- revised return (s.139(5)) needs the original return's acknowledgment + filing date ---
+        if (ctx.Return.FilingSection == ReturnFilingSection.Revised)
+        {
+            var ack = ctx.Return.OriginalAcknowledgmentNumber?.Trim() ?? string.Empty;
+            if (ack.Length != 15 || !ack.All(char.IsDigit))
+            {
+                Err("FILING.REVISED_NO_ORIGINAL_ACK", "$..FilingStatus.ReceiptNo",
+                    "A revised return (s.139(5)) requires the 15-digit acknowledgment number of the original return.",
+                    "Enter the original return's acknowledgment number (from the ITR-V / the portal) in the Personal step.");
+            }
+            if (ctx.Return.OriginalFilingDate is null)
+            {
+                Err("FILING.REVISED_NO_ORIGINAL_DATE", "$..FilingStatus.OrigRetFiledDate",
+                    "A revised return (s.139(5)) requires the original return's filing date.",
+                    "Enter the date the original return was filed in the Personal step.");
+            }
+        }
+
         // --- official ITD schema conformance (JSON Schema draft-04), when a schema is bundled for this AY + form ---
         var schemaResult = ItrSchemaValidator.Validate(ctx.AyCode, ctx.ItrType, json);
         if (schemaResult.SchemaAvailable)
