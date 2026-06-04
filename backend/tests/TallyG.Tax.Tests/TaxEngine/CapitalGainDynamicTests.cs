@@ -179,4 +179,19 @@ public class CapitalGainDynamicTests
 
         r.Buckets.Ltcg112.Should().Be(200_000m);
     }
+
+    [Fact]
+    public void Residential_property_ltcg_can_claim_the_54GB_reinvestment_exemption()
+    {
+        // LTCG on property ₹20L − ₹8L = ₹12L; ₹10L reinvested in eligible start-up equity (s.54GB) ⇒ taxable ₹2L.
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.ImmovableProperty, CapitalGainTerm.Long, null,
+            SaleConsideration: 2_000_000m, CostOfAcquisition: 800_000m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            ExemptionSection: "54GB", ReinvestmentAmount: 1_000_000m);
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(200_000m);
+    }
 }

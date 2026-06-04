@@ -580,9 +580,10 @@ export function CapitalGainForm({
                     {isAgriLand ? <option value="54B">54B — new agricultural land</option> : null}
                     <option value="54F">54F — any asset (proportionate)</option>
                     <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+                    {assetType === 'ImmovableProperty' ? <option value="54GB">54GB — start-up / SME equity</option> : null}
                   </Select>
                 </Field>
-                <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54B/54F/54EC)" />
+                <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54B/54EC/54F/54GB)" />
               </>
             ) : null}
           </div>

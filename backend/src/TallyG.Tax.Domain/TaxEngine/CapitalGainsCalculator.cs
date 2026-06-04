@@ -230,6 +230,14 @@ public static class CapitalGainsCalculator
         {
             case "54":
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+            case "54GB":
+                // s.54GB: LTCG on a residential house/land reinvested in eligible start-up / SME equity.
+                if (g.AssetType != CapitalGainAssetType.ImmovableProperty)
+                {
+                    return 0m;
+                }
+
+                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
             case "54B":
                 // s.54B: capital gain on agricultural land reinvested in new agricultural land — agri land only.
                 if (g.AssetType != CapitalGainAssetType.AgriculturalLand)
