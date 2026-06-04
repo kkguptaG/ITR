@@ -27,6 +27,7 @@ import { ComputationDashboard } from './components/ComputationDashboard';
 import type { TaxComputationResultDto } from './types';
 import { TaxesPaidCard } from '@/features/taxes-paid';
 import { ReconciliationCard } from '@/features/reconciliation';
+import { BankAccountsCard } from '@/features/bank-accounts';
 import { AssetsLiabilitiesCard, ImmovableAssetsCard, FirmInterestCard } from '@/features/assets-liabilities';
 import { ForeignAssetsSection } from '@/features/foreign-assets';
 import { Donations80GCard } from '@/features/donations-80g';
@@ -147,6 +148,12 @@ export function ReturnDetailView({ returnId }: { returnId: string }) {
       {/* Prepaid taxes: deductor-wise TDS + advance/self-assessment challans */}
       <div id="taxes-paid" className="scroll-mt-4">
         <TaxesPaidCard returnId={returnId} editable={!locked} />
+      </div>
+
+      {/* Refund bank account — the dashboard's refund banner links here. The ITD
+          pays refunds only into a pre-validated account, so capture it up front. */}
+      <div id="bank-accounts" className="scroll-mt-4">
+        <BankAccountsCard />
       </div>
 
       {/* Pre-filing reconciliation against the department's AIS / 26AS */}

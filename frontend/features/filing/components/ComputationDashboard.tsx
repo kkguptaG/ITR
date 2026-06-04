@@ -13,11 +13,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Calculator, Scale, Plus } from 'lucide-react';
+import { ChevronRight, Calculator, Scale, Plus, Landmark } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Spinner, Badge, Button } from '@/components/ui';
 import { formatInr } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ItrType } from '@/lib/api-types';
+import { listBankAccounts, bankAccountKeys } from '@/features/bank-accounts';
 import { computeTax, filingKeys } from '../api';
 import { incomeHeads } from '../steps';
 import type { Regime, TaxComputationResultDto } from '../types';
@@ -58,6 +59,21 @@ export function ComputationDashboard({
       ? data.old
       : data.new
     : undefined;
+
+  // A refund can only be paid into a pre-validated bank account, so when one is
+  // due we check whether the assessee has nominated a refund account and prompt
+  // for it if not. Only fetched once a refund is actually computed.
+  const refundDue = (c?.refundOrPayable ?? 0) > 0;
+  const bankAccountsQuery = useQuery({
+    queryKey: bankAccountKeys.list(),
+    queryFn: listBankAccounts,
+    enabled: refundDue,
+    staleTime: 30_000,
+  });
+  const needsRefundAccount =
+    refundDue &&
+    bankAccountsQuery.isSuccess &&
+    !(bankAccountsQuery.data ?? []).some((a) => a.useForRefund);
 
   const incomeHref = (focus: string) => `/returns/${returnId}/file/income?focus=${focus}`;
 
@@ -230,6 +246,27 @@ export function ComputationDashboard({
                 {formatInr(Math.abs(refundOrPayable))}
               </span>
             </div>
+
+            {/* A refund needs a pre-validated bank account — nudge the user to add
+                one so the refund isn't held up. Scrolls to the BankAccountsCard. */}
+            {needsRefundAccount && (
+              <button
+                type="button"
+                onClick={() =>
+                  document.getElementById('bank-accounts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+                className="group mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-money-200 bg-money-50/50 px-3 py-2 text-left text-xs text-money-800 hover:bg-money-100"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Landmark className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Add a bank account to receive your refund — the Income Tax Department only pays into a pre-validated account.
+                </span>
+                <ChevronRight
+                  className="h-3.5 w-3.5 shrink-0 text-money-400 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </button>
+            )}
           </>
         )}
       </CardContent>
