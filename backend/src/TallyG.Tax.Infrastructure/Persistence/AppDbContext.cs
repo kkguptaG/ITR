@@ -72,6 +72,7 @@ public class AppDbContext : DbContext
     public DbSet<TaxComputation> TaxComputations => Set<TaxComputation>();
     public DbSet<ItrFiling> ItrFilings => Set<ItrFiling>();
     public DbSet<EVerification> EVerifications => Set<EVerification>();
+    public DbSet<RefundTracking> RefundTrackings => Set<RefundTracking>();
 
     // --- Documents ---
     public DbSet<Document> Documents => Set<Document>();
@@ -159,6 +160,9 @@ public class AppDbContext : DbContext
 
         // One (current) e-verification row per filed return — re-issuing a challenge replaces it.
         b.Entity<EVerification>().HasIndex(e => e.TaxReturnId).IsUnique();
+
+        // One refund-tracking row per processed return.
+        b.Entity<RefundTracking>().HasIndex(r => r.TaxReturnId).IsUnique();
 
         b.Entity<Ledger>().HasIndex(l => new { l.TenantId, l.UserId });
         b.Entity<BankStatementImport>().HasIndex(i => new { i.TenantId, i.UserId });
