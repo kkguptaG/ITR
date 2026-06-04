@@ -145,6 +145,7 @@ export function ComputationDashboard({
     // liability — show it *after* the Total Tax Liability subtotal so the running
     // tally (subtotal + interest − prepaid credits = payable) reads top-to-bottom.
     ...(v(c?.interestPenalty) > 0 ? [{ key: 'int', label: 'Add: Interest u/s 234A/B/C', amount: v(c?.interestPenalty), kind: 'tax' as const }] : []),
+    ...(v(c?.lateFilingFee234F) > 0 ? [{ key: 'fee234f', label: 'Add: Late-filing fee u/s 234F', amount: v(c?.lateFilingFee234F), kind: 'tax' as const }] : []),
     { key: 'tds', label: 'Less: TDS credit', amount: v(c?.tdsPaid) - v(c?.tcsPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid' },
     ...(v(c?.tcsPaid) > 0 ? [{ key: 'tcs', label: 'Less: TCS credit', amount: v(c?.tcsPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid', indent: true }] : []),
     ...(v(c?.advanceTax) - v(c?.selfAssessmentTaxPaid) > 0 ? [{ key: 'adv', label: 'Less: Advance tax', amount: v(c?.advanceTax) - v(c?.selfAssessmentTaxPaid), kind: 'prepaid' as const, scrollTo: 'taxes-paid', indent: true }] : []),

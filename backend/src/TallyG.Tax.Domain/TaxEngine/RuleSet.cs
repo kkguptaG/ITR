@@ -50,6 +50,13 @@ public sealed class RuleSet
     /// s.234B/234C can apply. Default ₹10,000.</summary>
     public decimal AdvanceTaxThreshold { get; init; } = 10000m;
 
+    /// <summary>s.234F fee for furnishing a return after the due date. The full fee applies when total
+    /// income exceeds <see cref="LateFilingFeeIncomeThreshold"/>; the reduced fee applies below it.
+    /// Defaults: ₹5,000 / ₹1,000 reduced / ₹5,00,000 threshold.</summary>
+    public decimal LateFilingFee234F { get; init; } = 5000m;
+    public decimal LateFilingFee234FReduced { get; init; } = 1000m;
+    public decimal LateFilingFeeIncomeThreshold { get; init; } = 500000m;
+
     /// <summary>Flat tax rate on casual income u/s 115BB (lottery, betting, game shows). Default 30%.</summary>
     public decimal CasualIncome115BBRate { get; init; } = 0.30m;
 
@@ -133,6 +140,9 @@ public sealed class RuleSet
                 Cess = GetDecimal(root, "cess") ?? 0.04m,
                 InterestMonthlyRate = GetDecimal(root, "interest_monthly_rate") ?? 0.01m,
                 AdvanceTaxThreshold = GetDecimal(root, "advance_tax_threshold") ?? 10000m,
+                LateFilingFee234F = GetDecimal(root, "late_filing_fee_234f") ?? 5000m,
+                LateFilingFee234FReduced = GetDecimal(root, "late_filing_fee_234f_reduced") ?? 1000m,
+                LateFilingFeeIncomeThreshold = GetDecimal(root, "late_filing_fee_income_threshold") ?? 500000m,
                 CasualIncome115BBRate = GetDecimal(root, "casual_income_115bb_rate") ?? 0.30m,
                 AgriIntegrationThreshold = GetDecimal(root, "agri_integration_threshold") ?? 5000m,
                 AmtRate = GetDecimal(root, "amt_rate") ?? 0.185m,

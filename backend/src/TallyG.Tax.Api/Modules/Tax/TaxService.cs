@@ -396,6 +396,7 @@ public sealed class TaxService : ITaxService
             r.Interest234A,
             r.Interest234B,
             r.Interest234C,
+            r.LateFilingFee234F,
             r.RefundOrPayable,
             r.AdjustedTotalIncome,
             r.AlternativeMinimumTax,

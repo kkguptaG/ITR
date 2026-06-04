@@ -48,8 +48,10 @@ public class InterestCalculatorTests
         r.Trace.Should().Contain(t => t.Step == "Interest.234A");
         r.Trace.Should().Contain(t => t.Step == "Interest.234B");
         r.Trace.Should().Contain(t => t.Step == "Interest.234C");
-        // Payable must reflect the interest: refund/payable = prepaid − tax − interest = −(tax + interest).
-        r.RefundOrPayable.Should().Be(-(r.TotalTax + r.InterestPenalty));
+        // A belated return with income above ₹5L also attracts the flat s.234F late-filing fee.
+        r.LateFilingFee234F.Should().Be(5_000m);
+        // Payable must reflect interest AND the fee: payable = prepaid − tax − interest − fee.
+        r.RefundOrPayable.Should().Be(-(r.TotalTax + r.InterestPenalty + r.LateFilingFee234F));
     }
 
     [Fact]

@@ -89,6 +89,7 @@ export function TaxSummaryPanel({ comp }: { comp: TaxComputationResultDto }) {
               {comp.interest234C > 0 && <Line label="  ↳ 234C (instalment deferment)" value={comp.interest234C} indent />}
             </>
           )}
+          {comp.lateFilingFee234F > 0 && <Line label="Fee u/s 234F (late filing)" value={comp.lateFilingFee234F} indent />}
           {comp.amtCreditGenerated > 0 && <Line label="AMT credit carried forward (s.115JD)" value={comp.amtCreditGenerated} tone="muted" indent />}
           {comp.housePropertyLossCarriedForward > 0 && <Line label="House-property loss carried forward (s.71B)" value={comp.housePropertyLossCarriedForward} tone="muted" indent />}
           {comp.businessLossCarriedForward > 0 && <Line label="Business loss carried forward (s.72)" value={comp.businessLossCarriedForward} tone="muted" indent />}

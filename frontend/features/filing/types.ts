@@ -285,6 +285,8 @@ export interface TaxComputationResultDto {
   interest234A: number;
   interest234B: number;
   interest234C: number;
+  /** s.234F late-filing fee (flat) — folded into the refund/payable. 0 for an on-time return. */
+  lateFilingFee234F: number;
   /** Positive = refund due, negative = payable. */
   refundOrPayable: number;
   // AMT (s.115JC/JD) + reliefs (s.89/90/91); 0 when not applicable.

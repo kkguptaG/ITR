@@ -216,6 +216,10 @@ public sealed record ComputationResult
     public decimal Interest234B { get; init; }
     public decimal Interest234C { get; init; }
 
+    /// <summary>s.234F late-filing fee — a flat fee (not interest) charged when the return is furnished
+    /// after the due date. Folded into <see cref="RefundOrPayable"/>. 0 for an on-time return.</summary>
+    public decimal LateFilingFee234F { get; init; }
+
     /// <summary>Positive ⇒ refund due; negative ⇒ payable.</summary>
     public decimal RefundOrPayable { get; init; }
 

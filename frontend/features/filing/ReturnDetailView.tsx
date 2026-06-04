@@ -213,6 +213,7 @@ function toResult(c: TaxComputationDto | null | undefined): TaxComputationResult
     interest234A: num(c.interest234A),
     interest234B: num(c.interest234B),
     interest234C: num(c.interest234C),
+    lateFilingFee234F: 0, // not on the persisted snapshot; the live dashboard query supplies it
     refundOrPayable: num(c.refundOrPayable),
     // AMT/relief breakdown now persisted on the snapshot too.
     adjustedTotalIncome: num(c.adjustedTotalIncome),

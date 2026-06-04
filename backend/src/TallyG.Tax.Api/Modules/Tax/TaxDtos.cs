@@ -122,6 +122,7 @@ public sealed record TaxComputationResultDto(
     decimal Interest234A,
     decimal Interest234B,
     decimal Interest234C,
+    decimal LateFilingFee234F,
     decimal RefundOrPayable,
     decimal AdjustedTotalIncome,
     decimal AlternativeMinimumTax,

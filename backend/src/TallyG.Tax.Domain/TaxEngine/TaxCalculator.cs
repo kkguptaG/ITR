@@ -193,8 +193,13 @@ public sealed class TaxCalculator : ITaxCalculator
         // --- Stage 13: interest u/s 234A/B/C (0 unless the filing/PY dates are supplied) ---
         var interest = InterestCalculator.Compute(input, finalTax, rs, trace);
 
+        // --- Stage 13b: s.234F late-filing fee (flat, when the return is furnished after the due date) ---
+        var basicExemption = slabs.Where(s => s.Rate == 0m && s.Upto.HasValue)
+            .Select(s => s.Upto!.Value).DefaultIfEmpty(0m).Max();
+        var lateFee234F = ComputeLateFilingFee234F(input, totalTaxableIncome, basicExemption, rs, trace);
+
         // --- Stage 14: net refund (positive) or payable (negative) ---
-        var refundOrPayable = TaxMath.RoundTax(prepaid - finalTax - interest.Total, rs.Rounding);
+        var refundOrPayable = TaxMath.RoundTax(prepaid - finalTax - interest.Total - lateFee234F, rs.Rounding);
         trace.Add(new TraceLine("RefundOrPayable",
             refundOrPayable >= 0m ? "Refund due" : "Balance tax payable", refundOrPayable, null));
 
@@ -220,6 +225,7 @@ public sealed class TaxCalculator : ITaxCalculator
             Interest234A = interest.S234A,
             Interest234B = interest.S234B,
             Interest234C = interest.S234C,
+            LateFilingFee234F = lateFee234F,
             RefundOrPayable = refundOrPayable,
             AdjustedTotalIncome = amt.AdjustedTotalIncome,
             AlternativeMinimumTax = amt.Amt,
@@ -256,6 +262,33 @@ public sealed class TaxCalculator : ITaxCalculator
             NetAgriculturalIncome = agriculturalIncome,
             Trace = trace,
         };
+    }
+
+    /// <summary>
+    /// s.234F fee for furnishing the return after the s.139(1) due date: the full fee above the income
+    /// threshold, the reduced fee below it; nil when the return is on time or there is no income chargeable
+    /// to tax. Unlike s.234A/B/C interest it is a flat fee that applies even when a refund is due.
+    /// </summary>
+    private static decimal ComputeLateFilingFee234F(
+        TaxComputationInput input, decimal totalTaxableIncome, decimal basicExemption, RuleSet rs, List<TraceLine> trace)
+    {
+        if (input.FilingDueDate is not { } due || input.ActualFilingDate is not { } filed || filed <= due)
+        {
+            return 0m;
+        }
+        // No s.139(1) filing obligation (hence no fee) when total income is within the basic exemption.
+        if (totalTaxableIncome <= basicExemption)
+        {
+            return 0m;
+        }
+
+        var fee = totalTaxableIncome > rs.LateFilingFeeIncomeThreshold
+            ? rs.LateFilingFee234F
+            : rs.LateFilingFee234FReduced;
+        trace.Add(new TraceLine("Fee.234F",
+            $"Late-filing fee u/s 234F (return furnished {filed:dd-MMM-yyyy}, after the {due:dd-MMM-yyyy} due date)",
+            fee, "s.234F"));
+        return fee;
     }
 
     // ----------------------------------------------------------------- heads
