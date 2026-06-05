@@ -93,8 +93,10 @@ public static class CapitalGainsCalculator
             CapitalGainAssetType.CryptoVda
                 => ComputeCrypto(g, rules),
 
-            // Unlisted shares / gold / jewellery / bonds long-term -> 112 @ without-indexation rate.
-            CapitalGainAssetType.UnlistedShares or CapitalGainAssetType.Gold or CapitalGainAssetType.Jewellery or CapitalGainAssetType.Bonds
+            // Unlisted shares / gold / jewellery / bonds / other long-term capital assets (art, collectibles,
+            // IP, goodwill, slump sale s.50B) -> 112 @ without-indexation rate.
+            CapitalGainAssetType.UnlistedShares or CapitalGainAssetType.Gold or CapitalGainAssetType.Jewellery
+                or CapitalGainAssetType.Bonds or CapitalGainAssetType.Other
                 when g.Term == CapitalGainTerm.Long
                 => ComputeSection112(g, netProceeds, rules),
 

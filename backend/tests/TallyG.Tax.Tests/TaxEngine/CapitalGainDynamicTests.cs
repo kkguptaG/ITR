@@ -194,4 +194,24 @@ public class CapitalGainDynamicTests
 
         r.Buckets.Ltcg112.Should().Be(200_000m);
     }
+
+    [Fact]
+    public void Other_long_term_capital_asset_is_taxed_under_section_112()
+    {
+        // Art / collectibles / IP / goodwill / slump sale (s.50B) — a long-term "other" asset → s.112, not slab.
+        var r = CapitalGainsCalculator.Compute(new[] { Gain(CapitalGainAssetType.Other, CapitalGainTerm.Long, 1_500_000m, 500_000m) }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(1_000_000m);
+        r.Buckets.SlabRateGains.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Other_short_term_capital_asset_stays_at_slab_rate()
+    {
+        // The s.50 depreciable-block deemed STCG also flows as Other/Short — it must remain slab-rate.
+        var r = CapitalGainsCalculator.Compute(new[] { Gain(CapitalGainAssetType.Other, CapitalGainTerm.Short, 1_500_000m, 500_000m) }, Rules);
+
+        r.Buckets.SlabRateGains.Should().Be(1_000_000m);
+        r.Buckets.Ltcg112.Should().Be(0m);
+    }
 }
