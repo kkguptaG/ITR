@@ -49,6 +49,12 @@ public sealed class UpdateReturnRequestValidator : AbstractValidator<UpdateRetur
         When(x => x.Relief89.HasValue, () => RuleFor(x => x.Relief89!.Value).GreaterThanOrEqualTo(0));
         When(x => x.ForeignIncomeDoublyTaxed.HasValue, () => RuleFor(x => x.ForeignIncomeDoublyTaxed!.Value).GreaterThanOrEqualTo(0));
         When(x => x.ForeignTaxPaid.HasValue, () => RuleFor(x => x.ForeignTaxPaid!.Value).GreaterThanOrEqualTo(0));
+
+        // Form 10-IEA acknowledgement number, when supplied, must be the ITD 15-digit receipt number.
+        When(x => !string.IsNullOrWhiteSpace(x.Form10IeaAckNumber), () =>
+            RuleFor(x => x.Form10IeaAckNumber!)
+                .Must(s => System.Text.RegularExpressions.Regex.IsMatch(s.Trim(), "^[1-9][0-9]{14}$"))
+                .WithMessage("Form 10-IEA acknowledgement number must be a 15-digit number."));
     }
 }
 

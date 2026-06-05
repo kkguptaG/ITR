@@ -40,7 +40,10 @@ public sealed record UpdateReturnRequest(
     string? UpdatedReturnReason = null,
     int? UpdatedReturnTier = null,
     bool? OriginalReturnPreviouslyFiled = null,
-    decimal? OriginalTaxPaid = null);
+    decimal? OriginalTaxPaid = null,
+    // Form 10-IEA (regime opt-out) — a business/professional taxpayer choosing the OLD regime (s.115BAC).
+    string? Form10IeaAckNumber = null,
+    DateOnly? Form10IeaDate = null);
 
 /// <summary>List-row projection for GET /returns.</summary>
 public sealed record ReturnSummaryDto(
@@ -102,7 +105,9 @@ public sealed record ReturnDetailDto(
     string? UpdatedReturnReason = null,
     int UpdatedReturnTier = 0,
     bool OriginalReturnPreviouslyFiled = false,
-    decimal OriginalTaxPaid = 0m);
+    decimal OriginalTaxPaid = 0m,
+    string? Form10IeaAckNumber = null,
+    DateOnly? Form10IeaDate = null);
 
 // ----------------------------------------------------------------- income sources
 

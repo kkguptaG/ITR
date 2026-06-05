@@ -51,6 +51,23 @@ public class ItrSchemaConformanceTests
     }
 
     [Fact]
+    public void Itr4_old_regime_optout_via_Form10IEA_flows_into_the_ITR_JSON_and_still_conforms()
+    {
+        var ctx = BuildContext(ItrType.ITR4, presumptiveBusiness: true, withForm10Iea: true);
+        var json = _gen.Generate(ctx).Json;
+
+        // Conforms to the official schema with the Form 10-IEA opt-out fields present…
+        var result = ItrSchemaValidator.Validate(ctx.AyCode, ItrType.ITR4, json);
+        result.Errors.Should().BeEmpty("ITR-4 opting out to the old regime via Form 10-IEA must conform. Violations:\n" + Format(result));
+
+        // …and the opt-out declaration + the 15-digit acknowledgement number flow into FilingStatus.
+        System.Text.RegularExpressions.Regex.IsMatch(json, "\"F10IEACurrAYOldRegime\":\\s*\"Y\"")
+            .Should().BeTrue("opting out to the old regime must set F10IEACurrAYOldRegime=Y");
+        System.Text.RegularExpressions.Regex.IsMatch(json, "\"F10IEAAckNoCurrAYOldTax\":\\s*123456789012345")
+            .Should().BeTrue("the Form 10-IEA acknowledgement number must flow into the filed JSON");
+    }
+
+    [Fact]
     public void Itr2_late_filing_fee_234F_flows_into_the_ITR_JSON_and_still_conforms()
     {
         var ctx = BuildContext(ItrType.ITR2, ayCode: "AY2025-26", withLateFee: true);
@@ -1503,7 +1520,7 @@ public class ItrSchemaConformanceTests
     }
 
     // A minimal-but-complete, valid sample return so the generated structure can be schema-validated.
-    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false, bool withUpdated = false, bool withLateFee = false)
+    private static ItrFilingContext BuildContext(ItrType itrType, bool presumptiveBusiness = false, string ayCode = "AY2026-27", bool withHouse = false, bool withGains = false, bool withCarryForward = false, bool withDeductions = false, bool withAssets = false, bool withForeignBank = false, bool withDonees = false, bool withImmovable = false, bool withForeignInvestments = false, bool withGrandfathering = false, bool withFirmInterest = false, bool withCgLoss = false, bool withCgCrossLoss = false, bool withExemptIncome = false, bool withForeignSourceIncome = false, bool withClubbedIncome = false, bool withPassThrough = false, bool withSpouseApportionment = false, bool withAmt = false, bool withTcs = false, bool withDepreciation = false, bool withPropertySale = false, bool withVda = false, bool withWinnings = false, bool withPanTds = false, bool withTwoEmployers = false, bool withFinancialParticulars = false, bool withGoodsCarriage = false, bool withRevised = false, bool withUpdated = false, bool withLateFee = false, bool withForm10Iea = false)
     {
         var user = new User
         {
@@ -1569,6 +1586,15 @@ public class ItrSchemaConformanceTests
             Status = ReturnStatus.ComputedReady,
             TdsPaid = 50_000m,
         };
+
+        // Form 10-IEA: a presumptive business taxpayer opting OUT to the OLD regime (s.115BAC) for the AY.
+        if (withForm10Iea)
+        {
+            comp.Regime = Regime.Old;
+            ret.Regime = Regime.Old;
+            ret.Form10IeaAckNumber = "123456789012345";
+            ret.Form10IeaDate = new DateOnly(2025, 6, 30);
+        }
 
         if (withRevised)
         {

@@ -278,6 +278,14 @@ public sealed class ReturnService : IReturnService
         }
         if (request.OriginalFilingDate is { } ofd) ret.OriginalFilingDate = ofd;
 
+        // Form 10-IEA (regime opt-out) acknowledgement number + filing date.
+        if (request.Form10IeaAckNumber is not null)
+        {
+            var f10 = request.Form10IeaAckNumber.Trim();
+            ret.Form10IeaAckNumber = f10.Length == 0 ? null : f10;
+        }
+        if (request.Form10IeaDate is { } f10d) ret.Form10IeaDate = f10d;
+
         // Updated return (ITR-U) specifics.
         if (request.UpdatedReturnReason is not null)
         {
@@ -1394,7 +1402,9 @@ public sealed class ReturnService : IReturnService
             ret.UpdatedReturnReason,
             ret.UpdatedReturnTier,
             ret.OriginalReturnPreviouslyFiled,
-            ret.OriginalTaxPaid);
+            ret.OriginalTaxPaid,
+            ret.Form10IeaAckNumber,
+            ret.Form10IeaDate);
     }
 
     /// <summary>

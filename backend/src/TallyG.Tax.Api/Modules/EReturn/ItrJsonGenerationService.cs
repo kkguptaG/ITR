@@ -400,6 +400,14 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
             if (gen1["FilingStatus"] is Dictionary<string, object?> fs)
             {
                 fs["ReturnFileSec"] = ReturnFileSecCode(ctx);
+                // Opting OUT to the OLD regime (s.115BAC) on a business return is done by filing Form 10-IEA —
+                // record its AY2025-26 filing date + acknowledgement number alongside the method flag.
+                if (ctx.Computation?.Regime == Regime.Old)
+                {
+                    fs["OptOutNewTaxRegime_Method"] = "BY10IEA";
+                    ApplyForm10Iea(fs, ctx, "Form10IEADate", "Form10IEAAckNo");
+                }
+
                 WithRevisedReturn(fs, ctx);
             }
         }
@@ -818,13 +826,45 @@ public sealed partial class ItrJsonGenerationService : IItrJsonGenerationService
         ["ItrFilingDueDate"] = DueDate(ctx),
     }, ctx);
 
-    private static Dictionary<string, object?> FilingStatusItr4(ItrFilingContext ctx) => WithRevisedReturn(new()
+    private static Dictionary<string, object?> FilingStatusItr4(ItrFilingContext ctx)
     {
-        ["ReturnFileSec"] = ReturnFileSecCode(ctx),
-        ["Form10IEAEarlierAYOldRegime"] = "NA",
-        ["AsseseeRepFlg"] = "N",
-        ["ItrFilingDueDate"] = DueDate(ctx),
-    }, ctx);
+        var fs = new Dictionary<string, object?>
+        {
+            ["ReturnFileSec"] = ReturnFileSecCode(ctx),
+            ["Form10IEAEarlierAYOldRegime"] = "NA",
+            ["AsseseeRepFlg"] = "N",
+            ["ItrFilingDueDate"] = DueDate(ctx),
+        };
+
+        // Opting OUT of the default new regime (s.115BAC) to the OLD regime requires Form 10-IEA for a
+        // presumptive business/professional taxpayer — declare the opt-out + carry its ack number & filing date.
+        if (ctx.Computation?.Regime == Regime.Old)
+        {
+            fs["F10IEACurrAYOldRegime"] = "Y";
+            ApplyForm10Iea(fs, ctx, "F10IEADateCurrAYOldTax", "F10IEAAckNoCurrAYOldTax");
+        }
+
+        return WithRevisedReturn(fs, ctx);
+    }
+
+    /// <summary>Emit the captured Form 10-IEA filing date + (15-digit) acknowledgement number under the given
+    /// schema keys. The ack must be a 15-digit integer (schema min 1e14), so a missing / malformed ack is
+    /// skipped rather than emitted — which would otherwise fail conformance.</summary>
+    private static void ApplyForm10Iea(Dictionary<string, object?> fs, ItrFilingContext ctx, string dateKey, string ackKey)
+    {
+        if (ctx.Return.Form10IeaDate is { } d)
+        {
+            fs[dateKey] = d.ToString("yyyy-MM-dd");
+        }
+
+        var ackText = ctx.Return.Form10IeaAckNumber?.Trim();
+        if (!string.IsNullOrEmpty(ackText)
+            && System.Text.RegularExpressions.Regex.IsMatch(ackText, "^[1-9][0-9]{14}$")
+            && long.TryParse(ackText, out var ack))
+        {
+            fs[ackKey] = ack;
+        }
+    }
 
     private static Dictionary<string, object?> TaxComputationItr1(TaxComputation? c)
     {

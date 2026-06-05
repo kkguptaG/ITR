@@ -21,6 +21,14 @@ public class TaxReturn : BaseEntity, ITenantScoped, ISoftDeletable
     /// <summary>Null until chosen/auto-selected.</summary>
     public Regime? Regime { get; set; }
 
+    /// <summary>Form 10-IEA acknowledgement number (15-digit) — required when a business/professional taxpayer
+    /// (ITR-3/4) opts OUT of the default new regime (s.115BAC(6)) to the OLD regime for this AY. Null ⇒ no
+    /// opt-out form (new regime, or a non-business taxpayer who opts out simply by ticking the return).</summary>
+    public string? Form10IeaAckNumber { get; set; }
+
+    /// <summary>Date Form 10-IEA was filed (YYYY-MM-DD) — paired with <see cref="Form10IeaAckNumber"/>.</summary>
+    public DateOnly? Form10IeaDate { get; set; }
+
     /// <summary>Rule-set + questionnaire versions frozen at creation (pin-on-file, Ch.3 §3.11).</summary>
     public string RuleSetVersion { get; set; } = string.Empty;
     public string QuestionnaireSchemaVersion { get; set; } = string.Empty;
