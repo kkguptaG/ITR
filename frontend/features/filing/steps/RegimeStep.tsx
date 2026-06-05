@@ -7,9 +7,10 @@
 // advances to the summary.
 // ---------------------------------------------------------------------------
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Alert, Button, Spinner } from '@/components/ui';
+import { Alert, Button, Input, Spinner } from '@/components/ui';
 import { ApiError } from '@/lib/api';
 import type { Regime } from '@/lib/api-types';
 import { filingKeys, regimeCompare, updateReturn } from '../api';
@@ -24,6 +25,12 @@ export function RegimeStep() {
   const { returnId, detail, goNext, setSaveState } = useWizard();
   const invalidate = useInvalidateReturn(returnId);
 
+  // Form 10-IEA is required only for a business/professional taxpayer (ITR-3/4) opting OUT to the old regime.
+  const isBusinessForm = detail.itrType === 'ITR3' || detail.itrType === 'ITR4';
+  const [ackNo, setAckNo] = useState(detail.form10IeaAckNumber ?? '');
+  const [f10Date, setF10Date] = useState(detail.form10IeaDate ?? '');
+  const ackValid = ackNo.trim() === '' || /^[1-9][0-9]{14}$/.test(ackNo.trim());
+
   const compareQuery = useQuery({
     queryKey: filingKeys.regimeCompare(returnId),
     queryFn: () => regimeCompare(returnId),
@@ -34,10 +41,25 @@ export function RegimeStep() {
   const chooseMutation = useMutation({
     mutationFn: (regime: Regime) => updateReturn(returnId, { regime }),
     onMutate: () => setSaveState('saving'),
+    onSuccess: (_data, regime) => {
+      setSaveState('saved');
+      invalidate();
+      // A business taxpayer choosing OLD stays on this step to record Form 10-IEA before continuing.
+      if (!(regime === 'Old' && isBusinessForm)) goNext();
+    },
+    onError: () => setSaveState('error'),
+  });
+
+  const form10IeaMutation = useMutation({
+    mutationFn: () =>
+      updateReturn(returnId, {
+        form10IeaAckNumber: ackNo.trim() || null,
+        form10IeaDate: f10Date || null,
+      }),
+    onMutate: () => setSaveState('saving'),
     onSuccess: () => {
       setSaveState('saved');
       invalidate();
-      goNext();
     },
     onError: () => setSaveState('error'),
   });
@@ -72,6 +94,45 @@ export function RegimeStep() {
             selected={detail.regime}
             onChoose={(regime) => chooseMutation.mutate(regime)}
           />
+        ) : null}
+
+        {detail.regime === 'Old' && isBusinessForm ? (
+          <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+            <div className="text-sm font-semibold text-ink-800">Form 10-IEA — opting out of the new regime</div>
+            <p className="mt-1 text-xs text-ink-600">
+              As a business / professional taxpayer, choosing the <strong>old regime</strong> requires filing
+              Form 10-IEA on the income-tax portal before the due date. Enter its acknowledgement number and
+              filing date so we can quote them in your return (s.115BAC).
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-ink-700">Acknowledgement number</span>
+                <Input
+                  value={ackNo}
+                  onChange={(e) => setAckNo(e.target.value)}
+                  placeholder="15-digit receipt number"
+                  inputMode="numeric"
+                />
+                {!ackValid ? <span className="mt-1 block text-xs text-red-600">Must be a 15-digit number.</span> : null}
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-ink-700">Date of filing</span>
+                <Input type="date" value={f10Date} onChange={(e) => setF10Date(e.target.value)} />
+              </label>
+            </div>
+            <div className="mt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={form10IeaMutation.isPending}
+                disabled={!ackValid}
+                onClick={() => form10IeaMutation.mutate()}
+              >
+                Save Form 10-IEA details
+              </Button>
+            </div>
+          </div>
         ) : null}
       </WizardStep>
 

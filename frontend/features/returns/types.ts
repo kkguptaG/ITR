@@ -100,6 +100,10 @@ export interface ReturnDetailDto {
   originalReturnPreviouslyFiled: boolean;
   /** Tax already paid with the original return. */
   originalTaxPaid: number;
+  /** Form 10-IEA (regime opt-out) acknowledgement number — business taxpayer choosing the OLD regime. */
+  form10IeaAckNumber: string | null;
+  /** Form 10-IEA filing date, YYYY-MM-DD. */
+  form10IeaDate: string | null;
   acknowledgmentNumber: string | null;
   createdAt: IsoDateTime;
   submittedAt: IsoDateTime | null;
