@@ -214,4 +214,35 @@ public class CapitalGainDynamicTests
         r.Buckets.SlabRateGains.Should().Be(1_000_000m);
         r.Buckets.Ltcg112.Should().Be(0m);
     }
+
+    [Fact]
+    public void Property_with_indexation_subtracts_the_indexed_improvement_not_the_raw_amount()
+    {
+        // Old property where the 20%-with-indexation option wins. Improvement is indexed from its OWN year:
+        // gain = 60L − 34.8L (indexed cost) − 16.57143L (indexed improvement) = 8,62,857 (NOT 20,20,000 raw).
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.ImmovableProperty, CapitalGainTerm.Long, "112",
+            SaleConsideration: 6_000_000m, CostOfAcquisition: 1_000_000m, CostOfImprovement: 500_000m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m,
+            AcquisitionDate: new DateOnly(2001, 6, 1), TransferDate: new DateOnly(2023, 8, 1),
+            IndexedCost: 3_480_000m, IndexedImprovement: 1_657_143m);
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(862_857m);
+    }
+
+    [Fact]
+    public void Section_54D_reinvestment_reduces_the_long_term_gain()
+    {
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.ImmovableProperty, CapitalGainTerm.Long, "112",
+            SaleConsideration: 2_000_000m, CostOfAcquisition: 800_000m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            ExemptionSection: "54D", ReinvestmentAmount: 1_000_000m);
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(200_000m); // 12L gain − 10L reinvested
+    }
 }

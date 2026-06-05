@@ -59,6 +59,11 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     public decimal CostOfAcquisition { get; set; }
     public decimal IndexedCost { get; set; }
     public decimal CostOfImprovement { get; set; }
+
+    /// <summary>Year/date the improvement was incurred — drives s.48 indexation of the improvement from its
+    /// OWN year (separate from the acquisition year). Null ⇒ improvement is not indexed.</summary>
+    public DateOnly? ImprovementDate { get; set; }
+
     public decimal ExpensesOnTransfer { get; set; }
 
     public string? ExemptionSection { get; set; }

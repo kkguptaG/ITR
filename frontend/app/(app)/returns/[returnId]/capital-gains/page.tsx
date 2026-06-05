@@ -45,6 +45,7 @@ function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
     salePrice: row.salePrice,
     costOfAcquisition: row.costOfAcquisition,
     costOfImprovement: row.costOfImprovement,
+    improvementDate: row.improvementDate ?? '',
     expensesOnTransfer: row.expensesOnTransfer,
     exemptionAmount: row.exemptionAmount,
     exemptionSection: row.exemptionSection ?? '',
@@ -121,6 +122,7 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
         ...v,
         acquisitionDate: v.acquisitionDate || null,
         transferDate: v.transferDate || null,
+        improvementDate: v.improvementDate || null,
         previousOwnerAcquisitionDate: v.previousOwnerAcquisitionDate || null,
         lots: (v.lots ?? [])
           .filter((l) => (Number(l.quantity) || 0) > 0)

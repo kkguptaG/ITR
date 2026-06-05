@@ -153,7 +153,8 @@ public static class CapitalGainsCalculator
 
         if (eligibleForIndexation && g.IndexedCost is { } indexed && indexed > 0m)
         {
-            var withIndexationGain = netProceeds - indexed - g.CostOfImprovement;
+            // Improvement is indexed from its OWN year (s.48) when supplied; else the raw improvement cost.
+            var withIndexationGain = netProceeds - indexed - (g.IndexedImprovement ?? g.CostOfImprovement);
             var taxWith = TaxMath.NonNegative(withIndexationGain) * rules.Ltcg112RateWithIndexation;
 
             if (taxWith <= taxWithout)
@@ -232,6 +233,16 @@ public static class CapitalGainsCalculator
         {
             case "54":
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+            case "54D":
+            case "54G":
+            case "54GA":
+                // Compulsory acquisition of industrial land/building (54D) / shifting an industrial undertaking
+                // out of an urban area (54G) or to a SEZ (54GA): the gain reinvested in the new asset is exempt.
+                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+            case "54EE":
+                // LTCG invested in units of a notified long-term specified (start-up) fund — capped at ₹50L
+                // (the cap is shared with s.54EC).
+                return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
             case "54GB":
                 // s.54GB: LTCG on a residential house/land reinvested in eligible start-up / SME equity.
                 if (g.AssetType != CapitalGainAssetType.ImmovableProperty)

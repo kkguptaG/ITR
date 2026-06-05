@@ -160,7 +160,10 @@ public sealed record CapitalGainInput(
     /// <summary>Reinvestment-exemption section for a LONG-term gain: "54" / "54F" / "54EC" (null ⇒ use the manual <see cref="ExemptionAmount"/>).</summary>
     string? ExemptionSection = null,
     /// <summary>Amount reinvested (new house u/s 54/54F, or specified bonds u/s 54EC) driving the computed exemption.</summary>
-    decimal ReinvestmentAmount = 0m);
+    decimal ReinvestmentAmount = 0m,
+    /// <summary>Indexed cost of IMPROVEMENT (s.48), indexed from the improvement's own year — used in the
+    /// 20%-with-indexation property formula in place of the raw <see cref="CostOfImprovement"/>. Null ⇒ not indexed.</summary>
+    decimal? IndexedImprovement = null);
 
 public sealed record BusinessIncomeInput(
     bool IsPresumptive,

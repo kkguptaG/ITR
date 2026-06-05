@@ -133,6 +133,8 @@ export const capitalGainSchema = z.object({
   salePrice: money,
   costOfAcquisition: optionalMoney,
   costOfImprovement: optionalMoney,
+  // Year the improvement was incurred — indexes the improvement from its own year (s.48).
+  improvementDate: z.string().optional().or(z.literal('')),
   expensesOnTransfer: optionalMoney,
   exemptionAmount: optionalMoney,
   exemptionSection: z.string().optional().or(z.literal('')),

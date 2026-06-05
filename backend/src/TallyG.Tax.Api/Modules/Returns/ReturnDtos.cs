@@ -217,7 +217,8 @@ public sealed record UpsertCapitalGainRequest(
     decimal TdsOnSale = 0m,
     string? TdsSection = null,
     decimal CoOwnerPercent = 100m,
-    IReadOnlyList<CapitalGainLotInput>? Lots = null);
+    IReadOnlyList<CapitalGainLotInput>? Lots = null,
+    DateOnly? ImprovementDate = null);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -246,7 +247,8 @@ public sealed record CapitalGainDto(
     decimal TdsOnSale,
     string? TdsSection,
     decimal CoOwnerPercent,
-    IReadOnlyList<CapitalGainLotInput> Lots);
+    IReadOnlyList<CapitalGainLotInput> Lots,
+    DateOnly? ImprovementDate);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

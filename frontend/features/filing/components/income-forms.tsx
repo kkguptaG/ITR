@@ -453,7 +453,7 @@ export function CapitalGainForm({
       acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
       isRuralAgriculturalLand: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
-      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [],
+      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], improvementDate: '',
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
@@ -611,6 +611,11 @@ export function CapitalGainForm({
             {!isVda ? (
               <>
                 <MoneyField control={control} name="costOfImprovement" label={t('costOfImprovement')} />
+                {isLandBuilding ? (
+                  <Field label="Improvement date" hint="Indexes the improvement from its own year (s.48)">
+                    <Input type="date" {...register('improvementDate')} />
+                  </Field>
+                ) : null}
                 <MoneyField control={control} name="expensesOnTransfer" label={t('expensesOnTransfer')} />
                 <MoneyField control={control} name="exemptionAmount" label={t('exemption')} hint={t('exemptionHint')} />
                 <Field label="Reinvestment exemption section">
@@ -620,10 +625,14 @@ export function CapitalGainForm({
                     {isAgriLand ? <option value="54B">54B — new agricultural land</option> : null}
                     <option value="54F">54F — any asset (proportionate)</option>
                     <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+                    <option value="54EE">54EE — start-up fund (≤ ₹50L)</option>
+                    {assetType === 'ImmovableProperty' ? <option value="54D">54D — compulsory acquisition (industrial)</option> : null}
+                    <option value="54G">54G — shift industrial undertaking (non-urban)</option>
+                    <option value="54GA">54GA — shift industrial undertaking (SEZ)</option>
                     {assetType === 'ImmovableProperty' ? <option value="54GB">54GB — start-up / SME equity</option> : null}
                   </Select>
                 </Field>
-                <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54/54B/54EC/54F/54GB)" />
+                <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54-series)" />
               </>
             ) : null}
           </div>

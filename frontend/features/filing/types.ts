@@ -169,6 +169,7 @@ export interface CapitalGainDto {
   costOfAcquisition: number;
   indexedCost: number;
   costOfImprovement: number;
+  improvementDate: string | null;
   expensesOnTransfer: number;
   exemptionSection: string | null;
   exemptionAmount: number;
@@ -200,6 +201,7 @@ export interface UpsertCapitalGainRequest {
   salePrice: number;
   costOfAcquisition: number;
   costOfImprovement: number;
+  improvementDate?: string | null;
   expensesOnTransfer: number;
   exemptionSection?: string | null;
   exemptionAmount: number;

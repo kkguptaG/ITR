@@ -295,6 +295,7 @@ export function IncomeStep() {
                           salePrice: item.salePrice,
                           costOfAcquisition: item.costOfAcquisition,
                           costOfImprovement: item.costOfImprovement,
+                          improvementDate: item.improvementDate ?? '',
                           expensesOnTransfer: item.expensesOnTransfer,
                           exemptionAmount: item.exemptionAmount,
                           exemptionSection: item.exemptionSection ?? '',
@@ -316,6 +317,7 @@ export function IncomeStep() {
                       ...v,
                       acquisitionDate: v.acquisitionDate || null,
                       transferDate: v.transferDate || null,
+                      improvementDate: v.improvementDate || null,
                       previousOwnerAcquisitionDate: v.previousOwnerAcquisitionDate || null,
                       lots: (v.lots ?? [])
                         .filter((l) => (Number(l.quantity) || 0) > 0)

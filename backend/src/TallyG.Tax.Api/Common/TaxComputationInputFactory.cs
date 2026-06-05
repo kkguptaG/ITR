@@ -115,13 +115,29 @@ internal static class TaxComputationInputFactory
                     // Joint ownership (s.45 r/w co-ownership): apportion the gain components to the assessee's
                     // share. Default 100% ⇒ factor 1.0 ⇒ byte-identical to a solely-owned asset.
                     var f = x.c.CoOwnerPercent is > 0m and < 100m ? x.c.CoOwnerPercent / 100m : 1m;
+
+                    // Index the improvement from its OWN year (land/building only, acquired-before-cutoff) —
+                    // parallels the indexed cost of acquisition. Null ⇒ the raw improvement is used.
+                    decimal? indexedImpr = null;
+                    if (x.c.CostOfImprovement > 0m && x.c.ImprovementDate is { } impDate && x.c.TransferDate is { } impTrn
+                        && x.c.AssetType is CapitalGainAssetType.ImmovableProperty or CapitalGainAssetType.AgriculturalLand
+                        && (cgRules.PropertyIndexationCutoff is not { } impCutoff || impDate < impCutoff))
+                    {
+                        var ii = cgRules.IndexedCostOf(x.c.CostOfImprovement, impDate, impTrn);
+                        if (ii > x.c.CostOfImprovement)
+                        {
+                            indexedImpr = ii;
+                        }
+                    }
+
                     return new CapitalGainInput(
                         x.c.AssetType, x.d.Term, x.c.TaxSection, x.c.SalePrice * f, x.d.EffectiveCost * f, x.c.CostOfImprovement * f,
                         x.c.ExpensesOnTransfer * f, x.c.ExemptionAmount, x.d.EffectiveAcquisitionDate, x.c.TransferDate,
                         FairMarketValueOnGrandfatherDate: x.c.FairMarketValue31Jan2018 > 0m ? x.c.FairMarketValue31Jan2018 * f : null,
                         IndexedCost: x.d.IndexedCost is { } ic ? ic * f : null,
                         ExemptionSection: x.c.ExemptionSection,
-                        ReinvestmentAmount: x.c.ReinvestmentAmount);
+                        ReinvestmentAmount: x.c.ReinvestmentAmount,
+                        IndexedImprovement: indexedImpr is { } iv ? iv * f : null);
                 })
                 .Concat(deemedStcg > 0m
                     ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }

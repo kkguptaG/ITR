@@ -604,6 +604,7 @@ public sealed class ReturnService : IReturnService
             TdsSection = request.TdsSection?.Trim(),
             CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent,
             LotsJson = SerializeCapitalGainLots(request.Lots),
+            ImprovementDate = request.ImprovementDate,
         };
 
         ApplyCapitalGainDerived(entity);
@@ -644,6 +645,7 @@ public sealed class ReturnService : IReturnService
         entity.TdsSection = request.TdsSection?.Trim();
         entity.CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent;
         entity.LotsJson = SerializeCapitalGainLots(request.Lots);
+        entity.ImprovementDate = request.ImprovementDate;
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1712,7 +1714,7 @@ public sealed class ReturnService : IReturnService
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
         c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
         c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand,
-        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson));
+        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson), c.ImprovementDate);
 
     private static readonly System.Text.Json.JsonSerializerOptions CapitalGainLotJsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
 
