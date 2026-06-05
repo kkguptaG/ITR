@@ -260,4 +260,44 @@ public class CapitalGainDynamicTests
 
         r.Buckets.Ltcg112.Should().Be(400_000m);
     }
+
+    [Fact]
+    public void Multi_section_exemption_chart_sums_each_section_capped_at_the_gain()
+    {
+        // House LTCG ₹20L sheltered under TWO sections at once: ₹10L reinvested in a new house (s.54) +
+        // ₹6L in s.54EC bonds ⇒ ₹16L exempt, ₹4L taxable under s.112.
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.ImmovableProperty, CapitalGainTerm.Long, "112",
+            SaleConsideration: 3_000_000m, CostOfAcquisition: 1_000_000m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            Exemptions: new[]
+            {
+                new CapitalGainExemptionClaim("54", 1_000_000m),
+                new CapitalGainExemptionClaim("54EC", 600_000m),
+            });
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(400_000m);
+    }
+
+    [Fact]
+    public void Multi_section_exemption_chart_caps_the_total_at_the_gain()
+    {
+        // Over-claiming across sections cannot create a negative gain: ₹20L gain, ₹15L (s.54) + ₹15L (s.54EC,
+        // within its ₹50L cap) claimed ⇒ exemption capped at the ₹20L gain, taxable nil.
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.ImmovableProperty, CapitalGainTerm.Long, "112",
+            SaleConsideration: 3_000_000m, CostOfAcquisition: 1_000_000m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            Exemptions: new[]
+            {
+                new CapitalGainExemptionClaim("54", 1_500_000m),
+                new CapitalGainExemptionClaim("54EC", 1_500_000m),
+            });
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(0m);
+    }
 }

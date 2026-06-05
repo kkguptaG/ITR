@@ -606,6 +606,7 @@ public sealed class ReturnService : IReturnService
             LotsJson = SerializeCapitalGainLots(request.Lots),
             ImprovementDate = request.ImprovementDate,
             ExemptUnderDtaa = request.ExemptUnderDtaa,
+            ExemptionsJson = SerializeCapitalGainExemptions(request.Exemptions),
         };
 
         ApplyCapitalGainDerived(entity);
@@ -648,6 +649,7 @@ public sealed class ReturnService : IReturnService
         entity.LotsJson = SerializeCapitalGainLots(request.Lots);
         entity.ImprovementDate = request.ImprovementDate;
         entity.ExemptUnderDtaa = request.ExemptUnderDtaa;
+        entity.ExemptionsJson = SerializeCapitalGainExemptions(request.Exemptions);
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1723,7 +1725,8 @@ public sealed class ReturnService : IReturnService
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
         c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
         c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand,
-        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson), c.ImprovementDate, c.ExemptUnderDtaa);
+        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson), c.ImprovementDate, c.ExemptUnderDtaa,
+        DeserializeCapitalGainExemptions(c.ExemptionsJson));
 
     private static readonly System.Text.Json.JsonSerializerOptions CapitalGainLotJsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
 
@@ -1745,6 +1748,30 @@ public sealed class ReturnService : IReturnService
         catch (System.Text.Json.JsonException)
         {
             return Array.Empty<CapitalGainLotInput>();
+        }
+    }
+
+    private static string? SerializeCapitalGainExemptions(IReadOnlyList<CapitalGainExemptionInput>? exemptions)
+    {
+        var rows = exemptions?.Where(e => !string.IsNullOrWhiteSpace(e.Section)).ToList();
+        return rows is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(rows, CapitalGainLotJsonOptions) : null;
+    }
+
+    private static IReadOnlyList<CapitalGainExemptionInput> DeserializeCapitalGainExemptions(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<CapitalGainExemptionInput>();
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<CapitalGainExemptionInput>>(json, CapitalGainLotJsonOptions)
+                   ?? (IReadOnlyList<CapitalGainExemptionInput>)Array.Empty<CapitalGainExemptionInput>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Array.Empty<CapitalGainExemptionInput>();
         }
     }
 

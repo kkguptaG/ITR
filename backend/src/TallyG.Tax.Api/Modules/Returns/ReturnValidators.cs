@@ -118,6 +118,19 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
             .Must(s => string.IsNullOrWhiteSpace(s)
                 || new[] { "54", "54B", "54D", "54EC", "54ED", "54EE", "54F", "54G", "54GA", "54GB", "115F" }.Contains(s.Trim().ToUpperInvariant()))
             .WithMessage("Exemption section must be one of 54, 54B, 54D, 54EC, 54ED, 54EE, 54F, 54G, 54GA, 54GB, 115F.");
+
+        // Multi-section exemption chart: each row needs a valid section and non-negative amounts.
+        RuleForEach(x => x.Exemptions).ChildRules(e =>
+        {
+            e.RuleFor(r => r.Section)
+                .NotEmpty().WithMessage("Each exemption row needs a section.")
+                .Must(s => new[] { "54", "54B", "54D", "54EC", "54ED", "54EE", "54F", "54G", "54GA", "54GB", "115F" }
+                    .Contains((s ?? string.Empty).Trim().ToUpperInvariant()))
+                .WithMessage("Exemption section must be one of 54, 54B, 54D, 54EC, 54ED, 54EE, 54F, 54G, 54GA, 54GB, 115F.");
+            e.RuleFor(r => r.CostOfNewAsset).GreaterThanOrEqualTo(0);
+            e.RuleFor(r => r.CgasDeposit).GreaterThanOrEqualTo(0);
+        });
+
         RuleFor(x => x.TaxSection).MaximumLength(16);
         RuleFor(x => x.Isin).MaximumLength(20);
 

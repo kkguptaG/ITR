@@ -76,6 +76,12 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     /// <summary>Amount reinvested (new house u/s 54/54F, or NHAI/REC bonds u/s 54EC) driving the computed LTCG exemption.</summary>
     public decimal ReinvestmentAmount { get; set; }
 
+    /// <summary>Optional multi-section exemption chart as JSON (<c>[{section, costOfNewAsset, cgasDeposit,
+    /// dateOfAcquisition}]</c>) — the "Exempt Capital Gain" grid where one gain is sheltered under several
+    /// sections at once. When present it supersedes the single <see cref="ExemptionSection"/> /
+    /// <see cref="ReinvestmentAmount"/> above.</summary>
+    public string? ExemptionsJson { get; set; }
+
     public decimal Gain { get; set; }
     public string? Isin { get; set; }
 

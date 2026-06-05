@@ -210,13 +210,48 @@ public static class CapitalGainsCalculator
             return line;
         }
 
-        var exemption = ComputeExemption(g, line.Gain, rules);
+        decimal exemption;
+        string label;
+        if (g.Exemptions is { Count: > 0 } claims)
+        {
+            // Multi-section chart ("Exempt Capital Gain" grid): one gain sheltered under SEVERAL sections at
+            // once (e.g. part in a new house u/s 54, part in s.54EC bonds). Each row is computed per its own
+            // rule against the gain still un-sheltered, then summed — the running total can never exceed the gain.
+            var remaining = line.Gain;
+            var sum = 0m;
+            var sections = new List<string>();
+            foreach (var c in claims)
+            {
+                if (remaining <= 0m)
+                {
+                    break;
+                }
+
+                var e = Math.Min(ComputeExemptionFor(c.Section, c.Amount, g, remaining, rules), remaining);
+                if (e <= 0m)
+                {
+                    continue;
+                }
+
+                sum += e;
+                remaining -= e;
+                sections.Add($"s.{c.Section.Trim()}");
+            }
+
+            exemption = sum;
+            label = sections.Count > 0 ? $"{string.Join(" + ", sections)} exemption" : "exemption";
+        }
+        else
+        {
+            exemption = ComputeExemption(g, line.Gain, rules);
+            label = string.IsNullOrWhiteSpace(g.ExemptionSection) ? "exemption" : $"s.{g.ExemptionSection.Trim()} exemption";
+        }
+
         if (exemption <= 0m)
         {
             return line;
         }
 
-        var label = string.IsNullOrWhiteSpace(g.ExemptionSection) ? "exemption" : $"s.{g.ExemptionSection.Trim()} exemption";
         return line with
         {
             Gain = TaxMath.NonNegative(line.Gain - exemption),
@@ -224,15 +259,25 @@ public static class CapitalGainsCalculator
         };
     }
 
-    /// <summary>Compute the LTCG exemption: 54/54EC cap the reinvested amount (54EC also at ₹50L); 54F is
-    /// proportionate to net consideration reinvested; no section ⇒ the manual <c>ExemptionAmount</c>.</summary>
+    /// <summary>Single-section / manual exemption: when an <see cref="CapitalGainInput.ExemptionSection"/> is
+    /// supplied it delegates to the per-section rule with the row's <see cref="CapitalGainInput.ReinvestmentAmount"/>;
+    /// with no section it honours the manually-entered <see cref="CapitalGainInput.ExemptionAmount"/>.</summary>
     private static decimal ComputeExemption(CapitalGainInput g, decimal gain, CapitalGainRules rules)
+        => string.IsNullOrWhiteSpace(g.ExemptionSection)
+            ? Math.Min(gain, TaxMath.NonNegative(g.ExemptionAmount))
+            : ComputeExemptionFor(g.ExemptionSection, g.ReinvestmentAmount, g, gain, rules);
+
+    /// <summary>Compute the exemption for ONE section against <paramref name="gain"/>, given the amount
+    /// <paramref name="reinvestmentAmount"/> reinvested under it (cost of the new asset + any CGAS deposit):
+    /// 54/54D/54ED/54G/54GA cap the reinvested amount; 54EC/54EE also at the ₹50L cap; 54F/115F are proportionate
+    /// to net consideration; 54B needs agri land, 54GB an immovable property, 54EC land/building. Unknown ⇒ 0.</summary>
+    private static decimal ComputeExemptionFor(string? section, decimal reinvestmentAmount, CapitalGainInput g, decimal gain, CapitalGainRules rules)
     {
-        var sec = (g.ExemptionSection ?? string.Empty).Trim().ToUpperInvariant().Replace("U/S", string.Empty).Replace("S.", string.Empty).Trim();
+        var sec = (section ?? string.Empty).Trim().ToUpperInvariant().Replace("U/S", string.Empty).Replace("S.", string.Empty).Trim();
         switch (sec)
         {
             case "54":
-                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+                return Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount));
             case "54D":
             case "54ED":
             case "54G":
@@ -240,11 +285,11 @@ public static class CapitalGainsCalculator
                 // Compulsory acquisition of industrial land/building (54D) / certain listed securities (54ED) /
                 // shifting an industrial undertaking out of an urban area (54G) or to a SEZ (54GA): the gain
                 // reinvested in the new asset is exempt.
-                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+                return Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount));
             case "54EE":
                 // LTCG invested in units of a notified long-term specified (start-up) fund — capped at ₹50L
                 // (the cap is shared with s.54EC).
-                return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
+                return Math.Min(Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount)), rules.Section54EcCap);
             case "54GB":
                 // s.54GB: LTCG on a residential house/land reinvested in eligible start-up / SME equity.
                 if (g.AssetType != CapitalGainAssetType.ImmovableProperty)
@@ -252,7 +297,7 @@ public static class CapitalGainsCalculator
                     return 0m;
                 }
 
-                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+                return Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount));
             case "54B":
                 // s.54B: capital gain on agricultural land reinvested in new agricultural land — agri land only.
                 if (g.AssetType != CapitalGainAssetType.AgriculturalLand)
@@ -260,7 +305,7 @@ public static class CapitalGainsCalculator
                     return 0m;
                 }
 
-                return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
+                return Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount));
             case "54EC":
                 // s.54EC applies only to LTCG on land or building (incl. agricultural land) — ignore otherwise.
                 if (g.AssetType is not (CapitalGainAssetType.ImmovableProperty or CapitalGainAssetType.AgriculturalLand))
@@ -268,24 +313,23 @@ public static class CapitalGainsCalculator
                     return 0m;
                 }
 
-                return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
+                return Math.Min(Math.Min(gain, TaxMath.NonNegative(reinvestmentAmount)), rules.Section54EcCap);
             case "54F":
             case "115F":
             {
                 // s.54F (any LTCG asset → residential house) and s.115F (NRI: LTCG on a foreign-exchange asset
                 // → specified asset) are both PROPORTIONATE to the net consideration reinvested.
                 var netConsideration = TaxMath.NonNegative(g.SaleConsideration - g.ExpensesOnTransfer);
-                if (netConsideration <= 0m || g.ReinvestmentAmount <= 0m)
+                if (netConsideration <= 0m || reinvestmentAmount <= 0m)
                 {
                     return 0m;
                 }
 
-                var proportion = Math.Min(1m, g.ReinvestmentAmount / netConsideration);
+                var proportion = Math.Min(1m, reinvestmentAmount / netConsideration);
                 return TaxMath.NonNegative(gain * proportion);
             }
             default:
-                // No section supplied: honour the manually-entered exemption amount (previously ignored).
-                return Math.Min(gain, TaxMath.NonNegative(g.ExemptionAmount));
+                return 0m;
         }
     }
 

@@ -163,7 +163,11 @@ public sealed record CapitalGainInput(
     decimal ReinvestmentAmount = 0m,
     /// <summary>Indexed cost of IMPROVEMENT (s.48), indexed from the improvement's own year — used in the
     /// 20%-with-indexation property formula in place of the raw <see cref="CostOfImprovement"/>. Null ⇒ not indexed.</summary>
-    decimal? IndexedImprovement = null);
+    decimal? IndexedImprovement = null,
+    /// <summary>Multi-section reinvestment-exemption chart (the "Exempt Capital Gain" grid): each (section, amount)
+    /// is computed per its section's rule against the still-unsheltered gain and summed, capped at the gain. When
+    /// non-empty this SUPERSEDES the single <see cref="ExemptionSection"/>/<see cref="ReinvestmentAmount"/>.</summary>
+    IReadOnlyList<CapitalGainExemptionClaim>? Exemptions = null);
 
 public sealed record BusinessIncomeInput(
     bool IsPresumptive,

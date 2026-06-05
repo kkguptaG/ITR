@@ -193,6 +193,15 @@ public sealed record CapitalGainLotInput(
     decimal Cost,
     decimal FairMarketValue31Jan2018 = 0m);
 
+/// <summary>One row of the multi-section "Exempt Capital Gain" chart: the section claimed, the cost of the new
+/// asset, any amount deposited in the Capital Gains Account Scheme (CGAS) pending reinvestment, and the new
+/// asset's date of acquisition. Cost + CGAS deposit is the amount "reinvested" under that section.</summary>
+public sealed record CapitalGainExemptionInput(
+    string Section,
+    decimal CostOfNewAsset,
+    decimal CgasDeposit = 0m,
+    DateOnly? DateOfAcquisition = null);
+
 public sealed record UpsertCapitalGainRequest(
     CapitalGainAssetType AssetType,
     CapitalGainTerm Term,
@@ -219,7 +228,8 @@ public sealed record UpsertCapitalGainRequest(
     decimal CoOwnerPercent = 100m,
     IReadOnlyList<CapitalGainLotInput>? Lots = null,
     DateOnly? ImprovementDate = null,
-    bool ExemptUnderDtaa = false);
+    bool ExemptUnderDtaa = false,
+    IReadOnlyList<CapitalGainExemptionInput>? Exemptions = null);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -250,7 +260,8 @@ public sealed record CapitalGainDto(
     decimal CoOwnerPercent,
     IReadOnlyList<CapitalGainLotInput> Lots,
     DateOnly? ImprovementDate,
-    bool ExemptUnderDtaa);
+    bool ExemptUnderDtaa,
+    IReadOnlyList<CapitalGainExemptionInput> Exemptions);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

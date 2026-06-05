@@ -130,6 +130,13 @@ internal static class TaxComputationInputFactory
                         }
                     }
 
+                    // Multi-section exemption chart ("Exempt Capital Gain" grid); reinvested amounts scale to the
+                    // assessee's co-owner share. Empty ⇒ fall back to the single ExemptionSection / ReinvestmentAmount.
+                    var exemptionClaims = CapitalGainExemptions.Parse(x.c.ExemptionsJson);
+                    IReadOnlyList<CapitalGainExemptionClaim>? exemptions = exemptionClaims.Count == 0
+                        ? null
+                        : f == 1m ? exemptionClaims : exemptionClaims.Select(e => e with { Amount = e.Amount * f }).ToList();
+
                     return new CapitalGainInput(
                         x.c.AssetType, x.d.Term, x.c.TaxSection, x.c.SalePrice * f, x.d.EffectiveCost * f, x.c.CostOfImprovement * f,
                         x.c.ExpensesOnTransfer * f, x.c.ExemptionAmount, x.d.EffectiveAcquisitionDate, x.c.TransferDate,
@@ -137,7 +144,8 @@ internal static class TaxComputationInputFactory
                         IndexedCost: x.d.IndexedCost is { } ic ? ic * f : null,
                         ExemptionSection: x.c.ExemptionSection,
                         ReinvestmentAmount: x.c.ReinvestmentAmount,
-                        IndexedImprovement: indexedImpr is { } iv ? iv * f : null);
+                        IndexedImprovement: indexedImpr is { } iv ? iv * f : null,
+                        Exemptions: exemptions);
                 })
                 .Concat(deemedStcg > 0m
                     ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }
