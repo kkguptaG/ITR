@@ -300,6 +300,12 @@ export function IncomeStep() {
                           exemptionSection: item.exemptionSection ?? '',
                           reinvestmentAmount: item.reinvestmentAmount,
                           fairMarketValue31Jan2018: item.fairMarketValue31Jan2018,
+                          lots: (item.lots ?? []).map((l) => ({
+                            acquisitionDate: l.acquisitionDate ?? '',
+                            quantity: l.quantity,
+                            cost: l.cost,
+                            fairMarketValue31Jan2018: l.fairMarketValue31Jan2018,
+                          })),
                         }
                       : undefined
                   }
@@ -311,6 +317,9 @@ export function IncomeStep() {
                       acquisitionDate: v.acquisitionDate || null,
                       transferDate: v.transferDate || null,
                       previousOwnerAcquisitionDate: v.previousOwnerAcquisitionDate || null,
+                      lots: (v.lots ?? [])
+                        .filter((l) => (Number(l.quantity) || 0) > 0)
+                        .map((l) => ({ ...l, acquisitionDate: l.acquisitionDate || null })),
                     };
                     const op = item
                       ? gains.updateMutation.mutateAsync({ id: item.id, body })

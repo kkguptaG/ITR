@@ -151,6 +151,13 @@ export interface UpsertHousePropertyRequest {
   coOwnerSharePct: number;
 }
 
+export interface CapitalGainLot {
+  acquisitionDate: string | null;
+  quantity: number;
+  cost: number;
+  fairMarketValue31Jan2018: number;
+}
+
 export interface CapitalGainDto {
   id: Guid;
   assetType: CapitalGainAssetType;
@@ -178,6 +185,7 @@ export interface CapitalGainDto {
   tdsOnSale: number;
   tdsSection: string | null;
   coOwnerPercent: number;
+  lots: CapitalGainLot[];
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
@@ -203,6 +211,7 @@ export interface UpsertCapitalGainRequest {
   tdsOnSale?: number;
   tdsSection?: string | null;
   coOwnerPercent?: number;
+  lots?: CapitalGainLot[];
 }
 
 // --- Bulk import (P4) ---

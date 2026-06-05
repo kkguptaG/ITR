@@ -453,10 +453,12 @@ export function CapitalGainForm({
       acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
       isRuralAgriculturalLand: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
-      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0,
+      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [],
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
+  const lotsField = useFieldArray({ control, name: 'lots' });
+  const useLots = lotsField.fields.length > 0;
 
   const assetType = watch('assetType');
   const acquisitionMode = watch('acquisitionMode');
@@ -544,9 +546,11 @@ export function CapitalGainForm({
                 <option value="Long">{t('longTerm')}</option>
               </Select>
             </Field>
-            <Field label={t('acquisitionDate')}>
-              <Input type="date" {...register('acquisitionDate')} />
-            </Field>
+            {!useLots ? (
+              <Field label={t('acquisitionDate')}>
+                <Input type="date" {...register('acquisitionDate')} />
+              </Field>
+            ) : null}
             <Field label={t('transferDate')}>
               <Input type="date" {...register('transferDate')} />
             </Field>
@@ -559,7 +563,43 @@ export function CapitalGainForm({
               </>
             ) : null}
             <MoneyField control={control} name="salePrice" label={t('saleConsideration')} error={errors.salePrice?.message} />
-            <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
+            {!useLots ? (
+              <MoneyField control={control} name="costOfAcquisition" label={t('costOfAcquisition')} />
+            ) : null}
+            <label className="flex items-center gap-2 text-sm text-ink-700 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={useLots}
+                onChange={(e) => {
+                  if (e.target.checked) lotsField.append({ acquisitionDate: '', quantity: 0, cost: 0, fairMarketValue31Jan2018: 0 });
+                  else lotsField.replace([]);
+                }}
+                className="h-4 w-4 rounded border-ink-300 text-brand-600"
+              />
+              Bought in multiple lots (different dates / costs)
+            </label>
+            {useLots ? (
+              <div className="space-y-2 rounded-xl border border-ink-200 bg-ink-50/50 p-3 sm:col-span-2">
+                <p className="text-xs text-ink-500">
+                  Each lot is taxed on its own holding period &amp; cost — older lots can be long-term while recent
+                  ones are short-term, and pre-2018 equity lots are grandfathered individually.
+                </p>
+                {lotsField.fields.map((f, i) => (
+                  <div key={f.id} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <Field label="Buy date"><Input type="date" {...register(`lots.${i}.acquisitionDate` as Path<CapitalGainFormValues>)} /></Field>
+                    <Field label="Quantity"><Input type="number" step="any" {...register(`lots.${i}.quantity` as Path<CapitalGainFormValues>)} /></Field>
+                    <MoneyField control={control} name={`lots.${i}.cost` as Path<CapitalGainFormValues>} label="Cost" />
+                    <div className="flex items-end gap-1">
+                      <div className="flex-1"><MoneyField control={control} name={`lots.${i}.fairMarketValue31Jan2018` as Path<CapitalGainFormValues>} label="FMV 31-Jan-18" /></div>
+                      <button type="button" onClick={() => lotsField.remove(i)} className="mb-1 shrink-0 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50" aria-label="Remove lot">✕</button>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" onClick={() => lotsField.append({ acquisitionDate: '', quantity: 0, cost: 0, fairMarketValue31Jan2018: 0 })} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+                  + Add lot
+                </button>
+              </div>
+            ) : null}
             {is112AEligible ? (
               <>
                 <GrandfatherFmvLookup

@@ -139,6 +139,18 @@ export const capitalGainSchema = z.object({
   reinvestmentAmount: optionalMoney,
   // FMV on 31-Jan-2018 for s.112A grandfathering of pre-2018 listed equity / equity MF.
   fairMarketValue31Jan2018: optionalMoney,
+  // Optional multiple acquisition lots — each lot derives its own term / indexation / grandfathering.
+  lots: z
+    .array(
+      z.object({
+        acquisitionDate: z.string().optional().or(z.literal('')),
+        quantity: z.coerce.number().min(0).default(0),
+        cost: optionalMoney,
+        fairMarketValue31Jan2018: optionalMoney,
+      }),
+    )
+    .optional()
+    .default([]),
 });
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 

@@ -50,6 +50,12 @@ function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
     exemptionSection: row.exemptionSection ?? '',
     reinvestmentAmount: row.reinvestmentAmount,
     fairMarketValue31Jan2018: row.fairMarketValue31Jan2018,
+    lots: (row.lots ?? []).map((l) => ({
+      acquisitionDate: l.acquisitionDate ?? '',
+      quantity: l.quantity,
+      cost: l.cost,
+      fairMarketValue31Jan2018: l.fairMarketValue31Jan2018,
+    })),
   };
 }
 
@@ -116,6 +122,9 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
         acquisitionDate: v.acquisitionDate || null,
         transferDate: v.transferDate || null,
         previousOwnerAcquisitionDate: v.previousOwnerAcquisitionDate || null,
+        lots: (v.lots ?? [])
+          .filter((l) => (Number(l.quantity) || 0) > 0)
+          .map((l) => ({ ...l, acquisitionDate: l.acquisitionDate || null })),
       };
       if (editing?.row) await updateCapitalGain(returnId, editing.row.id, body);
       else await addCapitalGain(returnId, body);
