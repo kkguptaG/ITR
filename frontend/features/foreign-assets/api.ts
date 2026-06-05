@@ -13,6 +13,7 @@ import type {
   ForeignCashValueInsuranceDto, UpsertForeignCashValueInsuranceBody,
   ForeignOtherAssetDto, UpsertForeignOtherAssetBody,
   ForeignTrustInterestDto, UpsertForeignTrustInterestBody,
+  ForeignSourceIncomeDto, UpsertForeignSourceIncomeBody,
 } from './types';
 
 export const foreignAssetsKeys = {
@@ -63,6 +64,11 @@ export const foreignOtherAssetKeys = {
 export const foreignTrustKeys = {
   all: ['foreign-trusts'] as const,
   forReturn: (returnId: string) => [...foreignTrustKeys.all, returnId] as const,
+};
+
+export const foreignSourceIncomeKeys = {
+  all: ['foreign-source-income'] as const,
+  forReturn: (returnId: string) => [...foreignSourceIncomeKeys.all, returnId] as const,
 };
 
 const base = (returnId: string) => `/returns/${returnId}/foreign-bank-accounts`;
@@ -194,4 +200,18 @@ export function addForeignTrust(returnId: string, body: UpsertForeignTrustIntere
 
 export function deleteForeignTrust(returnId: string, id: string): Promise<void> {
   return apiDelete<void>(`${trustBase(returnId)}/${id}`);
+}
+
+const fsiBase = (returnId: string) => `/returns/${returnId}/foreign-source-income`;
+
+export function listForeignSourceIncome(returnId: string): Promise<ForeignSourceIncomeDto[]> {
+  return apiGet<ForeignSourceIncomeDto[]>(fsiBase(returnId));
+}
+
+export function addForeignSourceIncome(returnId: string, body: UpsertForeignSourceIncomeBody): Promise<ForeignSourceIncomeDto> {
+  return apiPost<ForeignSourceIncomeDto>(fsiBase(returnId), body);
+}
+
+export function deleteForeignSourceIncome(returnId: string, id: string): Promise<void> {
+  return apiDelete<void>(`${fsiBase(returnId)}/${id}`);
 }

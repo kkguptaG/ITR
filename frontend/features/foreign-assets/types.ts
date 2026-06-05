@@ -322,3 +322,30 @@ export interface UpsertForeignTrustInterestBody {
   incomeTaxSchedule: string;
   incomeTaxScheduleItem: string;
 }
+
+// Schedule FSI / TR — foreign-source income + foreign tax credit (s.90/90A/91).
+export type ForeignIncomeHead = 'Salary' | 'HouseProperty' | 'CapitalGains' | 'OtherSources' | 'Business';
+export type ForeignTaxReliefSection = 'Section90' | 'Section90A' | 'Section91';
+
+export interface ForeignSourceIncomeDto {
+  id: string;
+  countryCode: string;
+  countryName: string;
+  taxIdentificationNo: string;
+  head: ForeignIncomeHead;
+  incomeFromOutsideIndia: number;
+  taxPaidOutsideIndia: number;
+  reliefSection: ForeignTaxReliefSection;
+  dtaaArticle: string | null;
+}
+
+export interface UpsertForeignSourceIncomeBody {
+  countryCode: string;
+  countryName: string;
+  taxIdentificationNo: string;
+  head: ForeignIncomeHead;
+  incomeFromOutsideIndia: number;
+  taxPaidOutsideIndia: number;
+  reliefSection: ForeignTaxReliefSection;
+  dtaaArticle?: string | null;
+}

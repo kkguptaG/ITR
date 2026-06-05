@@ -18,6 +18,7 @@ import { ForeignOtherIncomeCard } from './ForeignOtherIncomeCard';
 import { ForeignCashValueInsuranceCard } from './ForeignCashValueInsuranceCard';
 import { ForeignOtherAssetCard } from './ForeignOtherAssetCard';
 import { ForeignTrustCard } from './ForeignTrustCard';
+import { ForeignSourceIncomeCard } from './ForeignSourceIncomeCard';
 
 export function ForeignAssetsSection({ returnId, editable }: { returnId: string; editable: boolean }) {
   const [open, setOpen] = useState(false);
@@ -34,8 +35,9 @@ export function ForeignAssetsSection({ returnId, editable }: { returnId: string;
           <div>
             <div className="font-semibold text-ink-900">Foreign assets &amp; income — Schedule FA</div>
             <div className="text-sm text-ink-500">
-              Bank, custodial &amp; equity/debt holdings, property, financial interest, signing authority and other
-              foreign income. Residents must disclose all foreign assets (Black Money Act).
+              Foreign tax credit (income taxed abroad), plus bank, custodial &amp; equity/debt holdings, property,
+              financial interest, signing authority and other foreign income. Residents must disclose all foreign
+              assets (Black Money Act).
             </div>
           </div>
         </div>
@@ -44,6 +46,7 @@ export function ForeignAssetsSection({ returnId, editable }: { returnId: string;
 
       {open && (
         <div className="space-y-4 border-t border-ink-100 p-5">
+          <ForeignSourceIncomeCard returnId={returnId} editable={editable} />
           <ForeignAssetsCard returnId={returnId} editable={editable} />
           <ForeignCustodialCard returnId={returnId} editable={editable} />
           <ForeignEquityDebtCard returnId={returnId} editable={editable} />
