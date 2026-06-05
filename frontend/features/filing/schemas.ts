@@ -130,6 +130,8 @@ export const capitalGainSchema = z.object({
   previousOwnerCost: optionalMoney,
   // Rural agricultural land is not a capital asset (s.2(14)) — the gain is fully exempt.
   isRuralAgriculturalLand: z.boolean().default(false),
+  // Not chargeable to tax in India under a DTAA (tax treaty) — excluded from taxable gains.
+  exemptUnderDtaa: z.boolean().default(false),
   salePrice: money,
   costOfAcquisition: optionalMoney,
   costOfImprovement: optionalMoney,

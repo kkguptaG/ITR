@@ -605,6 +605,7 @@ public sealed class ReturnService : IReturnService
             CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent,
             LotsJson = SerializeCapitalGainLots(request.Lots),
             ImprovementDate = request.ImprovementDate,
+            ExemptUnderDtaa = request.ExemptUnderDtaa,
         };
 
         ApplyCapitalGainDerived(entity);
@@ -646,6 +647,7 @@ public sealed class ReturnService : IReturnService
         entity.CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent;
         entity.LotsJson = SerializeCapitalGainLots(request.Lots);
         entity.ImprovementDate = request.ImprovementDate;
+        entity.ExemptUnderDtaa = request.ExemptUnderDtaa;
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1587,6 +1589,13 @@ public sealed class ReturnService : IReturnService
             return;
         }
 
+        // Not chargeable to tax in India under a DTAA — shown as an exempt (zero) gain.
+        if (c.ExemptUnderDtaa)
+        {
+            c.Gain = 0m;
+            return;
+        }
+
         // Share buy-back (s.115QA): pre-1-Oct-2024 is exempt (s.10(34A)); on/after, the consideration is a
         // deemed dividend (taxed under Other Sources by the engine) and the cost shows as a capital loss.
         if (c.SubType == CapitalGainSubType.Buyback)
@@ -1714,7 +1723,7 @@ public sealed class ReturnService : IReturnService
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
         c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
         c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand,
-        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson), c.ImprovementDate);
+        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson), c.ImprovementDate, c.ExemptUnderDtaa);
 
     private static readonly System.Text.Json.JsonSerializerOptions CapitalGainLotJsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
 

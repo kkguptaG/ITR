@@ -181,6 +181,7 @@ export interface CapitalGainDto {
   previousOwnerAcquisitionDate: string | null;
   previousOwnerCost: number;
   isRuralAgriculturalLand: boolean;
+  exemptUnderDtaa: boolean;
   subType: CapitalGainSubType | null;
   sttPaid: boolean;
   tdsOnSale: number;
@@ -198,6 +199,7 @@ export interface UpsertCapitalGainRequest {
   previousOwnerAcquisitionDate?: string | null;
   previousOwnerCost?: number;
   isRuralAgriculturalLand?: boolean;
+  exemptUnderDtaa?: boolean;
   salePrice: number;
   costOfAcquisition: number;
   costOfImprovement: number;

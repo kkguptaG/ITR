@@ -451,7 +451,7 @@ export function CapitalGainForm({
     defaultValues: {
       assetType: 'ListedEquity', term: 'Long', acquisitionMode: 'Purchase',
       acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
-      isRuralAgriculturalLand: false,
+      isRuralAgriculturalLand: false, exemptUnderDtaa: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
       exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], improvementDate: '',
       ...defaultValues,
@@ -633,6 +633,10 @@ export function CapitalGainForm({
                   </Select>
                 </Field>
                 <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54-series)" />
+                <label className="flex items-center gap-2 text-sm text-ink-700 sm:col-span-2">
+                  <input type="checkbox" {...register('exemptUnderDtaa')} className="h-4 w-4 rounded border-ink-300 text-brand-600" />
+                  Not chargeable to tax in India under a DTAA (tax treaty)
+                </label>
               </>
             ) : null}
           </div>

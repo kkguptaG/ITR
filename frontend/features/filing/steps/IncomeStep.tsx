@@ -292,6 +292,7 @@ export function IncomeStep() {
                           previousOwnerAcquisitionDate: item.previousOwnerAcquisitionDate ?? '',
                           previousOwnerCost: item.previousOwnerCost ?? 0,
                           isRuralAgriculturalLand: item.isRuralAgriculturalLand ?? false,
+                          exemptUnderDtaa: item.exemptUnderDtaa ?? false,
                           salePrice: item.salePrice,
                           costOfAcquisition: item.costOfAcquisition,
                           costOfImprovement: item.costOfImprovement,

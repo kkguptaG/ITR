@@ -107,7 +107,7 @@ internal static class TaxComputationInputFactory
                     c.AssetType, c.Term, c.AcquisitionMode, c.AcquisitionDate, c.TransferDate,
                     c.PreviousOwnerAcquisitionDate, c.CostOfAcquisition, c.PreviousOwnerCost, c.IndexedCost,
                     c.IsRuralAgriculturalLand, cgRules)))
-                .Where(x => !x.d.RuralExempt)   // rural agricultural land is exempt (s.2(14)) — excluded from the gain set
+                .Where(x => !x.d.RuralExempt && !x.c.ExemptUnderDtaa)   // exempt: rural agri (s.2(14)) / not chargeable per DTAA
                 .Where(x => x.c.SubType != CapitalGainSubType.Buyback)   // buy-backs handled below (deemed dividend + capital loss)
                 .Where(x => !lotIds.Contains(x.c.Id))                    // multi-lot holdings are expanded below
                 .Select(x =>

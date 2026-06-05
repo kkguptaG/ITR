@@ -55,6 +55,10 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     /// fully exempt and excluded from the computation. Urban agricultural land remains taxable (eligible for s.54B).</summary>
     public bool IsRuralAgriculturalLand { get; set; }
 
+    /// <summary>True ⇒ this gain is NOT chargeable to tax in India under a DTAA (tax treaty) — typically a
+    /// non-resident of a treaty country. Excluded from taxable gains (disclosed, but not taxed).</summary>
+    public bool ExemptUnderDtaa { get; set; }
+
     public decimal SalePrice { get; set; }
     public decimal CostOfAcquisition { get; set; }
     public decimal IndexedCost { get; set; }

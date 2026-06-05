@@ -42,6 +42,7 @@ function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
     previousOwnerAcquisitionDate: row.previousOwnerAcquisitionDate ?? '',
     previousOwnerCost: row.previousOwnerCost ?? 0,
     isRuralAgriculturalLand: row.isRuralAgriculturalLand ?? false,
+    exemptUnderDtaa: row.exemptUnderDtaa ?? false,
     salePrice: row.salePrice,
     costOfAcquisition: row.costOfAcquisition,
     costOfImprovement: row.costOfImprovement,
