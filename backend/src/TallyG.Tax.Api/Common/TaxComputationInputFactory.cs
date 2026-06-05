@@ -66,6 +66,22 @@ internal static class TaxComputationInputFactory
             cgRules = new CapitalGainRules();
         }
 
+        // Buy-back (s.115QA): from the cutoff the consideration is a DEEMED DIVIDEND (other sources) + a
+        // CAPITAL LOSS of the cost; before it the receipt is exempt (s.10(34A)). Resolve up-front so one row
+        // fans out across two income heads (and the exempt ones drop out entirely).
+        var buybacks = gains
+            .Where(c => c.SubType == CapitalGainSubType.Buyback)
+            .Select(c =>
+            {
+                var d = CapitalGainDerivation.Derive(
+                    c.AssetType, c.Term, c.AcquisitionMode, c.AcquisitionDate, c.TransferDate,
+                    c.PreviousOwnerAcquisitionDate, c.CostOfAcquisition, c.PreviousOwnerCost, c.IndexedCost,
+                    c.IsRuralAgriculturalLand, cgRules);
+                return (c, d, r: BuybackTreatment.Resolve(c.SalePrice, d.EffectiveCost, c.TransferDate, cgRules.BuybackCutoff));
+            })
+            .Where(x => !x.r.Exempt)
+            .ToList();
+
         return new TaxComputationInput
         {
             AssessmentYearCode = ayCode,
@@ -83,6 +99,7 @@ internal static class TaxComputationInputFactory
                     c.PreviousOwnerAcquisitionDate, c.CostOfAcquisition, c.PreviousOwnerCost, c.IndexedCost,
                     c.IsRuralAgriculturalLand, cgRules)))
                 .Where(x => !x.d.RuralExempt)   // rural agricultural land is exempt (s.2(14)) — excluded from the gain set
+                .Where(x => x.c.SubType != CapitalGainSubType.Buyback)   // buy-backs handled below (deemed dividend + capital loss)
                 .Select(x =>
                 {
                     // Joint ownership (s.45 r/w co-ownership): apportion the gain components to the assessee's
@@ -99,6 +116,10 @@ internal static class TaxComputationInputFactory
                 .Concat(deemedStcg > 0m
                     ? new[] { new CapitalGainInput(CapitalGainAssetType.Other, CapitalGainTerm.Short, null, deemedStcg, 0m, 0m, 0m, 0m, null, null) }
                     : Array.Empty<CapitalGainInput>())
+                // Buy-back (s.115QA) capital loss: NIL consideration against cost ⇒ a short/long-term capital loss.
+                .Concat(buybacks.Select(x => new CapitalGainInput(
+                    x.c.AssetType, x.d.Term, x.c.TaxSection, 0m, x.r.CapitalLoss, 0m, 0m, 0m,
+                    x.d.EffectiveAcquisitionDate, x.c.TransferDate)))
                 .ToList(),
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
@@ -113,6 +134,8 @@ internal static class TaxComputationInputFactory
                     .Where(e => e.Category == ExemptIncomeCategory.Agricultural && e.Amount > 0m)
                     .Select(e => new OtherIncomeInput(
                         string.IsNullOrWhiteSpace(e.Description) ? "Agricultural income" : e.Description, e.Amount, "agricultural")))
+                // Buy-back (s.115QA) deemed dividend (s.2(22)(f)) — taxed as Income from Other Sources (slab).
+                .Concat(buybacks.Select(x => new OtherIncomeInput("Share buy-back (s.2(22)(f))", x.r.DeemedDividend, "dividend")))
                 .ToList(),
             Deductions = BuildDeductionInputs(deductions, donations80G ?? Array.Empty<Donation80G>()),
             // Prepaid taxes + brought-forward losses captured on the return.

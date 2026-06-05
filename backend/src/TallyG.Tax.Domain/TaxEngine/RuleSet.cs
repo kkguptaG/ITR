@@ -336,6 +336,7 @@ public sealed class RuleSet
             Section54EcCap = GetDecimal(c, "section_54ec_cap") ?? 5000000m,
             GrandfatherDate112A = GetDateOnly(c, "grandfather_date_112a"),
             PropertyIndexationCutoff = GetDateOnly(c, "property_indexation_cutoff"),
+            BuybackCutoff = GetDateOnly(c, "buyback_cutoff"),
             HoldingMonths = holding,
         };
     }
@@ -570,6 +571,10 @@ public sealed class CapitalGainRules
 
     public DateOnly? GrandfatherDate112A { get; init; }
     public DateOnly? PropertyIndexationCutoff { get; init; }
+
+    /// <summary>Buy-back (s.115QA / s.2(22)(f)) deemed-dividend cutoff: on/after this date the buy-back is a
+    /// deemed dividend (other sources) + a capital loss; before it the receipt is exempt (s.10(34A)).</summary>
+    public DateOnly? BuybackCutoff { get; init; }
     public IReadOnlyDictionary<string, int> HoldingMonths { get; init; } = new Dictionary<string, int>();
 
     /// <summary>Cost Inflation Index (s.48), keyed by financial-year START year (2001 = FY2001-02 = base 100).</summary>

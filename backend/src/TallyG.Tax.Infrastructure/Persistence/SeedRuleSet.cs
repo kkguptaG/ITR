@@ -93,6 +93,7 @@ internal static class SeedRuleSet
         "crypto_115bbh_rate": 0.30,
         "grandfather_date_112a": "2018-01-31",
         "property_indexation_cutoff": "2024-07-23",
+        "buyback_cutoff": "2024-10-01",
         "holding_months": { "listed_equity": 12, "equity_mf": 12, "bonds": 12, "debt_mf": 24, "unlisted_shares": 24, "immovable_property": 24, "agricultural_land": 24, "gold": 24, "jewellery": 24, "other": 24 },
         "cost_inflation_index": { "2001": 100, "2002": 105, "2003": 109, "2004": 113, "2005": 117, "2006": 122, "2007": 129, "2008": 137, "2009": 148, "2010": 167, "2011": 184, "2012": 200, "2013": 220, "2014": 240, "2015": 254, "2016": 264, "2017": 272, "2018": 280, "2019": 289, "2020": 301, "2021": 317, "2022": 331, "2023": 348, "2024": 363 }
       },
@@ -215,6 +216,7 @@ internal static class SeedRuleSet
         "crypto_115bbh_rate": 0.30,
         "grandfather_date_112a": "2018-01-31",
         "property_indexation_cutoff": "2024-07-23",
+        "buyback_cutoff": "2024-10-01",
         "holding_months": { "listed_equity": 12, "equity_mf": 12, "bonds": 12, "debt_mf": 24, "unlisted_shares": 24, "immovable_property": 24, "agricultural_land": 24, "gold": 24, "jewellery": 24, "other": 24 },
         "cost_inflation_index": { "2001": 100, "2002": 105, "2003": 109, "2004": 113, "2005": 117, "2006": 122, "2007": 129, "2008": 137, "2009": 148, "2010": 167, "2011": 184, "2012": 200, "2013": 220, "2014": 240, "2015": 254, "2016": 264, "2017": 272, "2018": 280, "2019": 289, "2020": 301, "2021": 317, "2022": 331, "2023": 348, "2024": 363 }
       },

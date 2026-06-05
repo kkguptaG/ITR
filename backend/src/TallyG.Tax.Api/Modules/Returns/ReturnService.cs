@@ -1480,6 +1480,15 @@ public sealed class ReturnService : IReturnService
             return;
         }
 
+        // Share buy-back (s.115QA): pre-1-Oct-2024 is exempt (s.10(34A)); on/after, the consideration is a
+        // deemed dividend (taxed under Other Sources by the engine) and the cost shows as a capital loss.
+        if (c.SubType == CapitalGainSubType.Buyback)
+        {
+            var preCutoff = c.TransferDate is { } td && td < new DateOnly(2024, 10, 1);
+            c.Gain = preCutoff ? 0m : -Math.Max(0m, c.CostOfAcquisition);
+            return;
+        }
+
         // s.49(1) cost step-in: gifted / inherited / will assets take the previous owner's cost.
         var stepIn = c.AcquisitionMode is CapitalGainAcquisitionMode.Gift
             or CapitalGainAcquisitionMode.Inheritance
