@@ -42,6 +42,56 @@ public sealed record CapitalGainImportResult(
 
 public sealed record CapitalGainImportProfileDto(string Id, string DisplayName);
 
+/// <summary>Request to parse capital gains out of an already-extracted document (P5, AI-assisted parsing).</summary>
+public sealed record ParseCapitalGainDocumentRequest(Guid DocumentId, bool Commit = false);
+
+/// <summary>
+/// Maps a capital-gains-statement extraction (the canonical <c>capgain.*</c> fields produced by the
+/// document AI pipeline, each with a confidence) into import draft rows — reusing the same review/commit
+/// model as the CSV importer. Low-confidence figures are flagged so they can't auto-commit without a human
+/// look (docs/architecture/11, Layer 2C). Pure + deterministic.
+/// </summary>
+public static class CapitalGainDocumentParser
+{
+    public static IReadOnlyList<ImportedCgRow> ToRows(
+        IReadOnlyDictionary<string, (decimal Value, decimal Confidence)> fields,
+        decimal reviewThreshold = 0.92m)
+    {
+        var rows = new List<ImportedCgRow>();
+
+        void Add(string key, CapitalGainTerm term)
+        {
+            if (!fields.TryGetValue(key, out var f) || f.Value <= 0m)
+            {
+                return;
+            }
+
+            var errors = f.Confidence < reviewThreshold
+                ? new[] { $"Low extraction confidence ({f.Confidence:P0}) — verify before importing." }
+                : (IReadOnlyList<string>)Array.Empty<string>();
+
+            // Aggregate STT-paid equity gain figures: represent the gain as a sale with nil cost so the engine
+            // routes them to 111A (short) / 112A (long).
+            rows.Add(new ImportedCgRow(
+                Row: rows.Count + 1,
+                AssetType: CapitalGainAssetType.ListedEquity,
+                Term: term,
+                AcquisitionDate: null,
+                TransferDate: null,
+                SalePrice: f.Value,
+                CostOfAcquisition: 0m,
+                ExpensesOnTransfer: 0m,
+                Isin: null,
+                Duplicate: false,
+                Errors: errors));
+        }
+
+        Add("capgain.equity_stcg_111a", CapitalGainTerm.Short);
+        Add("capgain.equity_ltcg_112a", CapitalGainTerm.Long);
+        return rows;
+    }
+}
+
 /// <summary>A broker / statement format: which header names map to each logical column + the default asset class.</summary>
 public sealed record ImportProfile(
     string Id,

@@ -734,6 +734,109 @@ public sealed class ReturnService : IReturnService
         return TallyG.Tax.Domain.TaxEngine.CapitalGainInsightsEngine.Analyze(inputs);
     }
 
+    public async Task<CapitalGainImportResult> ParseCapitalGainDocumentAsync(Guid id, ParseCapitalGainDocumentRequest request, CancellationToken ct = default)
+    {
+        var ret = await LoadOwnedReturnAsync(id, ct);
+
+        var extraction = await _db.DocumentExtractions
+            .Where(e => e.DocumentId == request.DocumentId)
+            .OrderByDescending(e => e.CreatedAt)
+            .FirstOrDefaultAsync(ct)
+            ?? throw AppException.NotFound("No extraction found for that document — upload and scan it first.", "RETURN.CG_DOC_NOT_EXTRACTED");
+
+        var parsed = CapitalGainDocumentParser.ToRows(ExtractCapgainFields(extraction.FieldsJson));
+
+        // De-dupe against existing rows (same key as the CSV importer).
+        var existing = await _db.CapitalGains.Where(c => c.TaxReturnId == id)
+            .Select(c => new { c.AssetType, c.AcquisitionDate, c.TransferDate, c.SalePrice, c.CostOfAcquisition })
+            .ToListAsync(ct);
+        var seen = new HashSet<string>(existing.Select(e =>
+            CapitalGainCsvParser.DedupeKey(e.AssetType, e.AcquisitionDate, e.TransferDate, e.SalePrice, e.CostOfAcquisition)));
+
+        var rows = new List<ImportedCgRow>(parsed.Count);
+        foreach (var p in parsed)
+        {
+            var key = CapitalGainCsvParser.DedupeKey(p.AssetType, p.AcquisitionDate, p.TransferDate, p.SalePrice, p.CostOfAcquisition);
+            rows.Add(p with { Duplicate = !seen.Add(key) });
+        }
+
+        var imported = 0;
+        if (request.Commit)
+        {
+            EnsureMutable(ret);
+            foreach (var row in rows.Where(r => r.Ok))
+            {
+                var entity = new CapitalGain
+                {
+                    TenantId = ret.TenantId,
+                    TaxReturnId = ret.Id,
+                    AssetType = row.AssetType,
+                    Term = row.Term,
+                    AcquisitionDate = row.AcquisitionDate,
+                    TransferDate = row.TransferDate,
+                    SalePrice = row.SalePrice,
+                    CostOfAcquisition = row.CostOfAcquisition,
+                    ExpensesOnTransfer = row.ExpensesOnTransfer,
+                    Isin = string.IsNullOrWhiteSpace(row.Isin) ? null : row.Isin!.Trim(),
+                    CoOwnerPercent = 100m,
+                };
+                ApplyCapitalGainDerived(entity);
+                _db.CapitalGains.Add(entity);
+                imported++;
+            }
+
+            if (imported > 0)
+            {
+                await MarkInProgressAndSaveAsync(ret, ct);
+            }
+        }
+
+        return new CapitalGainImportResult("document", rows.Count, rows.Count(r => r.Ok),
+            rows.Count(r => r.Duplicate), rows.Count(r => r.Errors.Count > 0), imported, rows);
+    }
+
+    /// <summary>Pull the <c>capgain.*</c> figures (value + confidence) out of a DocumentExtraction.FieldsJson map.</summary>
+    private static Dictionary<string, (decimal Value, decimal Confidence)> ExtractCapgainFields(string fieldsJson)
+    {
+        var result = new Dictionary<string, (decimal, decimal)>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(fieldsJson))
+        {
+            return result;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(fieldsJson);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                return result;
+            }
+
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                if (!prop.Name.StartsWith("capgain.", StringComparison.Ordinal) || prop.Value.ValueKind != System.Text.Json.JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var valEl = prop.Value.TryGetProperty("value", out var v) ? v : default;
+                var confEl = prop.Value.TryGetProperty("confidence", out var c) ? c : default;
+                if (valEl.ValueKind == System.Text.Json.JsonValueKind.String
+                    && decimal.TryParse(valEl.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var value))
+                {
+                    var conf = confEl.ValueKind == System.Text.Json.JsonValueKind.Number ? confEl.GetDecimal() : 1m;
+                    result[prop.Name] = (value, conf);
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // A malformed extraction yields no rows rather than failing the request.
+        }
+
+        return result;
+    }
+
     // =========================================================== immovable-property buyers (s.194-IA)
 
     public async Task<IReadOnlyList<CapitalGainBuyerDto>> ListCapitalGainBuyersAsync(Guid id, Guid gainId, CancellationToken ct = default)
