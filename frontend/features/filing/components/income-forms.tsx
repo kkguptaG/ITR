@@ -433,6 +433,21 @@ function GrandfatherFmvLookup({ onPick }: { onPick: (fmv: number) => void }) {
   );
 }
 
+/** Sections offered in the multi-section "Exempt Capital Gain" chart. */
+const EXEMPTION_SECTIONS: { value: string; label: string }[] = [
+  { value: '54', label: '54 — residential house' },
+  { value: '54B', label: '54B — new agricultural land' },
+  { value: '54D', label: '54D — compulsory acq. (industrial)' },
+  { value: '54EC', label: '54EC — bonds (≤ ₹50L)' },
+  { value: '54ED', label: '54ED — listed securities' },
+  { value: '54EE', label: '54EE — start-up fund (≤ ₹50L)' },
+  { value: '54F', label: '54F — any asset (proportionate)' },
+  { value: '54G', label: '54G — shift industrial (non-urban)' },
+  { value: '54GA', label: '54GA — shift industrial (SEZ)' },
+  { value: '54GB', label: '54GB — start-up / SME equity' },
+  { value: '115F', label: '115F — NRI forex asset' },
+];
+
 export function CapitalGainForm({
   defaultValues,
   onSubmit,
@@ -453,12 +468,17 @@ export function CapitalGainForm({
       acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
       isRuralAgriculturalLand: false, exemptUnderDtaa: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
-      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], improvementDate: '',
+      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], exemptions: [], improvementDate: '',
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
   const lotsField = useFieldArray({ control, name: 'lots' });
   const useLots = lotsField.fields.length > 0;
+  const exemptionsField = useFieldArray({ control, name: 'exemptions' });
+  const totalReinvested = (watch('exemptions') ?? []).reduce(
+    (sum, r) => sum + (Number(r?.costOfNewAsset) || 0) + (Number(r?.cgasDeposit) || 0),
+    0,
+  );
 
   const assetType = watch('assetType');
   const acquisitionMode = watch('acquisitionMode');
@@ -635,6 +655,68 @@ export function CapitalGainForm({
                   </Select>
                 </Field>
                 <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54-series)" />
+
+                {/* Multi-section "Exempt Capital Gain" chart — shelter one gain under several sections at once. */}
+                <div className="sm:col-span-2 rounded-xl border border-money-200 bg-money-50/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-ink-800">Exempt Capital Gain — claim multiple sections</div>
+                    <button
+                      type="button"
+                      onClick={() => exemptionsField.append({ section: '54', costOfNewAsset: 0, cgasDeposit: 0, dateOfAcquisition: '' })}
+                      className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      + Add exemption
+                    </button>
+                  </div>
+                  {exemptionsField.fields.length === 0 ? (
+                    <p className="mt-1 text-xs text-ink-500">
+                      Claiming more than one exemption against this gain (e.g. part in a new house u/s 54 and part in
+                      s.54EC bonds)? Add rows — each is computed under its own section and capped at the gain.
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-3">
+                      {exemptionsField.fields.map((f, i) => (
+                        <div key={f.id} className="rounded-lg border border-ink-200 bg-white p-2">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Field label="Section">
+                              <Select {...register(`exemptions.${i}.section` as Path<CapitalGainFormValues>)}>
+                                {EXEMPTION_SECTIONS.map((s) => (
+                                  <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Date of acquisition of new asset">
+                              <Input type="date" {...register(`exemptions.${i}.dateOfAcquisition` as Path<CapitalGainFormValues>)} />
+                            </Field>
+                            <MoneyField control={control} name={`exemptions.${i}.costOfNewAsset` as Path<CapitalGainFormValues>} label="Cost of new asset" />
+                            <MoneyField control={control} name={`exemptions.${i}.cgasDeposit` as Path<CapitalGainFormValues>} label="Amount deposited in CGAS" />
+                          </div>
+                          <div className="mt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => exemptionsField.remove(i)}
+                              className="rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between border-t border-money-200 pt-2 text-sm">
+                        <span className="text-ink-500">Total reinvested across sections</span>
+                        <span className="font-semibold text-money-700 tabular-nums">
+                          {totalReinvested.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-ink-500">
+                        Chart rows <strong>supersede</strong> the single section above. Each exemption is computed per
+                        its section (proportionate for 54F/115F; ₹50L cap for 54EC/54EE) and the total can never
+                        exceed the gain.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <label className="flex items-center gap-2 text-sm text-ink-700 sm:col-span-2">
                   <input type="checkbox" {...register('exemptUnderDtaa')} className="h-4 w-4 rounded border-ink-300 text-brand-600" />
                   Not chargeable to tax in India under a DTAA (tax treaty)

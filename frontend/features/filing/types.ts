@@ -158,6 +158,14 @@ export interface CapitalGainLot {
   fairMarketValue31Jan2018: number;
 }
 
+/** One row of the multi-section "Exempt Capital Gain" chart. */
+export interface CapitalGainExemption {
+  section: string;
+  costOfNewAsset: number;
+  cgasDeposit: number;
+  dateOfAcquisition: string | null;
+}
+
 export interface CapitalGainDto {
   id: Guid;
   assetType: CapitalGainAssetType;
@@ -188,6 +196,7 @@ export interface CapitalGainDto {
   tdsSection: string | null;
   coOwnerPercent: number;
   lots: CapitalGainLot[];
+  exemptions: CapitalGainExemption[];
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
@@ -216,6 +225,7 @@ export interface UpsertCapitalGainRequest {
   tdsSection?: string | null;
   coOwnerPercent?: number;
   lots?: CapitalGainLot[];
+  exemptions?: CapitalGainExemption[];
 }
 
 // --- Bulk import (P4) ---

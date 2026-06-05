@@ -308,6 +308,12 @@ export function IncomeStep() {
                             cost: l.cost,
                             fairMarketValue31Jan2018: l.fairMarketValue31Jan2018,
                           })),
+                          exemptions: (item.exemptions ?? []).map((e) => ({
+                            section: e.section,
+                            costOfNewAsset: e.costOfNewAsset,
+                            cgasDeposit: e.cgasDeposit,
+                            dateOfAcquisition: e.dateOfAcquisition ?? '',
+                          })),
                         }
                       : undefined
                   }
@@ -323,6 +329,9 @@ export function IncomeStep() {
                       lots: (v.lots ?? [])
                         .filter((l) => (Number(l.quantity) || 0) > 0)
                         .map((l) => ({ ...l, acquisitionDate: l.acquisitionDate || null })),
+                      exemptions: (v.exemptions ?? [])
+                        .filter((e) => !!e.section)
+                        .map((e) => ({ ...e, dateOfAcquisition: e.dateOfAcquisition || null })),
                     };
                     const op = item
                       ? gains.updateMutation.mutateAsync({ id: item.id, body })

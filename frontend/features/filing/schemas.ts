@@ -155,6 +155,18 @@ export const capitalGainSchema = z.object({
     )
     .optional()
     .default([]),
+  // Multi-section "Exempt Capital Gain" chart — shelter one gain under several sections at once.
+  exemptions: z
+    .array(
+      z.object({
+        section: z.string().min(1, 'Pick a section'),
+        costOfNewAsset: optionalMoney,
+        cgasDeposit: optionalMoney,
+        dateOfAcquisition: z.string().optional().or(z.literal('')),
+      }),
+    )
+    .optional()
+    .default([]),
 });
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 
