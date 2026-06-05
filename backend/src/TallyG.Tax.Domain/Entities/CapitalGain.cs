@@ -29,6 +29,11 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     /// apportioned to this share before tax (each co-owner returns their own portion).</summary>
     public decimal CoOwnerPercent { get; set; } = 100m;
 
+    /// <summary>Optional multiple acquisition lots as JSON (<c>[{acquisitionDate, quantity, cost,
+    /// fairMarketValue31Jan2018}]</c>). When present the holding is computed lot-by-lot — each lot derives its
+    /// own term / s.48 indexation / s.112A grandfathering, and the sale value is split pro-rata by quantity.</summary>
+    public string? LotsJson { get; set; }
+
     /// <summary>e.g. "111A", "112A", "112", "115BBH".</summary>
     public string? TaxSection { get; set; }
 

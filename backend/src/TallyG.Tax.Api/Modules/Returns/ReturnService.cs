@@ -603,6 +603,7 @@ public sealed class ReturnService : IReturnService
             TdsOnSale = request.TdsOnSale,
             TdsSection = request.TdsSection?.Trim(),
             CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent,
+            LotsJson = SerializeCapitalGainLots(request.Lots),
         };
 
         ApplyCapitalGainDerived(entity);
@@ -642,6 +643,7 @@ public sealed class ReturnService : IReturnService
         entity.TdsOnSale = request.TdsOnSale;
         entity.TdsSection = request.TdsSection?.Trim();
         entity.CoOwnerPercent = request.CoOwnerPercent <= 0m ? 100m : request.CoOwnerPercent;
+        entity.LotsJson = SerializeCapitalGainLots(request.Lots);
 
         ApplyCapitalGainDerived(entity);
         await MarkInProgressAndSaveAsync(ret, ct);
@@ -1592,6 +1594,15 @@ public sealed class ReturnService : IReturnService
             return;
         }
 
+        // Multi-lot holding: display gain = sale − (sum of all lots' cost) − improvement − transfer expenses
+        // (the engine applies each lot's own indexation / grandfathering at compute time).
+        var lots = TallyG.Tax.Domain.TaxEngine.CapitalGainLots.Parse(c.LotsJson);
+        if (lots.Count > 0)
+        {
+            c.Gain = c.SalePrice - lots.Sum(l => l.Cost) - c.CostOfImprovement - c.ExpensesOnTransfer;
+            return;
+        }
+
         // s.49(1) cost step-in: gifted / inherited / will assets take the previous owner's cost.
         var stepIn = c.AcquisitionMode is CapitalGainAcquisitionMode.Gift
             or CapitalGainAcquisitionMode.Inheritance
@@ -1701,7 +1712,30 @@ public sealed class ReturnService : IReturnService
         c.CostOfAcquisition, c.IndexedCost, c.CostOfImprovement, c.ExpensesOnTransfer,
         c.ExemptionSection, c.ExemptionAmount, c.ReinvestmentAmount, c.Gain, c.Isin, c.FairMarketValue31Jan2018,
         c.AcquisitionMode, c.PreviousOwnerAcquisitionDate, c.PreviousOwnerCost, c.IsRuralAgriculturalLand,
-        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent);
+        c.SubType, c.SttPaid, c.TdsOnSale, c.TdsSection, c.CoOwnerPercent, DeserializeCapitalGainLots(c.LotsJson));
+
+    private static readonly System.Text.Json.JsonSerializerOptions CapitalGainLotJsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private static string? SerializeCapitalGainLots(IReadOnlyList<CapitalGainLotInput>? lots)
+        => lots is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(lots, CapitalGainLotJsonOptions) : null;
+
+    private static IReadOnlyList<CapitalGainLotInput> DeserializeCapitalGainLots(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<CapitalGainLotInput>();
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<CapitalGainLotInput>>(json, CapitalGainLotJsonOptions)
+                   ?? (IReadOnlyList<CapitalGainLotInput>)Array.Empty<CapitalGainLotInput>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return Array.Empty<CapitalGainLotInput>();
+        }
+    }
 
     private static BusinessIncomeDto ToBusinessDto(BusinessIncome b) => new(
         b.Id, b.NatureOfBusinessCode, b.AccountingMethod, b.IsPresumptive, b.PresumptiveSection,

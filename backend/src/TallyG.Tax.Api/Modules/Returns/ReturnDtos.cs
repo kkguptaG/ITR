@@ -186,6 +186,13 @@ public sealed record HousePropertyDto(
 
 // ----------------------------------------------------------------- capital gains
 
+/// <summary>One acquisition lot of a multi-lot holding (date / quantity / cost / 31-Jan-2018 FMV).</summary>
+public sealed record CapitalGainLotInput(
+    DateOnly? AcquisitionDate,
+    decimal Quantity,
+    decimal Cost,
+    decimal FairMarketValue31Jan2018 = 0m);
+
 public sealed record UpsertCapitalGainRequest(
     CapitalGainAssetType AssetType,
     CapitalGainTerm Term,
@@ -209,7 +216,8 @@ public sealed record UpsertCapitalGainRequest(
     bool SttPaid = false,
     decimal TdsOnSale = 0m,
     string? TdsSection = null,
-    decimal CoOwnerPercent = 100m);
+    decimal CoOwnerPercent = 100m,
+    IReadOnlyList<CapitalGainLotInput>? Lots = null);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -237,7 +245,8 @@ public sealed record CapitalGainDto(
     bool SttPaid,
     decimal TdsOnSale,
     string? TdsSection,
-    decimal CoOwnerPercent);
+    decimal CoOwnerPercent,
+    IReadOnlyList<CapitalGainLotInput> Lots);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

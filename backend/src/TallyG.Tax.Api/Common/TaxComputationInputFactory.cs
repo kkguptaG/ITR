@@ -82,6 +82,15 @@ internal static class TaxComputationInputFactory
             .Where(x => !x.r.Exempt)
             .ToList();
 
+        // Multi-lot holdings (each lot its own term / indexation / grandfathering) are expanded lot-by-lot
+        // instead of the single-row mapping. Buy-backs are excluded (handled above).
+        var lotGains = gains
+            .Where(c => c.SubType != CapitalGainSubType.Buyback)
+            .Select(c => (c, lots: CapitalGainLots.Parse(c.LotsJson)))
+            .Where(x => x.lots.Count > 0)
+            .ToList();
+        var lotIds = lotGains.Select(x => x.c.Id).ToHashSet();
+
         return new TaxComputationInput
         {
             AssessmentYearCode = ayCode,
@@ -100,6 +109,7 @@ internal static class TaxComputationInputFactory
                     c.IsRuralAgriculturalLand, cgRules)))
                 .Where(x => !x.d.RuralExempt)   // rural agricultural land is exempt (s.2(14)) — excluded from the gain set
                 .Where(x => x.c.SubType != CapitalGainSubType.Buyback)   // buy-backs handled below (deemed dividend + capital loss)
+                .Where(x => !lotIds.Contains(x.c.Id))                    // multi-lot holdings are expanded below
                 .Select(x =>
                 {
                     // Joint ownership (s.45 r/w co-ownership): apportion the gain components to the assessee's
@@ -120,6 +130,10 @@ internal static class TaxComputationInputFactory
                 .Concat(buybacks.Select(x => new CapitalGainInput(
                     x.c.AssetType, x.d.Term, x.c.TaxSection, 0m, x.r.CapitalLoss, 0m, 0m, 0m,
                     x.d.EffectiveAcquisitionDate, x.c.TransferDate)))
+                // Multi-lot holdings: one input per lot (sale split pro-rata; each lot's own term/indexation/grandfathering).
+                .Concat(lotGains.SelectMany(x => CapitalGainLots.Expand(
+                    x.c.AssetType, x.c.TaxSection, x.c.SalePrice, x.c.CostOfImprovement, x.c.ExpensesOnTransfer,
+                    x.c.TransferDate, x.lots, cgRules)))
                 .ToList(),
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
