@@ -19,6 +19,7 @@ import type {
   CapitalGainDto,
   CapitalGainImportRequest,
   CapitalGainImportResult,
+  ParseCapitalGainDocumentRequest,
   CgInsightsResult,
   CompleteUploadRequest,
   ComputeRequest,
@@ -151,6 +152,8 @@ export const importCapitalGains = (id: string, body: CapitalGainImportRequest) =
   apiPost<CapitalGainImportResult>(`/returns/${id}/capital-gains/import`, body);
 export const getCapitalGainInsights = (id: string) =>
   apiGet<CgInsightsResult>(`/returns/${id}/capital-gains/insights`);
+export const parseCapitalGainDocument = (id: string, body: ParseCapitalGainDocumentRequest) =>
+  apiPost<CapitalGainImportResult>(`/returns/${id}/capital-gains/parse-document`, body);
 
 // --------------------------------------------------------------- business income
 export const listBusinessIncomes = (id: string) =>

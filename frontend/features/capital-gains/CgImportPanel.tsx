@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { X, Upload, CheckCircle2, AlertCircle, Copy } from 'lucide-react';
+import { X, Upload, CheckCircle2, AlertCircle, Copy, FileText } from 'lucide-react';
 import { Button, Alert } from '@/components/ui';
 import { formatInr } from '@/lib/format';
-import { importCapitalGains } from '@/features/filing/api';
+import { importCapitalGains, parseCapitalGainDocument, listDocuments } from '@/features/filing/api';
 import type { CapitalGainImportResult } from '@/features/filing/types';
 
 const PROFILES = [
@@ -30,12 +31,23 @@ export function CgImportPanel({
   const [result, setResult] = useState<CapitalGainImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'csv' | 'document'>('csv');
+  const [documentId, setDocumentId] = useState('');
+
+  // Documents on this return that have been scanned (extracted) — candidates for AI parsing.
+  const docsQuery = useQuery({ queryKey: ['cg-import-docs', returnId], queryFn: () => listDocuments(returnId) });
+  const parseableDocs = (docsQuery.data?.items ?? []).filter(
+    (d) => (d.kind === 'CapitalGainStmt' || d.kind === 'AIS') && ['Extracted', 'NeedsReview', 'Verified'].includes(d.status),
+  );
 
   async function run(commit: boolean) {
     setBusy(true);
     setError(null);
     try {
-      const res = await importCapitalGains(returnId, { profileId, csv, commit });
+      const res =
+        mode === 'document'
+          ? await parseCapitalGainDocument(returnId, { documentId, commit })
+          : await importCapitalGains(returnId, { profileId, csv, commit });
       setResult(res);
       if (commit && res.importedRows > 0) onImported();
     } catch {
@@ -57,39 +69,91 @@ export function CgImportPanel({
       </div>
       <p className="text-xs text-ink-500">{t('importHelp')}</p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs font-medium text-ink-600">{t('importProfile')}</label>
-        <select
-          value={profileId}
-          onChange={(e) => {
-            setProfileId(e.target.value);
-            setResult(null);
-          }}
-          className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs text-ink-800"
-        >
-          {PROFILES.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+      {/* Source mode: paste a CSV, or AI-parse a scanned statement */}
+      <div className="inline-flex rounded-lg border border-ink-200 bg-ink-50 p-0.5 text-xs font-medium">
+        {(['csv', 'document'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => {
+              setMode(m);
+              setResult(null);
+            }}
+            className={mode === m ? 'rounded-md bg-white px-3 py-1 text-ink-900 shadow-sm' : 'rounded-md px-3 py-1 text-ink-500'}
+          >
+            {m === 'csv' ? t('importModeCsv') : t('importModeDoc')}
+          </button>
+        ))}
       </div>
 
-      <textarea
-        value={csv}
-        onChange={(e) => {
-          setCsv(e.target.value);
-          setResult(null);
-        }}
-        rows={6}
-        placeholder={t('importPlaceholder')}
-        className="w-full rounded-xl border border-ink-200 p-2.5 font-mono text-xs text-ink-800 placeholder:text-ink-400"
-      />
+      {mode === 'csv' ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs font-medium text-ink-600">{t('importProfile')}</label>
+            <select
+              value={profileId}
+              onChange={(e) => {
+                setProfileId(e.target.value);
+                setResult(null);
+              }}
+              className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs text-ink-800"
+            >
+              {PROFILES.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <textarea
+            value={csv}
+            onChange={(e) => {
+              setCsv(e.target.value);
+              setResult(null);
+            }}
+            rows={6}
+            placeholder={t('importPlaceholder')}
+            className="w-full rounded-xl border border-ink-200 p-2.5 font-mono text-xs text-ink-800 placeholder:text-ink-400"
+          />
+        </>
+      ) : (
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-ink-600">
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" /> {t('importDocLabel')}
+          </label>
+          {parseableDocs.length === 0 ? (
+            <p className="text-xs text-ink-500">{t('importNoDocs')}</p>
+          ) : (
+            <select
+              value={documentId}
+              onChange={(e) => {
+                setDocumentId(e.target.value);
+                setResult(null);
+              }}
+              className="w-full rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs text-ink-800"
+            >
+              <option value="">{t('importDocPick')}</option>
+              {parseableDocs.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.fileName}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-xs text-ink-400">{t('importDocHint')}</p>
+        </div>
+      )}
 
       {error ? <Alert variant="error">{error}</Alert> : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => void run(false)} loading={busy} disabled={!csv.trim()}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void run(false)}
+          loading={busy}
+          disabled={mode === 'csv' ? !csv.trim() : !documentId}
+        >
           <Copy className="h-4 w-4" aria-hidden="true" /> {t('importPreview')}
         </Button>
         {result && result.validRows > 0 ? (

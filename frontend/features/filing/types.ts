@@ -211,6 +211,10 @@ export interface CapitalGainImportRequest {
   csv: string;
   commit?: boolean;
 }
+export interface ParseCapitalGainDocumentRequest {
+  documentId: string;
+  commit?: boolean;
+}
 export interface ImportedCgRow {
   row: number;
   assetType: CapitalGainAssetType;
