@@ -82,6 +82,12 @@ public class CapitalGain : BaseEntity, ITenantScoped, ISoftDeletable
     /// <see cref="ReinvestmentAmount"/> above.</summary>
     public string? ExemptionsJson { get; set; }
 
+    /// <summary>Optional "Deemed Capital Gain" chart as JSON (<c>[{section, costOfNewAsset, cgasDeposit,
+    /// dateOfAcquisition, deemedIncome}]</c>) — the CLAWBACK of an earlier-year reinvestment exemption (new
+    /// asset sold within its lock-in, or CGAS deposit unutilised). Each deemed income is added as a long-term
+    /// gain (s.112) of the current year.</summary>
+    public string? DeemedGainsJson { get; set; }
+
     public decimal Gain { get; set; }
     public string? Isin { get; set; }
 

@@ -202,6 +202,16 @@ public sealed record CapitalGainExemptionInput(
     decimal CgasDeposit = 0m,
     DateOnly? DateOfAcquisition = null);
 
+/// <summary>One row of the "Deemed Capital Gain" chart (clawback of a prior-year exemption): the section, the
+/// earlier new-asset cost / CGAS deposit / acquisition date (disclosure), and the deemed income now chargeable
+/// — added as a long-term gain (s.112) of the current year.</summary>
+public sealed record CapitalGainDeemedInput(
+    string Section,
+    decimal CostOfNewAsset = 0m,
+    decimal CgasDeposit = 0m,
+    DateOnly? DateOfAcquisition = null,
+    decimal DeemedIncome = 0m);
+
 public sealed record UpsertCapitalGainRequest(
     CapitalGainAssetType AssetType,
     CapitalGainTerm Term,
@@ -229,7 +239,8 @@ public sealed record UpsertCapitalGainRequest(
     IReadOnlyList<CapitalGainLotInput>? Lots = null,
     DateOnly? ImprovementDate = null,
     bool ExemptUnderDtaa = false,
-    IReadOnlyList<CapitalGainExemptionInput>? Exemptions = null);
+    IReadOnlyList<CapitalGainExemptionInput>? Exemptions = null,
+    IReadOnlyList<CapitalGainDeemedInput>? DeemedGains = null);
 
 public sealed record CapitalGainDto(
     Guid Id,
@@ -261,7 +272,8 @@ public sealed record CapitalGainDto(
     IReadOnlyList<CapitalGainLotInput> Lots,
     DateOnly? ImprovementDate,
     bool ExemptUnderDtaa,
-    IReadOnlyList<CapitalGainExemptionInput> Exemptions);
+    IReadOnlyList<CapitalGainExemptionInput> Exemptions,
+    IReadOnlyList<CapitalGainDeemedInput> DeemedGains);
 
 // ----------------------------------------------------------------- immovable-property buyers (s.194-IA)
 

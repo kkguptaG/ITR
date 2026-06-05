@@ -300,4 +300,30 @@ public class CapitalGainDynamicTests
 
         r.Buckets.Ltcg112.Should().Be(0m);
     }
+
+    [Fact]
+    public void Deemed_capital_gain_is_taxed_as_a_long_term_s112_gain()
+    {
+        // A clawed-back exemption (new asset sold within lock-in / CGAS deposit unutilised) is a deemed LTCG of
+        // the year — the factory synthesises it as an Other / long-term / s.112 input of ₹5L.
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.Other, CapitalGainTerm.Long, "112",
+            SaleConsideration: 500_000m, CostOfAcquisition: 0m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null);
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(500_000m);
+    }
+
+    [Fact]
+    public void Deemed_gain_chart_parses_section_and_deemed_income()
+    {
+        var rows = CapitalGainDeemedGains.Parse(
+            "[{\"section\":\"54F\",\"costOfNewAsset\":1000000,\"cgasDeposit\":0,\"deemedIncome\":500000}]");
+
+        rows.Should().ContainSingle();
+        rows[0].Section.Should().Be("54F");
+        rows[0].DeemedIncome.Should().Be(500_000m);
+    }
 }

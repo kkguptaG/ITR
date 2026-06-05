@@ -131,6 +131,19 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
             e.RuleFor(r => r.CgasDeposit).GreaterThanOrEqualTo(0);
         });
 
+        // Deemed-capital-gain (clawback) chart: each row needs a valid section and non-negative amounts.
+        RuleForEach(x => x.DeemedGains).ChildRules(d =>
+        {
+            d.RuleFor(r => r.Section)
+                .NotEmpty().WithMessage("Each deemed-gain row needs a section.")
+                .Must(s => new[] { "54", "54B", "54D", "54EC", "54ED", "54EE", "54F", "54G", "54GA", "54GB", "115F" }
+                    .Contains((s ?? string.Empty).Trim().ToUpperInvariant()))
+                .WithMessage("Deemed-gain section must be one of 54, 54B, 54D, 54EC, 54ED, 54EE, 54F, 54G, 54GA, 54GB, 115F.");
+            d.RuleFor(r => r.CostOfNewAsset).GreaterThanOrEqualTo(0);
+            d.RuleFor(r => r.CgasDeposit).GreaterThanOrEqualTo(0);
+            d.RuleFor(r => r.DeemedIncome).GreaterThanOrEqualTo(0);
+        });
+
         RuleFor(x => x.TaxSection).MaximumLength(16);
         RuleFor(x => x.Isin).MaximumLength(20);
 

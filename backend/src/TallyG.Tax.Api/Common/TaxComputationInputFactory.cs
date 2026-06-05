@@ -158,6 +158,13 @@ internal static class TaxComputationInputFactory
                 .Concat(lotGains.SelectMany(x => CapitalGainLots.Expand(
                     x.c.AssetType, x.c.TaxSection, x.c.SalePrice, x.c.CostOfImprovement, x.c.ExpensesOnTransfer,
                     x.c.TransferDate, x.lots, cgRules)))
+                // Deemed capital gains (s.54(2)/54B(2)/54EC… clawback of a prior-year exemption): each deemed
+                // income is taxed as a LONG-term gain (s.112) of the current year, independent of the row's sale.
+                .Concat(gains.SelectMany(c => CapitalGainDeemedGains.Parse(c.DeemedGainsJson))
+                    .Where(d => d.DeemedIncome > 0m)
+                    .Select(d => new CapitalGainInput(
+                        CapitalGainAssetType.Other, CapitalGainTerm.Long, "112",
+                        d.DeemedIncome, 0m, 0m, 0m, 0m, null, null)))
                 .ToList(),
             BusinessIncomes = businesses.Select(b => new BusinessIncomeInput(
                 b.IsPresumptive, b.PresumptiveSection, b.Turnover, b.GrossReceiptsDigital, b.GrossReceiptsCash,
