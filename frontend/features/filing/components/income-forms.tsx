@@ -468,7 +468,7 @@ export function CapitalGainForm({
       acquisitionDate: '', transferDate: '', previousOwnerAcquisitionDate: '', previousOwnerCost: 0,
       isRuralAgriculturalLand: false, exemptUnderDtaa: false,
       salePrice: 0, costOfAcquisition: 0, costOfImprovement: 0, expensesOnTransfer: 0, exemptionAmount: 0,
-      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], exemptions: [], improvementDate: '',
+      exemptionSection: '', reinvestmentAmount: 0, fairMarketValue31Jan2018: 0, lots: [], exemptions: [], deemedGains: [], improvementDate: '',
       ...defaultValues,
     } as DefaultValues<CapitalGainFormValues>,
   });
@@ -479,6 +479,8 @@ export function CapitalGainForm({
     (sum, r) => sum + (Number(r?.costOfNewAsset) || 0) + (Number(r?.cgasDeposit) || 0),
     0,
   );
+  const deemedField = useFieldArray({ control, name: 'deemedGains' });
+  const totalDeemed = (watch('deemedGains') ?? []).reduce((sum, r) => sum + (Number(r?.deemedIncome) || 0), 0);
 
   const assetType = watch('assetType');
   const acquisitionMode = watch('acquisitionMode');
@@ -712,6 +714,67 @@ export function CapitalGainForm({
                         Chart rows <strong>supersede</strong> the single section above. Each exemption is computed per
                         its section (proportionate for 54F/115F; ₹50L cap for 54EC/54EE) and the total can never
                         exceed the gain.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* "Deemed Capital Gain" chart — clawback of a prior-year exemption (taxed as LTCG this year). */}
+                <div className="sm:col-span-2 rounded-xl border border-payable-200 bg-payable-50/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-ink-800">Deemed Capital Gain — clawback of earlier exemptions</div>
+                    <button
+                      type="button"
+                      onClick={() => deemedField.append({ section: '54', costOfNewAsset: 0, cgasDeposit: 0, dateOfAcquisition: '', deemedIncome: 0 })}
+                      className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      + Add deemed gain
+                    </button>
+                  </div>
+                  {deemedField.fields.length === 0 ? (
+                    <p className="mt-1 text-xs text-ink-500">
+                      Sold the new asset within its lock-in, or left a Capital Gains Account Scheme deposit
+                      unutilised? The earlier-exempt gain is taxed this year (s.54(2) / 54F(4) …) — add it here and
+                      it&apos;s added to your long-term capital gains.
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-3">
+                      {deemedField.fields.map((f, i) => (
+                        <div key={f.id} className="rounded-lg border border-ink-200 bg-white p-2">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Field label="Section">
+                              <Select {...register(`deemedGains.${i}.section` as Path<CapitalGainFormValues>)}>
+                                {EXEMPTION_SECTIONS.map((s) => (
+                                  <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Date of acquisition of new asset">
+                              <Input type="date" {...register(`deemedGains.${i}.dateOfAcquisition` as Path<CapitalGainFormValues>)} />
+                            </Field>
+                            <MoneyField control={control} name={`deemedGains.${i}.costOfNewAsset` as Path<CapitalGainFormValues>} label="Cost of new asset" />
+                            <MoneyField control={control} name={`deemedGains.${i}.cgasDeposit` as Path<CapitalGainFormValues>} label="Amount deposited in CGAS" />
+                            <MoneyField control={control} name={`deemedGains.${i}.deemedIncome` as Path<CapitalGainFormValues>} label="Deemed income (taxable now)" />
+                          </div>
+                          <div className="mt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => deemedField.remove(i)}
+                              className="rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between border-t border-payable-200 pt-2 text-sm">
+                        <span className="text-ink-500">Total deemed income (added to LTCG)</span>
+                        <span className="font-semibold text-payable-700 tabular-nums">
+                          {totalDeemed.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-ink-500">
+                        Each deemed income is taxed as a long-term capital gain (s.112) of the current year.
                       </p>
                     </div>
                   )}

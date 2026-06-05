@@ -167,6 +167,19 @@ export const capitalGainSchema = z.object({
     )
     .optional()
     .default([]),
+  // "Deemed Capital Gain" chart — clawback of a prior-year exemption (added to income, not subtracted).
+  deemedGains: z
+    .array(
+      z.object({
+        section: z.string().min(1, 'Pick a section'),
+        costOfNewAsset: optionalMoney,
+        cgasDeposit: optionalMoney,
+        dateOfAcquisition: z.string().optional().or(z.literal('')),
+        deemedIncome: optionalMoney,
+      }),
+    )
+    .optional()
+    .default([]),
 });
 export type CapitalGainFormValues = z.infer<typeof capitalGainSchema>;
 

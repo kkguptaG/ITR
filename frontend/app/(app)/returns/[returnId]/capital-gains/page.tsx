@@ -64,6 +64,13 @@ function toDefaults(row: CapitalGainDto): Partial<CapitalGainFormValues> {
       cgasDeposit: e.cgasDeposit,
       dateOfAcquisition: e.dateOfAcquisition ?? '',
     })),
+    deemedGains: (row.deemedGains ?? []).map((e) => ({
+      section: e.section,
+      costOfNewAsset: e.costOfNewAsset,
+      cgasDeposit: e.cgasDeposit,
+      dateOfAcquisition: e.dateOfAcquisition ?? '',
+      deemedIncome: e.deemedIncome,
+    })),
   };
 }
 
@@ -135,6 +142,9 @@ export default function CapitalGainsHubPage({ params }: { params: { returnId: st
           .filter((l) => (Number(l.quantity) || 0) > 0)
           .map((l) => ({ ...l, acquisitionDate: l.acquisitionDate || null })),
         exemptions: (v.exemptions ?? [])
+          .filter((e) => !!e.section)
+          .map((e) => ({ ...e, dateOfAcquisition: e.dateOfAcquisition || null })),
+        deemedGains: (v.deemedGains ?? [])
           .filter((e) => !!e.section)
           .map((e) => ({ ...e, dateOfAcquisition: e.dateOfAcquisition || null })),
       };

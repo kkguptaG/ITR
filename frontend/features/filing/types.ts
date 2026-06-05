@@ -166,6 +166,15 @@ export interface CapitalGainExemption {
   dateOfAcquisition: string | null;
 }
 
+/** One row of the "Deemed Capital Gain" chart (clawback of a prior-year exemption). */
+export interface CapitalGainDeemed {
+  section: string;
+  costOfNewAsset: number;
+  cgasDeposit: number;
+  dateOfAcquisition: string | null;
+  deemedIncome: number;
+}
+
 export interface CapitalGainDto {
   id: Guid;
   assetType: CapitalGainAssetType;
@@ -197,6 +206,7 @@ export interface CapitalGainDto {
   coOwnerPercent: number;
   lots: CapitalGainLot[];
   exemptions: CapitalGainExemption[];
+  deemedGains: CapitalGainDeemed[];
 }
 export interface UpsertCapitalGainRequest {
   assetType: CapitalGainAssetType;
@@ -226,6 +236,7 @@ export interface UpsertCapitalGainRequest {
   coOwnerPercent?: number;
   lots?: CapitalGainLot[];
   exemptions?: CapitalGainExemption[];
+  deemedGains?: CapitalGainDeemed[];
 }
 
 // --- Bulk import (P4) ---

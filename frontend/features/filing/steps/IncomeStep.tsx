@@ -314,6 +314,13 @@ export function IncomeStep() {
                             cgasDeposit: e.cgasDeposit,
                             dateOfAcquisition: e.dateOfAcquisition ?? '',
                           })),
+                          deemedGains: (item.deemedGains ?? []).map((e) => ({
+                            section: e.section,
+                            costOfNewAsset: e.costOfNewAsset,
+                            cgasDeposit: e.cgasDeposit,
+                            dateOfAcquisition: e.dateOfAcquisition ?? '',
+                            deemedIncome: e.deemedIncome,
+                          })),
                         }
                       : undefined
                   }
@@ -330,6 +337,9 @@ export function IncomeStep() {
                         .filter((l) => (Number(l.quantity) || 0) > 0)
                         .map((l) => ({ ...l, acquisitionDate: l.acquisitionDate || null })),
                       exemptions: (v.exemptions ?? [])
+                        .filter((e) => !!e.section)
+                        .map((e) => ({ ...e, dateOfAcquisition: e.dateOfAcquisition || null })),
+                      deemedGains: (v.deemedGains ?? [])
                         .filter((e) => !!e.section)
                         .map((e) => ({ ...e, dateOfAcquisition: e.dateOfAcquisition || null })),
                     };
