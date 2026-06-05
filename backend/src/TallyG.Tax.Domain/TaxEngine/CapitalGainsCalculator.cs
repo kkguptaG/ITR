@@ -234,10 +234,12 @@ public static class CapitalGainsCalculator
             case "54":
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
             case "54D":
+            case "54ED":
             case "54G":
             case "54GA":
-                // Compulsory acquisition of industrial land/building (54D) / shifting an industrial undertaking
-                // out of an urban area (54G) or to a SEZ (54GA): the gain reinvested in the new asset is exempt.
+                // Compulsory acquisition of industrial land/building (54D) / certain listed securities (54ED) /
+                // shifting an industrial undertaking out of an urban area (54G) or to a SEZ (54GA): the gain
+                // reinvested in the new asset is exempt.
                 return Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount));
             case "54EE":
                 // LTCG invested in units of a notified long-term specified (start-up) fund — capped at ₹50L
@@ -268,7 +270,10 @@ public static class CapitalGainsCalculator
 
                 return Math.Min(Math.Min(gain, TaxMath.NonNegative(g.ReinvestmentAmount)), rules.Section54EcCap);
             case "54F":
+            case "115F":
             {
+                // s.54F (any LTCG asset → residential house) and s.115F (NRI: LTCG on a foreign-exchange asset
+                // → specified asset) are both PROPORTIONATE to the net consideration reinvested.
                 var netConsideration = TaxMath.NonNegative(g.SaleConsideration - g.ExpensesOnTransfer);
                 if (netConsideration <= 0m || g.ReinvestmentAmount <= 0m)
                 {

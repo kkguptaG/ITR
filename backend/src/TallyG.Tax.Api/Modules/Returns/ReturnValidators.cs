@@ -116,8 +116,8 @@ public sealed class UpsertCapitalGainRequestValidator : AbstractValidator<Upsert
             RuleFor(x => x.SubType!.Value).IsInEnum().WithMessage("Unknown asset sub-type."));
         RuleFor(x => x.ExemptionSection)
             .Must(s => string.IsNullOrWhiteSpace(s)
-                || new[] { "54", "54B", "54D", "54EC", "54EE", "54F", "54G", "54GA", "54GB" }.Contains(s.Trim().ToUpperInvariant()))
-            .WithMessage("Exemption section must be one of 54, 54B, 54D, 54EC, 54EE, 54F, 54G, 54GA, 54GB.");
+                || new[] { "54", "54B", "54D", "54EC", "54ED", "54EE", "54F", "54G", "54GA", "54GB", "115F" }.Contains(s.Trim().ToUpperInvariant()))
+            .WithMessage("Exemption section must be one of 54, 54B, 54D, 54EC, 54ED, 54EE, 54F, 54G, 54GA, 54GB, 115F.");
         RuleFor(x => x.TaxSection).MaximumLength(16);
         RuleFor(x => x.Isin).MaximumLength(20);
 

@@ -245,4 +245,19 @@ public class CapitalGainDynamicTests
 
         r.Buckets.Ltcg112.Should().Be(200_000m); // 12L gain − 10L reinvested
     }
+
+    [Fact]
+    public void Section_115F_gives_a_proportionate_NRI_reinvestment_exemption()
+    {
+        // NRI LTCG ₹8L (sale 20L − cost 12L); ₹10L of the ₹20L net consideration reinvested = 50% → ₹4L exempt.
+        var input = new CapitalGainInput(
+            CapitalGainAssetType.UnlistedShares, CapitalGainTerm.Long, "112",
+            SaleConsideration: 2_000_000m, CostOfAcquisition: 1_200_000m, CostOfImprovement: 0m,
+            ExpensesOnTransfer: 0m, ExemptionAmount: 0m, AcquisitionDate: null, TransferDate: null,
+            ExemptionSection: "115F", ReinvestmentAmount: 1_000_000m);
+
+        var r = CapitalGainsCalculator.Compute(new[] { input }, Rules);
+
+        r.Buckets.Ltcg112.Should().Be(400_000m);
+    }
 }

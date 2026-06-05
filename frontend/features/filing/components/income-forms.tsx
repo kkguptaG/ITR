@@ -625,11 +625,13 @@ export function CapitalGainForm({
                     {isAgriLand ? <option value="54B">54B — new agricultural land</option> : null}
                     <option value="54F">54F — any asset (proportionate)</option>
                     <option value="54EC">54EC — bonds (≤ ₹50L)</option>
+                    <option value="54ED">54ED — certain listed securities</option>
                     <option value="54EE">54EE — start-up fund (≤ ₹50L)</option>
                     {assetType === 'ImmovableProperty' ? <option value="54D">54D — compulsory acquisition (industrial)</option> : null}
                     <option value="54G">54G — shift industrial undertaking (non-urban)</option>
                     <option value="54GA">54GA — shift industrial undertaking (SEZ)</option>
                     {assetType === 'ImmovableProperty' ? <option value="54GB">54GB — start-up / SME equity</option> : null}
+                    <option value="115F">115F — NRI foreign-exchange asset</option>
                   </Select>
                 </Field>
                 <MoneyField control={control} name="reinvestmentAmount" label="Amount reinvested (54-series)" />
